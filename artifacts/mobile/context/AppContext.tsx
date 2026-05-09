@@ -126,14 +126,18 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     );
     clearTimeout(tid);
     const d = await r.json();
-    const road = d.address?.road || "";
+    const road = d.address?.road || d.address?.pedestrian || d.address?.path || "";
+    const houseNumber = d.address?.house_number || "";
+    const postcode = d.address?.postcode || "";
     const city =
       d.address?.city ||
       d.address?.town ||
       d.address?.village ||
       d.address?.suburb ||
       "";
-    return [road, city].filter(Boolean).join(", ") || `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    const street = houseNumber ? `${road} ${houseNumber}`.trim() : road;
+    const locality = [postcode, city].filter(Boolean).join(" ");
+    return [street, locality].filter(Boolean).join(", ") || `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
   } catch {
     return `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
   }
