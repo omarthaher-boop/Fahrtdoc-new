@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "kR-ib0RnnYvfn8znCVRMT"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "drivelog app icon"

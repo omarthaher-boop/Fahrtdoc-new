@@ -1,0 +1,380 @@
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import React, { useMemo, useState } from "react";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ActiveTripBanner from "@/components/ActiveTripBanner";
+import StatCard from "@/components/StatCard";
+import TripCard from "@/components/TripCard";
+import { useApp } from "@/context/AppContext";
+import { useColors } from "@/hooks/useColors";
+
+const fmtDur = (s: number) => {
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}min` : `${m} min`;
+};
+
+type Period = 1 | 3 | 6 | 12;
+const PERIOD_LABELS: Record<Period, string> = {
+  1: "1 Mon.",
+  3: "3 Mon.",
+  6: "6 Mon.",
+  12: "Dieses Jahr",
+};
+
+export default function HomeScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { user, trips, activeTrip, startTrip, gpsStatus } = useApp();
+  const [period, setPeriod] = useState<Period>(3);
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
+  const [starting, setStarting] = useState(false);
+
+  const cutoff = useMemo(() => {
+    const d = new Date();
+    if (period === 12) return new Date(d.getFullYear(), 0, 1);
+    d.setMonth(d.getMonth() - period);
+    return d;
+  }, [period]);
+
+  const periodTrips = useMemo(
+    () => trips.filter((t) => new Date(t.date) >= cutoff),
+    [trips, cutoff]
+  );
+
+  const totalKm = useMemo(() => periodTrips.reduce((a, b) => a + b.km, 0), [periodTrips]);
+  const totalDur = useMemo(() => periodTrips.reduce((a, b) => a + b.dur, 0), [periodTrips]);
+  const businessCount = useMemo(() => periodTrips.filter((t) => t.type === "business").length, [periodTrips]);
+  const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
+  const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
+
+  const openStartModal = (type: "business" | "private") => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setPendingType(type);
+    setShowStartModal(true);
+  };
+
+  const confirmStart = async () => {
+    if (!pendingType) return;
+    setStarting(true);
+    setShowStartModal(false);
+    await startTrip(pendingType);
+    setStarting(false);
+    setPendingType(null);
+  };
+
+  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View>
+          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Hallo,</Text>
+          <Text style={[styles.userName, { color: colors.foreground }]}>
+            {user?.name?.split(" ")[0] ?? "Fahrer"}
+          </Text>
+        </View>
+        <View style={[styles.plateBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Feather name="truck" size={12} color={colors.primary} />
+          <Text style={[styles.plateText, { color: colors.sub }]}>{user?.plate ?? "—"}</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Active trip */}
+        {activeTrip && <ActiveTripBanner />}
+
+        {/* Quick Start */}
+        {!activeTrip && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Schnellstart</Text>
+            <View style={styles.quickRow}>
+              <TouchableOpacity
+                style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => openStartModal("business")}
+                disabled={starting}
+                testID="start-business"
+              >
+                <View style={[styles.quickIcon, { backgroundColor: colors.accent }]}>
+                  <Feather name="briefcase" size={22} color={colors.primary} />
+                </View>
+                <Text style={[styles.quickLabel, { color: colors.foreground }]}>Geschäftsreise</Text>
+                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>Arbeit & Dienst</Text>
+                <Feather name="arrow-right" size={16} color={colors.primary} style={styles.quickArrow} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => openStartModal("private")}
+                disabled={starting}
+                testID="start-private"
+              >
+                <View style={[styles.quickIcon, { backgroundColor: colors.successLight }]}>
+                  <Feather name="user" size={22} color={colors.success} />
+                </View>
+                <Text style={[styles.quickLabel, { color: colors.foreground }]}>Private Fahrt</Text>
+                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>Persönlich</Text>
+                <Feather name="arrow-right" size={16} color={colors.success} style={styles.quickArrow} />
+              </TouchableOpacity>
+            </View>
+            {gpsStatus === "denied" && (
+              <View style={[styles.gpsBanner, { backgroundColor: colors.warningLight ?? "#FFF8E7", borderColor: colors.warning ?? "#FFB703" }]}>
+                <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
+                <Text style={[styles.gpsBannerText, { color: colors.warning ?? "#FFB703" }]}>
+                  GPS blockiert – Simulation aktiv
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Period filter */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Statistiken</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
+            {([1, 3, 6, 12] as Period[]).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: period === p ? colors.primary : colors.secondary,
+                    borderColor: period === p ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setPeriod(p)}
+              >
+                <Text style={[styles.pillText, { color: period === p ? "#FFFFFF" : colors.mutedForeground }]}>
+                  {PERIOD_LABELS[p]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Stats grid */}
+          <View style={styles.statsGrid}>
+            <StatCard label="Gesamt km" value={totalKm.toFixed(0)} unit="km" accent={colors.primary} />
+            <StatCard label="Fahrten" value={String(periodTrips.length)} accent={colors.success} />
+          </View>
+          <View style={[styles.statsGrid, { marginTop: 10 }]}>
+            <StatCard label="Fahrzeit" value={fmtDur(totalDur)} mini accent={colors.primary} />
+            <StatCard label="Geschäftl." value={businessCount + " Fahrten"} mini accent={colors.primary} />
+            <StatCard label="Privat" value={privateCount + " Fahrten"} mini accent={colors.success} />
+          </View>
+
+          {/* Distribution bar */}
+          {periodTrips.length > 0 && (
+            <View style={[styles.distCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.distLabel, { color: colors.mutedForeground }]}>Zweckverteilung</Text>
+              <View style={[styles.distBar, { backgroundColor: colors.border }]}>
+                {businessCount > 0 && (
+                  <View style={[styles.distSegment, { flex: businessCount, backgroundColor: colors.primary }]}>
+                    {businessCount / periodTrips.length > 0.15 && (
+                      <Text style={styles.distPct}>{Math.round((businessCount / periodTrips.length) * 100)}%</Text>
+                    )}
+                  </View>
+                )}
+                {privateCount > 0 && (
+                  <View style={[styles.distSegment, { flex: privateCount, backgroundColor: colors.success }]}>
+                    {privateCount / periodTrips.length > 0.15 && (
+                      <Text style={styles.distPct}>{Math.round((privateCount / periodTrips.length) * 100)}%</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+              <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.legendText, { color: colors.sub }]}>Geschäftl. {businessKm.toFixed(0)} km</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+                  <Text style={[styles.legendText, { color: colors.sub }]}>
+                    Privat {periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0).toFixed(0)} km
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Recent trips */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Letzte Fahrten</Text>
+          {periodTrips.length === 0 ? (
+            <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Feather name="map" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                Keine Fahrten in diesem Zeitraum
+              </Text>
+            </View>
+          ) : (
+            periodTrips.slice(0, 3).map((t) => <TripCard key={t.id} trip={t} />)
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Start Trip Confirm Modal */}
+      <Modal visible={showStartModal} transparent animationType="fade">
+        <Pressable style={styles.overlay} onPress={() => setShowStartModal(false)}>
+          <Pressable style={[styles.modal, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.modalIcon, { backgroundColor: pendingType === "business" ? colors.accent : colors.successLight }]}>
+              <Feather
+                name={pendingType === "business" ? "briefcase" : "user"}
+                size={28}
+                color={pendingType === "business" ? colors.primary : colors.success}
+              />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+              {pendingType === "business" ? "Geschäftsreise" : "Private Fahrt"} starten?
+            </Text>
+            <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+              GPS wird aktiviert und die Strecke automatisch aufgezeichnet.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalBtn, { backgroundColor: pendingType === "business" ? colors.primary : colors.success }]}
+              onPress={confirmStart}
+              testID="confirm-start"
+            >
+              <Feather name="play" size={16} color="#FFFFFF" />
+              <Text style={styles.modalBtnText}>Fahrt starten</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowStartModal(false)}>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  greeting: { fontSize: 13, fontWeight: "500" },
+  userName: { fontSize: 22, fontWeight: "800", letterSpacing: -0.3 },
+  plateBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  plateText: { fontSize: 13, fontWeight: "700" },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 17, fontWeight: "800", marginBottom: 12, letterSpacing: -0.2 },
+  quickRow: { flexDirection: "row", gap: 12 },
+  quickBtn: {
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 16,
+    gap: 8,
+  },
+  quickIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  quickLabel: { fontSize: 14, fontWeight: "700" },
+  quickSub: { fontSize: 12 },
+  quickArrow: { alignSelf: "flex-end" },
+  gpsBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  gpsBannerText: { fontSize: 12, fontWeight: "600" },
+  pillScroll: { marginBottom: 14 },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  pillText: { fontSize: 13, fontWeight: "600" },
+  statsGrid: { flexDirection: "row", gap: 12 },
+  distCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 12,
+    gap: 12,
+  },
+  distLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.7 },
+  distBar: { height: 28, borderRadius: 8, flexDirection: "row", overflow: "hidden" },
+  distSegment: { alignItems: "center", justifyContent: "center" },
+  distPct: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  legendRow: { flexDirection: "row", gap: 16 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 3 },
+  legendText: { fontSize: 12 },
+  empty: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 32,
+    alignItems: "center",
+    gap: 10,
+  },
+  emptyText: { fontSize: 14, textAlign: "center" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modal: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 28,
+    alignItems: "center",
+    gap: 12,
+  },
+  modalIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  modalTitle: { fontSize: 20, fontWeight: "800", textAlign: "center" },
+  modalSub: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  modalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    marginTop: 8,
+    width: "100%",
+    justifyContent: "center",
+  },
+  modalBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  modalCancel: { fontSize: 14, fontWeight: "500", padding: 8 },
+});
