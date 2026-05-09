@@ -1,14 +1,16 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,50 +20,83 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
-const fmtDur = (s: number) => {
-  if (s < 60) return `${s}s`;
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m}min` : `${m} min`;
-};
+const APP_VERSION = "v1.0.0";
+const PREF_DEFAULT_TRIP = "pref_default_trip_type";
+const PREF_APP_LOCK = "pref_app_lock";
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" });
+type TripType = "business" | "private";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateProfile, trips } = useApp();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(user?.name ?? "");
-  const [plate, setPlate] = useState(user?.plate ?? "");
+  const { user, logout, updateProfile, updatePassword, isSynced } = useApp();
 
-  const totalKm = trips.reduce((a, b) => a + b.km, 0);
-  const totalDur = trips.reduce((a, b) => a + b.dur, 0);
-  const businessTrips = trips.filter((t) => t.type === "business");
-  const businessKm = businessTrips.reduce((a, b) => a + b.km, 0);
+  const [defaultTripType, setDefaultTripType] = useState<TripType>("business");
+  const [appLock, setAppLock] = useState(false);
 
-  const handleSave = async () => {
-    if (!name.trim() || !plate.trim()) return;
-    await updateProfile(name.trim(), plate.trim().toUpperCase());
-    setEditing(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState(user?.name ?? "");
+  const [editPlate, setEditPlate] = useState(user?.plate ?? "");
+
+  const [pwModalVisible, setPwModalVisible] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(PREF_DEFAULT_TRIP).then((v) => {
+      if (v === "business" || v === "private") setDefaultTripType(v);
+    });
+    AsyncStorage.getItem(PREF_APP_LOCK).then((v) => {
+      if (v === "true") setAppLock(true);
+    });
+  }, []);
+
+  const handleDefaultTripType = async (t: TripType) => {
+    setDefaultTripType(t);
+    await AsyncStorage.setItem(PREF_DEFAULT_TRIP, t);
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+  };
+
+  const handleAppLock = async (val: boolean) => {
+    setAppLock(val);
+    await AsyncStorage.setItem(PREF_APP_LOCK, val ? "true" : "false");
+  };
+
+  const handleOpenEdit = () => {
+    setEditName(user?.name ?? "");
+    setEditPlate(user?.plate ?? "");
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim() || !editPlate.trim()) return;
+    await updateProfile(editName.trim(), editPlate.trim().toUpperCase());
+    setEditModalVisible(false);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleExportEmail = () => {
-    const total = trips.reduce((a, b) => a + b.km, 0);
-    const dur = trips.reduce((a, b) => a + b.dur, 0);
-    const body = trips
-      .slice(0, 50)
-      .map((t) => `${fmtDate(t.date)} | ${t.startAddr} → ${t.endAddr} | ${t.km.toFixed(1)}km | ${fmtDur(t.dur)} | ${t.type === "business" ? "Geschäftlich" : "Privat"}`)
-      .join("\n");
-    const text = `DriveLog Fahrtenbuch\nFahrer: ${user?.name}\nKennzeichen: ${user?.plate}\n\n${body}\n\nGesamt: ${total.toFixed(1)} km · ${fmtDur(dur)}`;
-
-    if (Platform.OS === "web") {
-      const mailto = `mailto:?subject=${encodeURIComponent("DriveLog Fahrtenbuch")}&body=${encodeURIComponent(text)}`;
-      window.open(mailto);
-    } else {
-      Share.share({ message: text, title: "DriveLog Fahrtenbuch" });
+  const handleSavePassword = async () => {
+    if (!pwNew.trim() || pwNew !== pwConfirm) {
+      Alert.alert("Fehler", "Passwörter stimmen nicht überein.");
+      return;
+    }
+    if (pwNew.length < 6) {
+      Alert.alert("Fehler", "Passwort muss mindestens 6 Zeichen lang sein.");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await updatePassword(user!.email, pwNew);
+      setPwModalVisible(false);
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Passwort geändert", "Dein Passwort wurde erfolgreich aktualisiert.");
+    } catch {
+      Alert.alert("Fehler", "Passwort konnte nicht geändert werden.");
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -80,90 +115,181 @@ export default function ProfileScreen() {
     }
   };
 
+  const showComingSoon = () =>
+    Alert.alert("Demnächst", "Diese Funktion wird in einer zukünftigen Version verfügbar sein.");
+
+  const initials = (user?.name ?? "?")
+    .split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
+
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
+  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 100);
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Fixed header */}
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profil</Text>
+        <TouchableOpacity onPress={showComingSoon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="settings" size={22} color={colors.foreground} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={{ paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Profil</Text>
-          <TouchableOpacity
-            style={[styles.editBtn, { backgroundColor: editing ? colors.primary : colors.secondary, borderColor: editing ? colors.primary : colors.border }]}
-            onPress={() => editing ? handleSave() : setEditing(true)}
-          >
-            <Feather name={editing ? "check" : "edit-2"} size={15} color={editing ? "#FFFFFF" : colors.foreground} />
-            <Text style={[styles.editBtnText, { color: editing ? "#FFFFFF" : colors.foreground }]}>
-              {editing ? "Speichern" : "Bearbeiten"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.content}>
 
-        <View style={{ padding: 16, gap: 16 }}>
-          {/* Avatar + info */}
-          <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.avatarText}>
-                {(user?.name ?? "F").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-              </Text>
-            </View>
-            {!editing ? (
-              <View style={styles.profileInfo}>
+          {/* Profile card */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.profileRow}>
+              <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <View style={styles.profileMeta}>
                 <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.name}</Text>
                 <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>{user?.email}</Text>
-                <View style={[styles.plateBadge, { backgroundColor: colors.accent }]}>
-                  <Feather name="truck" size={12} color={colors.primary} />
-                  <Text style={[styles.plateText, { color: colors.primary }]}>{user?.plate}</Text>
-                </View>
               </View>
-            ) : (
-              <View style={[styles.profileInfo, { gap: 10 }]}>
-                <EditField label="Name" value={name} onChangeText={setName} icon="user" colors={colors} />
-                <EditField label="Kennzeichen" value={plate} onChangeText={(t) => setPlate(t.toUpperCase())} icon="truck" autoCapitalize="characters" colors={colors} />
-                <Text style={[styles.emailNote, { color: colors.mutedForeground }]}>
-                  E-Mail: {user?.email}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Stats */}
-          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Meine Statistiken</Text>
-            <View style={styles.statsGrid}>
-              <StatItem label="Gesamt km" value={totalKm.toFixed(0)} unit="km" color={colors.primary} colors={colors} />
-              <StatItem label="Fahrten" value={String(trips.length)} color={colors.success} colors={colors} />
-              <StatItem label="Geschäftl. km" value={businessKm.toFixed(0)} unit="km" color={colors.primary} colors={colors} />
-              <StatItem label="Fahrzeit" value={fmtDur(totalDur)} color={colors.success} colors={colors} />
             </View>
-          </View>
-
-          {/* Export */}
-          <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Export</Text>
             <TouchableOpacity
-              style={[styles.actionRow, { borderBottomColor: colors.border }]}
-              onPress={handleExportEmail}
+              style={[styles.editProfileBtn, { borderColor: colors.primary }]}
+              onPress={handleOpenEdit}
             >
-              <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
-                <Feather name="mail" size={18} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.actionLabel, { color: colors.foreground }]}>Per E-Mail teilen</Text>
-                <Text style={[styles.actionSub, { color: colors.mutedForeground }]}>Alle {trips.length} Fahrten exportieren</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              <Feather name="edit-2" size={15} color={colors.primary} />
+              <Text style={[styles.editProfileBtnText, { color: colors.primary }]}>Profil bearbeiten</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Logout */}
+          {/* Info bar */}
+          <View style={[styles.infoBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.infoCell, { borderRightColor: colors.border }]}>
+              <Feather name="credit-card" size={16} color={colors.mutedForeground} />
+              <Text style={[styles.infoCellLabel, { color: colors.mutedForeground }]}>Kennzeichen</Text>
+              <Text style={[styles.infoCellValue, { color: colors.foreground }]}>{user?.plate || "–"}</Text>
+            </View>
+            <View style={[styles.infoCell, { borderRightColor: colors.border }]}>
+              <Feather name="award" size={16} color={colors.warning} />
+              <Text style={[styles.infoCellLabel, { color: colors.mutedForeground }]}>Konto</Text>
+              <Text style={[styles.infoCellValue, { color: colors.foreground, fontWeight: "700" }]}>Standard</Text>
+            </View>
+            <View style={styles.infoCell}>
+              <Feather name="check-circle" size={16} color={isSynced ? colors.success : colors.mutedForeground} />
+              <Text style={[styles.infoCellLabel, { color: colors.mutedForeground }]}>Sync-Status</Text>
+              <Text style={[styles.infoCellValue, { color: isSynced ? colors.success : colors.mutedForeground }]}>
+                {isSynced ? "Synchronisiert" : "Offline"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Konto */}
+          <SectionHeader label="Konto" colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ListRow
+              icon="user" label="Persönliche Daten"
+              onPress={handleOpenEdit} colors={colors} showDivider
+            />
+            <ListRow
+              icon="navigation" label="Fahrprofil & Fahrzeugdaten"
+              onPress={showComingSoon} colors={colors}
+            />
+          </View>
+
+          {/* Einstellungen */}
+          <SectionHeader label="Einstellungen" colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ListRow
+              icon="bell" label="Benachrichtigungen"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            {/* Standard-Fahrtart segmented */}
+            <View style={[styles.listRow, styles.divider, { borderBottomColor: colors.border }]}>
+              <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+                <Feather name="navigation" size={17} color={colors.primary} />
+              </View>
+              <Text style={[styles.listLabel, { color: colors.foreground }]}>Standard-Fahrtart</Text>
+              <View style={[styles.segmented, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.segBtn,
+                    defaultTripType === "business" && { backgroundColor: colors.primary, borderRadius: 8 },
+                  ]}
+                  onPress={() => handleDefaultTripType("business")}
+                >
+                  <Text style={[styles.segBtnText, { color: defaultTripType === "business" ? "#fff" : colors.mutedForeground }]}>
+                    Geschäftlich
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.segBtn,
+                    defaultTripType === "private" && { backgroundColor: colors.primary, borderRadius: 8 },
+                  ]}
+                  onPress={() => handleDefaultTripType("private")}
+                >
+                  <Text style={[styles.segBtnText, { color: defaultTripType === "private" ? "#fff" : colors.mutedForeground }]}>
+                    Privat
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <ListRow
+              icon="globe" label="Sprache" value="Deutsch"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            <ListRow
+              icon="sun" label="Design" value="Hell"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            <ListRow
+              icon="file-text" label="PDF / Export"
+              onPress={showComingSoon} colors={colors}
+            />
+          </View>
+
+          {/* Sicherheit & Datenschutz */}
+          <SectionHeader label="Sicherheit & Datenschutz" colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ListRow
+              icon="lock" label="Passwort ändern"
+              onPress={() => setPwModalVisible(true)} colors={colors} showDivider
+            />
+            <ListRow
+              icon="shield" label="Datenschutz"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            {/* App-Sperre / Face ID */}
+            <View style={styles.listRow}>
+              <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+                <Feather name="aperture" size={17} color={colors.primary} />
+              </View>
+              <Text style={[styles.listLabel, { color: colors.foreground, flex: 1 }]}>Face ID / App-Sperre</Text>
+              <Switch
+                value={appLock}
+                onValueChange={handleAppLock}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
+          {/* Support */}
+          <SectionHeader label="Support" colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ListRow
+              icon="help-circle" label="Hilfe & FAQ"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            <ListRow
+              icon="mail" label="Kontakt"
+              onPress={showComingSoon} colors={colors} showDivider
+            />
+            <ListRow
+              icon="info" label="App-Version" value={APP_VERSION}
+              colors={colors}
+            />
+          </View>
+
+          {/* Abmelden */}
           <TouchableOpacity
             style={[styles.logoutBtn, { backgroundColor: colors.card, borderColor: colors.destructive }]}
             onPress={handleLogout}
@@ -172,41 +298,134 @@ export default function ProfileScreen() {
             <Feather name="log-out" size={18} color={colors.destructive} />
             <Text style={[styles.logoutText, { color: colors.destructive }]}>Abmelden</Text>
           </TouchableOpacity>
+
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
 
-function StatItem({ label, value, unit, color, colors }: { label: string; value: string; unit?: string; color: string; colors: ReturnType<typeof useColors> }) {
-  return (
-    <View style={[styles.statItem, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.statValue, { color: color }]}>
-        {value}{unit ? ` ${unit}` : ""}
-      </Text>
+      {/* Edit Profile Modal */}
+      <Modal visible={editModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView
+          style={[styles.modalScreen, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Profil bearbeiten</Text>
+            <TouchableOpacity onPress={handleSaveProfile}>
+              <Text style={[styles.modalSave, { color: colors.primary }]}>Speichern</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <ModalField
+              label="Name" value={editName} onChangeText={setEditName}
+              icon="user" placeholder="Max Mustermann" colors={colors}
+            />
+            <ModalField
+              label="Kennzeichen" value={editPlate}
+              onChangeText={(t) => setEditPlate(t.toUpperCase())}
+              icon="credit-card" placeholder="B-MM1234"
+              autoCapitalize="characters" colors={colors}
+            />
+            <View style={[styles.infoNote, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+              <Feather name="mail" size={14} color={colors.primary} />
+              <Text style={[styles.infoNoteText, { color: colors.primary }]}>E-Mail: {user?.email}</Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal visible={pwModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView
+          style={[styles.modalScreen, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => { setPwModalVisible(false); setPwCurrent(""); setPwNew(""); setPwConfirm(""); }}>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Passwort ändern</Text>
+            <TouchableOpacity onPress={handleSavePassword} disabled={pwLoading}>
+              <Text style={[styles.modalSave, { color: pwLoading ? colors.mutedForeground : colors.primary }]}>
+                {pwLoading ? "…" : "Speichern"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <ModalField
+              label="Neues Passwort" value={pwNew} onChangeText={setPwNew}
+              icon="lock" placeholder="Mindestens 6 Zeichen"
+              secureTextEntry colors={colors}
+            />
+            <ModalField
+              label="Passwort bestätigen" value={pwConfirm} onChangeText={setPwConfirm}
+              icon="lock" placeholder="Passwort wiederholen"
+              secureTextEntry colors={colors}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
-function EditField({ label, value, onChangeText, icon, keyboardType, autoCapitalize, colors }: {
-  label: string; value: string; onChangeText: (t: string) => void; icon: string;
-  keyboardType?: "email-address" | "default"; autoCapitalize?: "none" | "characters" | "sentences";
+function SectionHeader({ label, colors }: { label: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>{label}</Text>
+  );
+}
+
+function ListRow({
+  icon, label, value, onPress, colors, showDivider,
+}: {
+  icon: string;
+  label: string;
+  value?: string;
+  onPress?: () => void;
   colors: ReturnType<typeof useColors>;
+  showDivider?: boolean;
 }) {
   return (
-    <View>
-      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-        <Feather name={icon as never} size={15} color={colors.mutedForeground} />
+    <TouchableOpacity
+      style={[styles.listRow, showDivider && styles.divider, { borderBottomColor: colors.border }]}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.6 : 1}
+    >
+      <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+        <Feather name={icon as never} size={17} color={colors.primary} />
+      </View>
+      <Text style={[styles.listLabel, { color: colors.foreground, flex: 1 }]}>{label}</Text>
+      {value !== undefined && (
+        <Text style={[styles.listValue, { color: colors.mutedForeground }]}>{value}</Text>
+      )}
+      {onPress && <Feather name="chevron-right" size={17} color={colors.mutedForeground} style={{ marginLeft: 4 }} />}
+    </TouchableOpacity>
+  );
+}
+
+function ModalField({
+  label, value, onChangeText, icon, placeholder, autoCapitalize, secureTextEntry, colors,
+}: {
+  label: string; value: string; onChangeText: (t: string) => void;
+  icon: string; placeholder?: string; autoCapitalize?: "none" | "characters" | "sentences";
+  secureTextEntry?: boolean; colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={styles.modalField}>
+      <Text style={[styles.modalFieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <View style={[styles.modalInputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Feather name={icon as never} size={16} color={colors.mutedForeground} />
         <TextInput
-          style={[styles.input, { color: colors.foreground }]}
+          style={[styles.modalInput, { color: colors.foreground }]}
           value={value}
           onChangeText={onChangeText}
-          keyboardType={keyboardType ?? "default"}
+          placeholder={placeholder}
+          placeholderTextColor={colors.mutedForeground}
           autoCapitalize={autoCapitalize ?? "sentences"}
           autoCorrect={false}
-          placeholderTextColor={colors.mutedForeground}
+          secureTextEntry={secureTextEntry}
         />
       </View>
     </View>
@@ -218,96 +437,90 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingBottom: 14,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
-  editBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
+  headerTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
+  content: { padding: 16, gap: 8 },
+
+  card: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 18, gap: 14 },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  avatar: { width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontSize: 21, fontWeight: "800" },
+  profileMeta: { flex: 1 },
+  profileName: { fontSize: 17, fontWeight: "700" },
+  profileEmail: { fontSize: 13, marginTop: 2 },
+  editProfileBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, borderRadius: 10, borderWidth: 1.2,
+    paddingVertical: 10,
   },
-  editBtnText: { fontSize: 14, fontWeight: "600" },
-  profileCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 16,
+  editProfileBtnText: { fontSize: 14, fontWeight: "600" },
+
+  infoBar: {
+    borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row", overflow: "hidden",
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+  infoCell: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingVertical: 14, gap: 3,
+    borderRightWidth: StyleSheet.hairlineWidth,
   },
-  avatarText: { color: "#FFFFFF", fontSize: 22, fontWeight: "800" },
-  profileInfo: { flex: 1 },
-  profileName: { fontSize: 18, fontWeight: "700" },
-  profileEmail: { fontSize: 14, marginTop: 2 },
-  plateBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginTop: 8,
+  infoCellLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  infoCellValue: { fontSize: 13, fontWeight: "600" },
+
+  sectionHeader: {
+    fontSize: 13, fontWeight: "600",
+    textTransform: "uppercase", letterSpacing: 0.5,
+    marginTop: 8, marginBottom: 2, marginLeft: 4,
   },
-  plateText: { fontSize: 13, fontWeight: "700" },
-  emailNote: { fontSize: 12, marginTop: 2 },
-  statsCard: { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14 },
-  cardTitle: { fontSize: 16, fontWeight: "700" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  statItem: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    minWidth: "45%",
-    flex: 1,
+  listCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  listRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
-  statLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
-  statValue: { fontSize: 18, fontWeight: "800" },
-  actionsCard: { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14 },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth },
+  listIconWrap: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  listLabel: { fontSize: 15 },
+  listValue: { fontSize: 14 },
+
+  segmented: {
+    flexDirection: "row", borderRadius: 10, borderWidth: 1,
+    padding: 3, gap: 2,
   },
-  actionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  actionLabel: { fontSize: 14, fontWeight: "600" },
-  actionSub: { fontSize: 12, marginTop: 2 },
+  segBtn: { paddingHorizontal: 12, paddingVertical: 6 },
+  segBtnText: { fontSize: 13, fontWeight: "600" },
+
   logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    padding: 16,
+    marginTop: 8, flexDirection: "row", alignItems: "center",
+    justifyContent: "center", gap: 10,
+    borderRadius: 16, borderWidth: 1.5, padding: 16,
   },
   logoutText: { fontSize: 15, fontWeight: "700" },
-  fieldLabel: { fontSize: 11, fontWeight: "600", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.4 },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
+
+  modalScreen: { flex: 1 },
+  modalHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 18, paddingTop: 56, paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  input: { flex: 1, fontSize: 14 },
+  modalTitle: { fontSize: 16, fontWeight: "700" },
+  modalCancel: { fontSize: 15 },
+  modalSave: { fontSize: 15, fontWeight: "600" },
+  modalContent: { padding: 20, gap: 16 },
+  modalField: { gap: 6 },
+  modalFieldLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  modalInputRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  modalInput: { flex: 1, fontSize: 15 },
+  infoNote: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    padding: 12, borderRadius: 10, borderWidth: 1,
+  },
+  infoNoteText: { fontSize: 13 },
 });

@@ -63,6 +63,7 @@ interface SessionRecord {
 interface AppContextType {
   user: UserProfile | null;
   loading: boolean;
+  isSynced: boolean;
   logout: () => Promise<void>;
   login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
@@ -854,6 +855,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         loading,
+        isSynced: serverToken !== null,
         logout,
         login,
         register,
