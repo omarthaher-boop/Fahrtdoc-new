@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Linking,
   Platform,
   ScrollView,
@@ -114,7 +115,8 @@ export default function HistoryScreen() {
     () => filtered.filter((t) => selectedIds.has(t.id)),
     [filtered, selectedIds]
   );
-  const displayTrips = selectionMode && selectedIds.size > 0 ? selectedTrips : filtered;
+  // In selection mode: use checked trips (even if empty). Outside selection mode: use all filtered trips.
+  const displayTrips = selectionMode ? selectedTrips : filtered;
 
   const statsKm = useMemo(() => displayTrips.reduce((a, b) => a + b.km, 0), [displayTrips]);
   const statsDur = useMemo(() => displayTrips.reduce((a, b) => a + b.dur, 0), [displayTrips]);
@@ -159,6 +161,10 @@ export default function HistoryScreen() {
   // --- Export handlers ---
   const handleEmailExport = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (selectionMode && selectedIds.size === 0) {
+      Alert.alert("Keine Fahrten ausgewählt", "Bitte wähle mindestens eine Fahrt aus oder verlasse den Auswahlmodus.");
+      return;
+    }
     const toExport = displayTrips;
     const lines = toExport.map(
       (t) =>
@@ -184,6 +190,10 @@ export default function HistoryScreen() {
 
   const handleExportPDF = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (selectionMode && selectedIds.size === 0) {
+      Alert.alert("Keine Fahrten ausgewählt", "Bitte wähle mindestens eine Fahrt aus oder verlasse den Auswahlmodus.");
+      return;
+    }
     await exportPDF(displayTrips, user, dateFrom, dateTo);
   };
 
