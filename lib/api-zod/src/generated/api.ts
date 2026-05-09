@@ -14,3 +14,125 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Register a new user
+ */
+export const RegisterUserBody = zod.object({
+  email: zod.string(),
+  name: zod.string(),
+  plate: zod.string(),
+  password: zod.string(),
+});
+
+/**
+ * @summary Log in with email and password
+ */
+export const LoginUserBody = zod.object({
+  email: zod.string(),
+  password: zod.string(),
+});
+
+export const LoginUserResponse = zod.object({
+  token: zod.string(),
+  email: zod.string(),
+  name: zod.string(),
+  plate: zod.string(),
+});
+
+/**
+ * @summary List all trips for the authenticated user
+ */
+export const ListTripsResponseItem = zod.object({
+  id: zod.string(),
+  date: zod.string(),
+  startAddr: zod.string(),
+  endAddr: zod.string(),
+  km: zod.number(),
+  dur: zod.number(),
+  type: zod.enum(["business", "private"]),
+  edited: zod.boolean().nullish(),
+  deleted: zod.boolean(),
+});
+export const ListTripsResponse = zod.array(ListTripsResponseItem);
+
+/**
+ * @summary Create a new trip
+ */
+export const CreateTripBody = zod.object({
+  id: zod.string(),
+  date: zod.string(),
+  startAddr: zod.string(),
+  endAddr: zod.string(),
+  km: zod.number(),
+  dur: zod.number(),
+  type: zod.enum(["business", "private"]),
+  edited: zod.boolean().nullish(),
+});
+
+/**
+ * @summary Upsert multiple trips at once (for initial sync)
+ */
+export const BatchUpsertTripsBody = zod.object({
+  trips: zod.array(
+    zod.object({
+      id: zod.string(),
+      date: zod.string(),
+      startAddr: zod.string(),
+      endAddr: zod.string(),
+      km: zod.number(),
+      dur: zod.number(),
+      type: zod.enum(["business", "private"]),
+      edited: zod.boolean().nullish(),
+    }),
+  ),
+});
+
+export const BatchUpsertTripsResponseItem = zod.object({
+  id: zod.string(),
+  date: zod.string(),
+  startAddr: zod.string(),
+  endAddr: zod.string(),
+  km: zod.number(),
+  dur: zod.number(),
+  type: zod.enum(["business", "private"]),
+  edited: zod.boolean().nullish(),
+  deleted: zod.boolean(),
+});
+export const BatchUpsertTripsResponse = zod.array(BatchUpsertTripsResponseItem);
+
+/**
+ * @summary Update a trip
+ */
+export const UpdateTripParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const UpdateTripBody = zod.object({
+  date: zod.string().optional(),
+  startAddr: zod.string().optional(),
+  endAddr: zod.string().optional(),
+  km: zod.number().optional(),
+  dur: zod.number().optional(),
+  type: zod.enum(["business", "private"]).optional(),
+  edited: zod.boolean().nullish(),
+});
+
+export const UpdateTripResponse = zod.object({
+  id: zod.string(),
+  date: zod.string(),
+  startAddr: zod.string(),
+  endAddr: zod.string(),
+  km: zod.number(),
+  dur: zod.number(),
+  type: zod.enum(["business", "private"]),
+  edited: zod.boolean().nullish(),
+  deleted: zod.boolean(),
+});
+
+/**
+ * @summary Delete a trip
+ */
+export const DeleteTripParams = zod.object({
+  id: zod.coerce.string(),
+});

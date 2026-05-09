@@ -27,6 +27,25 @@ interface ResetPasswordResponse {
   error?: string;
 }
 
+export interface ApiTrip {
+  id: string;
+  date: string;
+  startAddr: string;
+  endAddr: string;
+  km: number;
+  dur: number;
+  type: "business" | "private";
+  edited?: boolean | null;
+  deleted?: boolean;
+}
+
+export interface AuthResult {
+  token: string;
+  email: string;
+  name: string;
+  plate: string;
+}
+
 export async function requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
   const res = await fetch(`${API_BASE}/auth/forgot-password`, {
     method: "POST",
@@ -47,4 +66,100 @@ export async function confirmPasswordReset(
     body: JSON.stringify({ email, code, newPassword }),
   });
   return res.json();
+}
+
+export async function serverRegister(
+  email: string,
+  name: string,
+  plate: string,
+  password: string
+): Promise<AuthResult | null> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name, plate, password }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function serverLogin(email: string, password: string): Promise<AuthResult | null> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchServerTrips(token: string): Promise<ApiTrip[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function serverCreateTrip(token: string, trip: ApiTrip): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/trips`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(trip),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function serverUpdateTrip(token: string, id: string, changes: Partial<ApiTrip>): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(changes),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function serverDeleteTrip(token: string, id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}
+
+export async function serverBatchUpsertTrips(token: string, trips: ApiTrip[]): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/trips/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ trips }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

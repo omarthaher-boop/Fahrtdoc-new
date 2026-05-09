@@ -8,3 +8,88 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface UserRegistration {
+  email: string;
+  name: string;
+  plate: string;
+  password: string;
+}
+
+export interface UserCredentials {
+  email: string;
+  password: string;
+}
+
+export interface AuthResult {
+  token: string;
+  email: string;
+  name: string;
+  plate: string;
+}
+
+export type TripType = (typeof TripType)[keyof typeof TripType];
+
+export const TripType = {
+  business: "business",
+  private: "private",
+} as const;
+
+export interface Trip {
+  id: string;
+  date: string;
+  startAddr: string;
+  endAddr: string;
+  km: number;
+  dur: number;
+  type: TripType;
+  /** @nullable */
+  edited?: boolean | null;
+  deleted: boolean;
+}
+
+export type TripInputType = (typeof TripInputType)[keyof typeof TripInputType];
+
+export const TripInputType = {
+  business: "business",
+  private: "private",
+} as const;
+
+export interface TripInput {
+  id: string;
+  date: string;
+  startAddr: string;
+  endAddr: string;
+  km: number;
+  dur: number;
+  type: TripInputType;
+  /** @nullable */
+  edited?: boolean | null;
+}
+
+export type TripUpdateType =
+  (typeof TripUpdateType)[keyof typeof TripUpdateType];
+
+export const TripUpdateType = {
+  business: "business",
+  private: "private",
+} as const;
+
+export interface TripUpdate {
+  date?: string;
+  startAddr?: string;
+  endAddr?: string;
+  km?: number;
+  dur?: number;
+  type?: TripUpdateType;
+  /** @nullable */
+  edited?: boolean | null;
+}
+
+export interface TripBatch {
+  trips: TripInput[];
+}

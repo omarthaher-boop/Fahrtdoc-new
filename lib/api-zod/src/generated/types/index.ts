@@ -6,4 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./authResult";
+export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./trip";
+export * from "./tripBatch";
+export * from "./tripInput";
+export * from "./tripInputType";
+export * from "./tripType";
+export * from "./tripUpdate";
+export * from "./tripUpdateType";
+export * from "./userCredentials";
+export * from "./userRegistration";
