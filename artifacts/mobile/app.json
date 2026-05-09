@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Fahrtdoc",
+    "name": "FahrtDoc",
     "slug": "fahrtdoc",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,9 +38,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Fahrtdoc benötigt deinen Standort, um Fahrten zu erfassen.",
-          "locationWhenInUsePermission": "Fahrtdoc benötigt deinen Standort, um Fahrten zu erfassen.",
-          "locationAlwaysPermission": "Fahrtdoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
+          "locationAlwaysAndWhenInUsePermission": "FahrtDoc benötigt deinen Standort, um Fahrten zu erfassen.",
+          "locationWhenInUsePermission": "FahrtDoc benötigt deinen Standort, um Fahrten zu erfassen.",
+          "locationAlwaysPermission": "FahrtDoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }

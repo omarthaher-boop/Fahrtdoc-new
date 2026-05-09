@@ -62,7 +62,7 @@ function buildHTML(
   const logoHtml = user?.logoUri
     ? `<img src="${user.logoUri}" style="max-height:48px; max-width:160px; object-fit:contain; display:block; margin-bottom:6px;" alt="Logo" />`
     : "";
-  const headerLabel = user?.companyName ? user.companyName : "Fahrtdoc";
+  const headerLabel = user?.companyName ? user.companyName : "FahrtDoc";
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -209,7 +209,7 @@ async function exportPDFWeb(
   doc.setFillColor(...navy);
   doc.setDrawColor(...navy);
 
-  const brandLabel = user?.companyName || "Fahrtdoc";
+  const brandLabel = user?.companyName || "FahrtDoc";
 
   if (user?.logoUri) {
     try {

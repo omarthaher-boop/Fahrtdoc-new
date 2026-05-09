@@ -170,9 +170,9 @@ export default function HistoryScreen() {
       (t) =>
         `${new Date(t.date).toLocaleDateString("de-DE")}  |  ${t.type === "business" ? "Geschäftl." : "Privat"}  |  ${t.startAddr} → ${t.endAddr}  |  ${t.km.toFixed(1)} km  |  ${fmtDur(t.dur)}`
     );
-    const subject = `Fahrtdoc Fahrtenbuch – ${toExport.length} Fahrten (${statsKm.toFixed(1)} km)`;
+    const subject = `FahrtDoc Fahrtenbuch – ${toExport.length} Fahrten (${statsKm.toFixed(1)} km)`;
     const body = [
-      "Fahrtdoc Fahrtenbuch",
+      "FahrtDoc Fahrtenbuch",
       "=".repeat(40),
       `${toExport.length} Fahrten · ${statsKm.toFixed(1)} km gesamt`,
       "",
@@ -182,7 +182,7 @@ export default function HistoryScreen() {
       "-".repeat(90),
       `Gesamt: ${statsKm.toFixed(1)} km · ${fmtDur(statsDur)}`,
       "",
-      `Exportiert mit Fahrtdoc am ${new Date().toLocaleDateString("de-DE")}`,
+      `Exportiert mit FahrtDoc am ${new Date().toLocaleDateString("de-DE")}`,
     ].join("\n");
     const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     await Linking.openURL(mailto);

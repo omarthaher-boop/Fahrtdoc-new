@@ -740,7 +740,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               timeInterval: 2000,
               distanceInterval: 5,
               foregroundService: {
-                notificationTitle: "Fahrtdoc",
+                notificationTitle: "FahrtDoc",
                 notificationBody: "Fahrt wird aufgezeichnet …",
                 notificationColor: "#0070D8",
               },

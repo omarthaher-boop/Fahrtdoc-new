@@ -6,7 +6,7 @@ const {
   SMTP_PORT,
   SMTP_USER,
   SMTP_PASS,
-  SMTP_FROM = "Fahrtdoc <noreply@fahrtdoc.app>",
+  SMTP_FROM = "FahrtDoc <noreply@fahrtdoc.app>",
 } = process.env;
 
 const hasSmtp = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS);
@@ -32,12 +32,12 @@ export async function sendPasswordChangeCode(to: string, code: string): Promise<
   await transporter.sendMail({
     from: SMTP_FROM,
     to,
-    subject: "Fahrtdoc – Dein Bestätigungscode",
+    subject: "FahrtDoc – Dein Bestätigungscode",
     text: `Dein Bestätigungscode lautet: ${code}\n\nDer Code ist 5 Minuten gültig und kann nur einmal verwendet werden.`,
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:420px;margin:0 auto">
         <div style="background:#0070D8;padding:24px 24px 16px;border-radius:16px 16px 0 0">
-          <h1 style="color:#fff;margin:0;font-size:22px;font-weight:800">Fahrtdoc</h1>
+          <h1 style="color:#fff;margin:0;font-size:22px;font-weight:800">FahrtDoc</h1>
           <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px">Passwort ändern</p>
         </div>
         <div style="background:#fff;padding:28px 24px;border-radius:0 0 16px 16px;border:1px solid #E5E9F0;border-top:none">

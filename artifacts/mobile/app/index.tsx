@@ -98,7 +98,7 @@ export default function AuthScreen() {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={[styles.appName, { color: colors.foreground }]}>Fahrtdoc</Text>
+          <Text style={[styles.appName, { color: colors.foreground }]}>FahrtDoc</Text>
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
             Dein digitales Fahrtenbuch
           </Text>
