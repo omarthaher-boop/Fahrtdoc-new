@@ -16,6 +16,7 @@ import EditTripModal from "@/components/EditTripModal";
 import TripCard from "@/components/TripCard";
 import { useApp, Trip } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { exportPDF } from "@/utils/exportPDF";
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 type TypeFilter = "all" | "business" | "private";
@@ -56,7 +57,7 @@ function groupByDate(trips: Trip[]): { label: string; trips: Trip[] }[] {
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { trips, deleteTrip, editTrip } = useApp();
+  const { trips, deleteTrip, editTrip, user } = useApp();
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -133,9 +134,9 @@ export default function HistoryScreen() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    handleExportAll();
+    await exportPDF(filtered, user, dateFrom, dateTo);
   };
 
   const handleEdit = (trip: Trip) => {

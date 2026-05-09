@@ -57,6 +57,9 @@
   },
   "dependencies": {
     "expo-crypto": "^55.0.14",
-    "expo-secure-store": "^55.0.13"
+    "expo-print": "^15.0.8",
+    "expo-secure-store": "^55.0.13",
+    "expo-sharing": "^14.0.8",
+    "jspdf": "^2.5.2"
   }
 }
