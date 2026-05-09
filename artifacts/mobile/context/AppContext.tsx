@@ -17,6 +17,7 @@ export interface Trip {
   km: number;
   dur: number;
   type: "business" | "private";
+  edited?: boolean;
 }
 
 export interface ActiveTrip {
@@ -43,6 +44,7 @@ interface AppContextType {
   trips: Trip[];
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
+  editTrip: (id: string, changes: Partial<Trip>) => void;
   activeTrip: ActiveTrip | null;
   paused: boolean;
   pauseStartedAt: number | null;
@@ -57,15 +59,22 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+function seedDate(offsetDays: number, hour = 12, min = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  d.setHours(hour, min, 0, 0);
+  return d.toISOString();
+}
+
 const SEED_TRIPS: Trip[] = [
-  { id: "a1", date: "2026-04-28T08:14:00", startAddr: "Musterstraße 12, Berlin", endAddr: "Alexanderplatz 1, Berlin", km: 8.4, dur: 1080, type: "private" },
-  { id: "a2", date: "2026-04-27T17:30:00", startAddr: "Potsdamer Platz, Berlin", endAddr: "Flughafen BER", km: 22.1, dur: 2040, type: "business" },
-  { id: "a3", date: "2026-04-25T12:10:00", startAddr: "Musterstraße 12, Berlin", endAddr: "REWE Schöneberg", km: 3.7, dur: 540, type: "private" },
-  { id: "a4", date: "2026-04-22T07:55:00", startAddr: "Büro Mitte, Berlin", endAddr: "Musterstraße 12, Berlin", km: 11.2, dur: 1620, type: "business" },
-  { id: "a5", date: "2026-04-20T14:20:00", startAddr: "Musterstraße 12, Berlin", endAddr: "Klinikum Steglitz", km: 15.8, dur: 2280, type: "business" },
-  { id: "a6", date: "2026-03-30T09:00:00", startAddr: "Musterstraße 12, Berlin", endAddr: "Potsdam HBF", km: 31.4, dur: 2880, type: "private" },
-  { id: "a7", date: "2026-03-18T16:45:00", startAddr: "Ku'damm 100, Berlin", endAddr: "Tegel Gewerbepark", km: 19.3, dur: 2460, type: "business" },
-  { id: "a8", date: "2026-02-14T08:30:00", startAddr: "Musterstraße 12, Berlin", endAddr: "Cottbus HBF", km: 110.2, dur: 4920, type: "business" },
+  { id: "a1", date: seedDate(0, 8, 14), startAddr: "Giessereistrasse 8, Arbon", endAddr: "Zielpunkt unbekannt", km: 0.0, dur: 66, type: "business", edited: true },
+  { id: "a2", date: seedDate(1, 18, 12), startAddr: "Spitalstrasse, Herisau", endAddr: "Stickereistrasse, Arbon", km: 17.6, dur: 5160, type: "business", edited: true },
+  { id: "a3", date: seedDate(1, 18, 11), startAddr: "Spitalstrasse 6, Herisau", endAddr: "Spitalstrasse 6, Herisau", km: 17.6, dur: 5100, type: "business", edited: true },
+  { id: "a4", date: seedDate(3, 7, 55), startAddr: "Büro Mitte, Berlin", endAddr: "Musterstraße 12, Berlin", km: 11.2, dur: 1620, type: "business" },
+  { id: "a5", date: seedDate(5, 14, 20), startAddr: "Musterstraße 12, Berlin", endAddr: "Klinikum Steglitz", km: 15.8, dur: 2280, type: "business" },
+  { id: "a6", date: seedDate(10, 9, 0), startAddr: "Musterstraße 12, Berlin", endAddr: "Potsdam HBF", km: 31.4, dur: 2880, type: "private" },
+  { id: "a7", date: seedDate(22, 16, 45), startAddr: "Ku'damm 100, Berlin", endAddr: "Tegel Gewerbepark", km: 19.3, dur: 2460, type: "business" },
+  { id: "a8", date: seedDate(40, 8, 30), startAddr: "Musterstraße 12, Berlin", endAddr: "Cottbus HBF", km: 110.2, dur: 4920, type: "business" },
 ];
 
 const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -206,6 +215,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteTrip = useCallback(async (id: string) => {
     setTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
+      AsyncStorage.setItem("trips", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const editTrip = useCallback((id: string, changes: Partial<Trip>) => {
+    setTrips((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
       AsyncStorage.setItem("trips", JSON.stringify(next));
       return next;
     });
@@ -361,6 +378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         trips,
         addTrip,
         deleteTrip,
+        editTrip,
         activeTrip,
         paused,
         pauseStartedAt,

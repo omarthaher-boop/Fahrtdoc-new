@@ -1,140 +1,360 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import {
-  FlatList,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import EditTripModal from "@/components/EditTripModal";
 import TripCard from "@/components/TripCard";
 import { useApp, Trip } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
+type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 type TypeFilter = "all" | "business" | "private";
+
+const fmtDur = (s: number) => {
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}min` : `${m} min`;
+};
+
+const fmtDateLabel = (iso: string): string => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  if (sameDay(d, today)) return "Heute";
+  if (sameDay(d, yesterday)) return "Gestern";
+  return d.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+};
+
+function groupByDate(trips: Trip[]): { label: string; trips: Trip[] }[] {
+  const map = new Map<string, Trip[]>();
+  for (const t of trips) {
+    const label = fmtDateLabel(t.date);
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(t);
+  }
+  return Array.from(map.entries()).map(([label, trips]) => ({ label, trips }));
+}
 
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { trips, deleteTrip } = useApp();
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [months, setMonths] = useState<number>(999);
+  const { trips, deleteTrip, editTrip } = useApp();
 
-  const TYPE_OPTIONS: { label: string; value: TypeFilter }[] = [
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+
+  const PERIOD_OPTIONS: { label: string; value: PeriodFilter }[] = [
     { label: "Alle", value: "all" },
-    { label: "Geschäftlich", value: "business" },
-    { label: "Privat", value: "private" },
-  ];
-  const MONTH_OPTIONS = [
-    { label: "Alle", value: 999 },
-    { label: "1 Mon.", value: 1 },
-    { label: "3 Mon.", value: 3 },
-    { label: "6 Mon.", value: 6 },
+    { label: "Letzter Monat", value: 1 },
+    { label: "3 Monate", value: 3 },
+    { label: "6 Monate", value: 6 },
     { label: "Dieses Jahr", value: 12 },
   ];
 
   const cutoff = useMemo(() => {
-    if (months === 999) return new Date(0);
+    if (periodFilter === "all") return new Date(0);
     const d = new Date();
-    if (months === 12) return new Date(d.getFullYear(), 0, 1);
-    d.setMonth(d.getMonth() - months);
+    if (periodFilter === 12) return new Date(d.getFullYear(), 0, 1);
+    d.setMonth(d.getMonth() - periodFilter);
     return d;
-  }, [months]);
+  }, [periodFilter]);
 
   const filtered = useMemo(() => {
     return trips.filter((t) => {
-      if (new Date(t.date) < cutoff) return false;
+      const d = new Date(t.date);
+      if (d < cutoff) return false;
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
+      if (dateFrom) {
+        const [dd, mm, yyyy] = dateFrom.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          const from = new Date(yyyy, mm - 1, dd);
+          if (d < from) return false;
+        }
+      }
+      if (dateTo) {
+        const [dd, mm, yyyy] = dateTo.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          const to = new Date(yyyy, mm - 1, dd + 1);
+          if (d >= to) return false;
+        }
+      }
       return true;
     });
-  }, [trips, cutoff, typeFilter]);
+  }, [trips, cutoff, typeFilter, dateFrom, dateTo]);
 
   const totalKm = useMemo(() => filtered.reduce((a, b) => a + b.km, 0), [filtered]);
+  const totalDur = useMemo(() => filtered.reduce((a, b) => a + b.dur, 0), [filtered]);
+
+  const groups = useMemo(() => groupByDate(filtered), [filtered]);
+
+  const isDateRangeActive = !!dateFrom || !!dateTo;
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  const renderItem = ({ item }: { item: Trip }) => (
-    <TripCard trip={item} onDelete={deleteTrip} />
-  );
+  const handleExportAll = async () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    const lines = filtered.map(
+      (t) =>
+        `${new Date(t.date).toLocaleDateString("de-DE")} | ${t.type === "business" ? "Geschäftl." : "Privat"} | ${t.startAddr} → ${t.endAddr} | ${t.km.toFixed(1)} km | ${fmtDur(t.dur)}`
+    );
+    const text = `DriveLog Fahrtenbuch\n${filtered.length} Fahrten · ${totalKm.toFixed(1)} km\n\n${lines.join("\n")}`;
+    if (Platform.OS === "web") {
+      const blob = new Blob([text], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Fahrtenbuch.txt";
+      a.click();
+    } else {
+      await Share.share({ message: text, title: "DriveLog Fahrtenbuch" });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    handleExportAll();
+  };
+
+  const handleEdit = (trip: Trip) => {
+    setEditingTrip(trip);
+  };
+
+  const handleSaveEdit = (id: string, changes: Partial<Trip>) => {
+    editTrip(id, changes);
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Fahrtenbuch</Text>
-        <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-          <Text style={[styles.badgeText, { color: colors.primary }]}>
-            {filtered.length} Fahrten · {totalKm.toFixed(0)} km
-          </Text>
-        </View>
+      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.foreground }]}>Fahrten</Text>
       </View>
 
-      {/* Filters */}
-      <View style={[styles.filtersWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <View style={styles.filterRow}>
-            {TYPE_OPTIONS.map((o) => (
+      {/* Filter Row 1: period */}
+      <View style={[styles.filterRow1Wrap, { backgroundColor: colors.background }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {PERIOD_OPTIONS.map((o) => {
+            const active = periodFilter === o.value;
+            return (
               <TouchableOpacity
-                key={o.value}
+                key={String(o.value)}
+                onPress={() => { setPeriodFilter(o.value); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
                 style={[
                   styles.pill,
                   {
-                    backgroundColor: typeFilter === o.value ? colors.primary : colors.secondary,
-                    borderColor: typeFilter === o.value ? colors.primary : colors.border,
+                    backgroundColor: active ? "#1A2B6B" : colors.card,
+                    borderColor: active ? "#1A2B6B" : colors.border,
                   },
                 ]}
-                onPress={() => setTypeFilter(o.value)}
               >
-                <Text style={[styles.pillText, { color: typeFilter === o.value ? "#FFFFFF" : colors.mutedForeground }]}>
+                <Text style={[styles.pillText, { color: active ? "#FFFFFF" : colors.mutedForeground }]}>
                   {o.label}
                 </Text>
               </TouchableOpacity>
-            ))}
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            {MONTH_OPTIONS.map((o) => (
-              <TouchableOpacity
-                key={o.value}
-                style={[
-                  styles.pill,
-                  {
-                    backgroundColor: months === o.value ? colors.success : colors.secondary,
-                    borderColor: months === o.value ? colors.success : colors.border,
-                  },
-                ]}
-                onPress={() => setMonths(o.value)}
-              >
-                <Text style={[styles.pillText, { color: months === o.value ? "#FFFFFF" : colors.mutedForeground }]}>
-                  {o.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            );
+          })}
         </ScrollView>
       </View>
 
-      {/* List */}
+      {/* Filter Row 2: type + date range */}
+      <View style={[styles.filterRow2Wrap, { backgroundColor: colors.background }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          <TouchableOpacity
+            onPress={() => { setShowDateRange((p) => !p); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
+            style={[
+              styles.pill,
+              styles.pillWithIcon,
+              {
+                backgroundColor: (showDateRange || isDateRangeActive) ? colors.accent : colors.card,
+                borderColor: (showDateRange || isDateRangeActive) ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Feather name="calendar" size={13} color={(showDateRange || isDateRangeActive) ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.pillText, { color: (showDateRange || isDateRangeActive) ? colors.primary : colors.mutedForeground }]}>
+              Von – Bis
+            </Text>
+          </TouchableOpacity>
+
+          {(["business", "private"] as const).map((t) => {
+            const active = typeFilter === t;
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => { setTypeFilter(typeFilter === t ? "all" : t); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
+                style={[
+                  styles.pill,
+                  styles.pillWithIcon,
+                  {
+                    backgroundColor: active ? colors.accent : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Feather
+                  name={t === "business" ? "briefcase" : "user"}
+                  size={13}
+                  color={active ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.pillText, { color: active ? colors.primary : colors.mutedForeground }]}>
+                  {t === "business" ? "Geschäftlich" : "Privat"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Date range picker */}
+      {showDateRange && (
+        <View style={[styles.dateRangePanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.dateRangeRow}>
+            <View style={styles.dateField}>
+              <Text style={[styles.dateFieldLabel, { color: colors.mutedForeground }]}>Von</Text>
+              <View style={[styles.dateInput, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.dateInputText, { color: colors.foreground }]}
+                  value={dateFrom}
+                  onChangeText={setDateFrom}
+                  placeholder="TT.MM.JJJJ"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+            <View style={[styles.dateArrow, { backgroundColor: colors.border }]}>
+              <Feather name="arrow-right" size={14} color={colors.mutedForeground} />
+            </View>
+            <View style={styles.dateField}>
+              <Text style={[styles.dateFieldLabel, { color: colors.mutedForeground }]}>Bis</Text>
+              <View style={[styles.dateInput, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.dateInputText, { color: colors.foreground }]}
+                  value={dateTo}
+                  onChangeText={setDateTo}
+                  placeholder="TT.MM.JJJJ"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          </View>
+          {isDateRangeActive && (
+            <TouchableOpacity
+              onPress={() => { setDateFrom(""); setDateTo(""); }}
+              style={[styles.clearDateBtn, { borderColor: colors.destructive }]}
+            >
+              <Feather name="x" size={12} color={colors.destructive} />
+              <Text style={[styles.clearDateText, { color: colors.destructive }]}>Filter löschen</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Stats summary card */}
+      <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
+        <View style={styles.statItem}>
+          <Feather name="list" size={18} color={colors.primary} />
+          <View>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{filtered.length}</Text>
+            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>Fahrten</Text>
+          </View>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.statItem}>
+          <Feather name="navigation" size={18} color={colors.primary} />
+          <View>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{totalKm.toFixed(1)} km</Text>
+            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>Gesamtstrecke</Text>
+          </View>
+        </View>
+        <View style={styles.exportBtns}>
+          <TouchableOpacity
+            onPress={handleExportPDF}
+            style={[styles.exportBtn, { borderColor: colors.primary }]}
+          >
+            <Feather name="file-text" size={13} color={colors.primary} />
+            <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleExportAll}
+            style={[styles.exportBtn, { borderColor: colors.primary }]}
+          >
+            <Feather name="check-square" size={13} color={colors.primary} />
+            <Text style={[styles.exportBtnText, { color: colors.primary }]}>Alle</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Trip list grouped by date */}
       {filtered.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Feather name="map" size={48} color={colors.mutedForeground} />
+          <Feather name="map" size={40} color={colors.mutedForeground} />
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Keine Fahrten</Text>
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            Es gibt keine Fahrten für den gewählten Filter.
+            Keine Fahrten für den gewählten Filter.
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={filtered}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad, paddingTop: 4 }}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!!filtered.length}
-        />
+        >
+          {groups.map(({ label, trips: groupTrips }) => (
+            <View key={label} style={styles.group}>
+              {/* Section header */}
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{label}</Text>
+                <View style={[styles.countBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <Text style={[styles.countText, { color: colors.mutedForeground }]}>{groupTrips.length}</Text>
+                </View>
+              </View>
+              {/* Trip cards */}
+              {groupTrips.map((t) => (
+                <TripCard
+                  key={t.id}
+                  trip={t}
+                  onDelete={deleteTrip}
+                  onEdit={handleEdit}
+                />
+              ))}
+            </View>
+          ))}
+        </ScrollView>
       )}
+
+      {/* Edit modal */}
+      <EditTripModal
+        trip={editingTrip}
+        visible={editingTrip !== null}
+        onClose={() => setEditingTrip(null)}
+        onSave={handleSaveEdit}
+      />
     </View>
   );
 }
@@ -143,33 +363,139 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  filterRow1Wrap: { paddingBottom: 8 },
+  filterRow2Wrap: { paddingBottom: 10 },
+  filterRow: {
+    paddingHorizontal: 16,
+    flexDirection: "row",
     gap: 8,
+    alignItems: "center",
   },
-  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
-  badge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  badgeText: { fontSize: 13, fontWeight: "600" },
-  filtersWrap: {
-    borderBottomWidth: 1,
-    paddingVertical: 12,
-  },
-  filterScroll: { paddingHorizontal: 16 },
-  filterRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pill: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
-  pillText: { fontSize: 13, fontWeight: "600" },
-  divider: { width: 1, height: 24, marginHorizontal: 4 },
-  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 40 },
+  pillWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  dateRangePanel: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  dateRangeRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  dateField: { flex: 1, gap: 5 },
+  dateFieldLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  dateInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 7,
+  },
+  dateInputText: { flex: 1, fontSize: 13 },
+  dateArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  clearDateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  clearDateText: { fontSize: 12, fontWeight: "600" },
+  statsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statValue: { fontSize: 16, fontWeight: "800" },
+  statUnit: { fontSize: 11, fontWeight: "500" },
+  statDivider: { width: 1, height: 32, marginHorizontal: 2 },
+  exportBtns: {
+    flexDirection: "row",
+    gap: 8,
+    marginLeft: "auto",
+  },
+  exportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  exportBtnText: { fontSize: 13, fontWeight: "700" },
+  group: { marginBottom: 8 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  countBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countText: { fontSize: 12, fontWeight: "700" },
+  emptyWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 40,
+  },
   emptyTitle: { fontSize: 18, fontWeight: "700" },
   emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
 });

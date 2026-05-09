@@ -1,8 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useRef } from "react";
+import React from "react";
 import {
-  Animated,
   Platform,
   StyleSheet,
   Text,
@@ -15,159 +14,242 @@ import { Trip } from "@/context/AppContext";
 interface Props {
   trip: Trip;
   onDelete?: (id: string) => void;
+  onEdit?: (trip: Trip) => void;
 }
 
-const fmtDur = (s: number) => {
-  if (s < 60) return `${s}s`;
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}min` : `${m} min`;
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+const fmtDurMin = (s: number) => {
+  const m = Math.round(s / 60);
+  if (m <= 0) return null;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return h > 0 ? `${h}h ${rem}min` : `${m} Min`;
 };
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-export default function TripCard({ trip, onDelete }: Props) {
+export default function TripCard({ trip, onDelete, onEdit }: Props) {
   const colors = useColors();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
   const isBusiness = trip.type === "business";
   const accentColor = isBusiness ? colors.primary : colors.success;
-  const accentBg = isBusiness ? colors.accent : colors.successLight;
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start();
-  };
+  const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
+  const dur = fmtDurMin(trip.dur);
 
   const handleDelete = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onDelete?.(trip.id);
   };
 
-  return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={handlePress}
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <View style={[styles.iconWrap, { backgroundColor: accentBg }]}>
-          <Feather name={isBusiness ? "briefcase" : "user"} size={18} color={accentColor} />
-        </View>
+  const handleEdit = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    onEdit?.(trip);
+  };
 
-        <View style={styles.info}>
-          <View style={styles.row}>
-            <Text style={[styles.type, { color: accentColor }]}>
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Left blue accent bar */}
+      <View style={[styles.leftBar, { backgroundColor: colors.primary }]} />
+
+      <View style={styles.inner}>
+        {/* Top row: type badge + time + edit + delete */}
+        <View style={styles.topRow}>
+          <View style={[styles.typeBadge, { backgroundColor: accentBg }]}>
+            <Feather
+              name={isBusiness ? "briefcase" : "user"}
+              size={13}
+              color={accentColor}
+            />
+            <Text style={[styles.typeText, { color: accentColor }]}>
               {isBusiness ? "Geschäftlich" : "Privat"}
             </Text>
-            <View style={[styles.badge, { backgroundColor: accentBg }]}>
-              <Text style={[styles.badgeText, { color: accentColor }]}>
+          </View>
+
+          <View style={styles.topActions}>
+            <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
+              {fmtTime(trip.date)}
+            </Text>
+            <TouchableOpacity
+              onPress={handleEdit}
+              style={[styles.actionBtn, { borderColor: colors.border }]}
+              testID={`edit-${trip.id}`}
+            >
+              <Feather name="edit-2" size={13} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDelete}
+              style={[styles.actionBtn, { borderColor: colors.border }]}
+              testID={`delete-${trip.id}`}
+            >
+              <Feather name="trash-2" size={13} color={colors.destructive} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Addresses */}
+        <View style={styles.addrSection}>
+          <View style={styles.addrRow}>
+            <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
+              {trip.startAddr || "Startpunkt unbekannt"}
+            </Text>
+          </View>
+          <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
+          <View style={styles.addrRow}>
+            <View style={[styles.dotHollow, { borderColor: colors.mutedForeground }]} />
+            <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
+              {trip.endAddr || "Zielpunkt unbekannt"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Bottom row: km + duration + edited badge */}
+        <View style={styles.bottomRow}>
+          <View style={styles.metaLeft}>
+            <View style={styles.metaItem}>
+              <Feather name="navigation" size={12} color={colors.primary} />
+              <Text style={[styles.metaText, { color: colors.foreground }]}>
                 {trip.km.toFixed(1)} km
               </Text>
             </View>
+            {dur && (
+              <View style={styles.metaItem}>
+                <Feather name="clock" size={12} color={colors.mutedForeground} />
+                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                  {dur}
+                </Text>
+              </View>
+            )}
           </View>
-
-          <View style={styles.addrRow}>
-            <Feather name="circle" size={8} color={colors.mutedForeground} />
-            <Text style={[styles.addr, { color: colors.sub }]} numberOfLines={1}>
-              {trip.startAddr}
-            </Text>
-          </View>
-          <View style={[styles.addrRow, { marginTop: 2 }]}>
-            <Feather name="map-pin" size={8} color={colors.primary} />
-            <Text style={[styles.addr, { color: colors.sub }]} numberOfLines={1}>
-              {trip.endAddr}
-            </Text>
-          </View>
-
-          <View style={[styles.row, { marginTop: 8 }]}>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-              {fmtDate(trip.date)} · {fmtTime(trip.date)}
-            </Text>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-              {fmtDur(trip.dur)}
-            </Text>
-          </View>
+          {trip.edited && (
+            <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
+              <Feather name="edit" size={11} color="#C98A00" />
+              <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
+            </View>
+          )}
         </View>
-
-        {onDelete && (
-          <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn} testID={`delete-${trip.id}`}>
-            <Feather name="trash-2" size={16} color={colors.destructive} />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 14,
     marginBottom: 10,
-    gap: 12,
+    overflow: "hidden",
   },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+  leftBar: {
+    width: 4,
     flexShrink: 0,
-    marginTop: 2,
   },
-  info: {
+  inner: {
     flex: 1,
-    gap: 4,
+    padding: 14,
+    gap: 10,
   },
-  row: {
+  topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
-  addrRow: {
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  typeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  topActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  type: {
+  timeText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "500",
+    fontVariant: ["tabular-nums" as const],
+    marginRight: 2,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  actionBtn: {
+    width: 30,
+    height: 30,
     borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
+  addrSection: {
+    gap: 0,
   },
-  addr: {
-    fontSize: 12,
+  addrRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 3,
+  },
+  addrConnector: {
+    height: 8,
+    marginLeft: 5,
+    borderLeftWidth: 1.5,
+    borderLeftColor: "#E5E9F0",
+    borderStyle: "dashed",
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  dotHollow: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    flexShrink: 0,
+  },
+  addrText: {
+    fontSize: 14,
+    fontWeight: "500",
     flex: 1,
   },
-  meta: {
-    fontSize: 11,
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  deleteBtn: {
-    padding: 6,
-    marginTop: -2,
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  editedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  editedText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
 });
