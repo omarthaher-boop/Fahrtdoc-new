@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 import { Platform } from "react-native";
-
+import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import {
@@ -154,10 +154,7 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
 };
 
 async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return ExpoCrypto.digestStringAsync(ExpoCrypto.CryptoDigestAlgorithm.SHA256, text);
 }
 
 function tripsKey(email: string): string {

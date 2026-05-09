@@ -56,11 +56,11 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
-    "expo-crypto": "^55.0.14",
+    "expo-crypto": "~15.0.9",
     "expo-print": "^15.0.8",
-    "expo-secure-store": "^55.0.13",
+    "expo-secure-store": "~15.0.8",
     "expo-sharing": "^14.0.8",
-    "expo-task-manager": "^55.0.15",
+    "expo-task-manager": "~14.0.9",
     "jspdf": "^2.5.2"
   }
 }
