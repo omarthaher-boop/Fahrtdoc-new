@@ -246,15 +246,6 @@ export default function HistoryScreen() {
     await exportPDF(displayTrips, user, dateFrom, dateTo);
   };
 
-  const _handleSplitExport = async () => {
-    if (Platform.OS !== "web") Haptics.selectionAsync();
-    if (selectionMode && selectedIds.size === 0) {
-      Alert.alert("Keine Fahrten ausgewählt", "Bitte wähle mindestens eine Fahrt aus oder verlasse den Auswahlmodus.");
-      return;
-    }
-    await exportSplitPDF(displayTrips, user, dateFrom, dateTo);
-  };
-
   const handleEdit = (trip: Trip) => {
     setEditingTrip(trip);
   };
