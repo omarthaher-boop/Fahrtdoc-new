@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -92,9 +93,11 @@ export default function AuthScreen() {
       >
         {/* Logo */}
         <View style={styles.logoSection}>
-          <View style={[styles.logoCircle, { backgroundColor: colors.primary }]}>
-            <Feather name="navigation" size={32} color="#FFFFFF" />
-          </View>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={[styles.appName, { color: colors.foreground }]}>DriveLog</Text>
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
             Dein digitales Fahrtenbuch
@@ -262,12 +265,9 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  logoCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   appName: {
     fontSize: 28,
