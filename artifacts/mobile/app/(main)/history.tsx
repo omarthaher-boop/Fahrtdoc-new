@@ -18,7 +18,7 @@ import EditTripModal from "@/components/EditTripModal";
 import TripCard from "@/components/TripCard";
 import { useApp, Trip } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
-import { exportPDF, exportSplitPDF } from "@/utils/exportPDF";
+import { exportPDF } from "@/utils/exportPDF";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 
@@ -246,7 +246,7 @@ export default function HistoryScreen() {
     await exportPDF(displayTrips, user, dateFrom, dateTo);
   };
 
-  const handleSplitExport = async () => {
+  const _handleSplitExport = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert("Keine Fahrten ausgewählt", "Bitte wähle mindestens eine Fahrt aus oder verlasse den Auswahlmodus.");
@@ -428,13 +428,6 @@ export default function HistoryScreen() {
           >
             <Feather name="file-text" size={13} color={colors.primary} />
             <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleSplitExport}
-            style={[styles.exportBtn, { borderColor: colors.primary }]}
-          >
-            <Feather name="copy" size={13} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]}>Split PDF</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleEmailExport}
