@@ -422,19 +422,33 @@ export default function HistoryScreen() {
           </View>
         </View>
         <View style={styles.exportBtns}>
-          <TouchableOpacity
-            onPress={handleExportPDF}
-            style={[styles.exportBtn, { borderColor: colors.primary }]}
-          >
-            <Feather name="file-text" size={13} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleEmailExport}
-            style={[styles.exportBtn, { borderColor: colors.primary }]}
-          >
-            <Feather name="mail" size={15} color={colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.exportBtnWrap}>
+            <TouchableOpacity
+              onPress={handleExportPDF}
+              style={[styles.exportBtn, { borderColor: colors.primary }]}
+            >
+              <Feather name="file-text" size={13} color={colors.primary} />
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+            </TouchableOpacity>
+            {selectionMode && selectedIds.size > 0 && (
+              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.exportBtnWrap}>
+            <TouchableOpacity
+              onPress={handleEmailExport}
+              style={[styles.exportBtn, { borderColor: colors.primary }]}
+            >
+              <Feather name="mail" size={15} color={colors.primary} />
+            </TouchableOpacity>
+            {selectionMode && selectedIds.size > 0 && (
+              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -660,6 +674,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginLeft: "auto",
   },
+  exportBtnWrap: {
+    position: "relative",
+  },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -670,6 +687,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   exportBtnText: { fontSize: 13, fontWeight: "700" },
+  exportBadge: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  exportBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    lineHeight: 12,
+  },
   group: { marginBottom: 8 },
   sectionHeader: {
     flexDirection: "row",
