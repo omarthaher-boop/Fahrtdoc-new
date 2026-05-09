@@ -163,3 +163,32 @@ export async function serverBatchUpsertTrips(token: string, trips: ApiTrip[]): P
     return false;
   }
 }
+
+export async function serverRequestChangeCode(token: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/request-change-code`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.json();
+  } catch {
+    return { success: false, error: "Netzwerkfehler. Bitte versuche es erneut." };
+  }
+}
+
+export async function serverConfirmChangePassword(
+  token: string,
+  code: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/confirm-change-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code, newPassword }),
+    });
+    return res.json();
+  } catch {
+    return { success: false, error: "Netzwerkfehler. Bitte versuche es erneut." };
+  }
+}

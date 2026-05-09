@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -25,11 +25,12 @@ const PREF_DEFAULT_TRIP = "pref_default_trip_type";
 const PREF_APP_LOCK = "pref_app_lock";
 
 type TripType = "business" | "private";
+type PwStep = "request" | "verify";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateProfile, updatePassword, isSynced } = useApp();
+  const { user, logout, updateProfile, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
 
   const [defaultTripType, setDefaultTripType] = useState<TripType>("business");
   const [appLock, setAppLock] = useState(false);
@@ -39,10 +40,14 @@ export default function ProfileScreen() {
   const [editPlate, setEditPlate] = useState(user?.plate ?? "");
 
   const [pwModalVisible, setPwModalVisible] = useState(false);
-  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwStep, setPwStep] = useState<PwStep>("request");
+  const [pwCode, setPwCode] = useState("");
   const [pwNew, setPwNew] = useState("");
   const [pwConfirm, setPwConfirm] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwCodeSent, setPwCodeSent] = useState(false);
+  const codeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(PREF_DEFAULT_TRIP).then((v) => {
@@ -77,27 +82,64 @@ export default function ProfileScreen() {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleSavePassword = async () => {
-    if (!pwNew.trim() || pwNew !== pwConfirm) {
-      Alert.alert("Fehler", "Passwörter stimmen nicht überein.");
+  const openPwModal = () => {
+    setPwStep("request");
+    setPwCode("");
+    setPwNew("");
+    setPwConfirm("");
+    setPwError("");
+    setPwCodeSent(false);
+    setPwLoading(false);
+    setPwModalVisible(true);
+  };
+
+  const closePwModal = () => {
+    setPwModalVisible(false);
+    setPwCode("");
+    setPwNew("");
+    setPwConfirm("");
+    setPwError("");
+    setPwCodeSent(false);
+  };
+
+  const handleRequestCode = async () => {
+    setPwLoading(true);
+    setPwError("");
+    const result = await requestPasswordChangeCode();
+    setPwLoading(false);
+    if (!result.success) {
+      setPwError(result.error ?? "Fehler beim Senden des Codes.");
       return;
     }
-    if (pwNew.length < 6) {
-      Alert.alert("Fehler", "Passwort muss mindestens 6 Zeichen lang sein.");
+    setPwCodeSent(true);
+    setPwStep("verify");
+    setTimeout(() => codeInputRef.current?.focus(), 300);
+  };
+
+  const handleConfirmChange = async () => {
+    if (pwCode.trim().length !== 6) {
+      setPwError("Bitte gib den 6-stelligen Code ein.");
+      return;
+    }
+    if (!pwNew.trim() || pwNew.length < 6) {
+      setPwError("Das Passwort muss mindestens 6 Zeichen lang sein.");
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError("Die Passwörter stimmen nicht überein.");
       return;
     }
     setPwLoading(true);
-    try {
-      await updatePassword(user!.email, pwNew);
-      setPwModalVisible(false);
-      setPwCurrent(""); setPwNew(""); setPwConfirm("");
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Passwort geändert", "Dein Passwort wurde erfolgreich aktualisiert.");
-    } catch {
-      Alert.alert("Fehler", "Passwort konnte nicht geändert werden.");
-    } finally {
-      setPwLoading(false);
+    setPwError("");
+    const result = await confirmPasswordChange(pwCode.trim(), pwNew);
+    setPwLoading(false);
+    if (!result.success) {
+      setPwError(result.error ?? "Code ungültig. Bitte erneut versuchen.");
+      return;
     }
+    closePwModal();
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Passwort geändert", "Dein Passwort wurde erfolgreich aktualisiert.");
   };
 
   const handleLogout = () => {
@@ -126,7 +168,6 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* Fixed header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profil</Text>
         <TouchableOpacity onPress={showComingSoon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -134,10 +175,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: bottomPad }}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
 
           {/* Profile card */}
@@ -184,24 +222,14 @@ export default function ProfileScreen() {
           {/* Konto */}
           <SectionHeader label="Konto" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ListRow
-              icon="user" label="Persönliche Daten"
-              onPress={handleOpenEdit} colors={colors} showDivider
-            />
-            <ListRow
-              icon="navigation" label="Fahrprofil & Fahrzeugdaten"
-              onPress={showComingSoon} colors={colors}
-            />
+            <ListRow icon="user" label="Persönliche Daten" onPress={handleOpenEdit} colors={colors} showDivider />
+            <ListRow icon="navigation" label="Fahrprofil & Fahrzeugdaten" onPress={showComingSoon} colors={colors} />
           </View>
 
           {/* Einstellungen */}
           <SectionHeader label="Einstellungen" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ListRow
-              icon="bell" label="Benachrichtigungen"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            {/* Standard-Fahrtart segmented */}
+            <ListRow icon="bell" label="Benachrichtigungen" onPress={showComingSoon} colors={colors} showDivider />
             <View style={[styles.listRow, styles.divider, { borderBottomColor: colors.border }]}>
               <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
                 <Feather name="navigation" size={17} color={colors.primary} />
@@ -209,10 +237,7 @@ export default function ProfileScreen() {
               <Text style={[styles.listLabel, { color: colors.foreground }]}>Standard-Fahrtart</Text>
               <View style={[styles.segmented, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[
-                    styles.segBtn,
-                    defaultTripType === "business" && { backgroundColor: colors.primary, borderRadius: 8 },
-                  ]}
+                  style={[styles.segBtn, defaultTripType === "business" && { backgroundColor: colors.primary, borderRadius: 8 }]}
                   onPress={() => handleDefaultTripType("business")}
                 >
                   <Text style={[styles.segBtnText, { color: defaultTripType === "business" ? "#fff" : colors.mutedForeground }]}>
@@ -220,10 +245,7 @@ export default function ProfileScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.segBtn,
-                    defaultTripType === "private" && { backgroundColor: colors.primary, borderRadius: 8 },
-                  ]}
+                  style={[styles.segBtn, defaultTripType === "private" && { backgroundColor: colors.primary, borderRadius: 8 }]}
                   onPress={() => handleDefaultTripType("private")}
                 >
                   <Text style={[styles.segBtnText, { color: defaultTripType === "private" ? "#fff" : colors.mutedForeground }]}>
@@ -232,32 +254,16 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            <ListRow
-              icon="globe" label="Sprache" value="Deutsch"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            <ListRow
-              icon="sun" label="Design" value="Hell"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            <ListRow
-              icon="file-text" label="PDF / Export"
-              onPress={showComingSoon} colors={colors}
-            />
+            <ListRow icon="globe" label="Sprache" value="Deutsch" onPress={showComingSoon} colors={colors} showDivider />
+            <ListRow icon="sun" label="Design" value="Hell" onPress={showComingSoon} colors={colors} showDivider />
+            <ListRow icon="file-text" label="PDF / Export" onPress={showComingSoon} colors={colors} />
           </View>
 
-          {/* Sicherheit & Datenschutz */}
+          {/* Sicherheit */}
           <SectionHeader label="Sicherheit & Datenschutz" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ListRow
-              icon="lock" label="Passwort ändern"
-              onPress={() => setPwModalVisible(true)} colors={colors} showDivider
-            />
-            <ListRow
-              icon="shield" label="Datenschutz"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            {/* App-Sperre / Face ID */}
+            <ListRow icon="lock" label="Passwort ändern" onPress={openPwModal} colors={colors} showDivider />
+            <ListRow icon="shield" label="Datenschutz" onPress={showComingSoon} colors={colors} showDivider />
             <View style={styles.listRow}>
               <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
                 <Feather name="aperture" size={17} color={colors.primary} />
@@ -275,18 +281,9 @@ export default function ProfileScreen() {
           {/* Support */}
           <SectionHeader label="Support" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ListRow
-              icon="help-circle" label="Hilfe & FAQ"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            <ListRow
-              icon="mail" label="Kontakt"
-              onPress={showComingSoon} colors={colors} showDivider
-            />
-            <ListRow
-              icon="info" label="App-Version" value={APP_VERSION}
-              colors={colors}
-            />
+            <ListRow icon="help-circle" label="Hilfe & FAQ" onPress={showComingSoon} colors={colors} showDivider />
+            <ListRow icon="mail" label="Kontakt" onPress={showComingSoon} colors={colors} showDivider />
+            <ListRow icon="info" label="App-Version" value={APP_VERSION} colors={colors} />
           </View>
 
           {/* Abmelden */}
@@ -298,7 +295,6 @@ export default function ProfileScreen() {
             <Feather name="log-out" size={18} color={colors.destructive} />
             <Text style={[styles.logoutText, { color: colors.destructive }]}>Abmelden</Text>
           </TouchableOpacity>
-
         </View>
       </ScrollView>
 
@@ -336,34 +332,131 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Change Password Modal */}
+      {/* Change Password Modal — two steps */}
       <Modal visible={pwModalVisible} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView
           style={[styles.modalScreen, { backgroundColor: colors.background }]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => { setPwModalVisible(false); setPwCurrent(""); setPwNew(""); setPwConfirm(""); }}>
+            <TouchableOpacity onPress={closePwModal} disabled={pwLoading}>
               <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Passwort ändern</Text>
-            <TouchableOpacity onPress={handleSavePassword} disabled={pwLoading}>
-              <Text style={[styles.modalSave, { color: pwLoading ? colors.mutedForeground : colors.primary }]}>
-                {pwLoading ? "…" : "Speichern"}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ width: 70 }} />
           </View>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <ModalField
-              label="Neues Passwort" value={pwNew} onChangeText={setPwNew}
-              icon="lock" placeholder="Mindestens 6 Zeichen"
-              secureTextEntry colors={colors}
-            />
-            <ModalField
-              label="Passwort bestätigen" value={pwConfirm} onChangeText={setPwConfirm}
-              icon="lock" placeholder="Passwort wiederholen"
-              secureTextEntry colors={colors}
-            />
+
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+
+            {/* Step indicator */}
+            <View style={styles.stepRow}>
+              <View style={styles.stepItem}>
+                <View style={[styles.stepDot, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.stepDotText}>{pwStep === "request" ? "1" : "✓"}</Text>
+                </View>
+                <Text style={[styles.stepLabel, { color: pwStep === "request" ? colors.foreground : colors.mutedForeground }]}>
+                  Code anfordern
+                </Text>
+              </View>
+              <View style={[styles.stepLine, { backgroundColor: pwStep === "verify" ? colors.primary : colors.border }]} />
+              <View style={styles.stepItem}>
+                <View style={[styles.stepDot, { backgroundColor: pwStep === "verify" ? colors.primary : colors.border }]}>
+                  <Text style={[styles.stepDotText, { color: pwStep === "verify" ? "#fff" : colors.mutedForeground }]}>2</Text>
+                </View>
+                <Text style={[styles.stepLabel, { color: pwStep === "verify" ? colors.foreground : colors.mutedForeground }]}>
+                  Code & Passwort
+                </Text>
+              </View>
+            </View>
+
+            {pwStep === "request" ? (
+              <>
+                <View style={[styles.infoNote, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                  <Feather name="mail" size={15} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.infoNoteText, { color: colors.primary }]}>
+                      Ein 6-stelliger Code wird an deine E-Mail-Adresse gesendet:
+                    </Text>
+                    <Text style={[styles.infoNoteEmail, { color: colors.primary }]}>{user?.email}</Text>
+                  </View>
+                </View>
+                {pwError !== "" && (
+                  <View style={[styles.errorBox, { backgroundColor: "#FFF0F3", borderColor: colors.destructive }]}>
+                    <Feather name="alert-circle" size={14} color={colors.destructive} />
+                    <Text style={[styles.errorText, { color: colors.destructive }]}>{pwError}</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: pwLoading ? colors.mutedForeground : colors.primary }]}
+                  onPress={handleRequestCode}
+                  disabled={pwLoading}
+                >
+                  <Feather name="send" size={16} color="#fff" />
+                  <Text style={styles.primaryBtnText}>
+                    {pwLoading ? "Senden…" : "Code per E-Mail senden"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={[styles.infoNote, { backgroundColor: colors.successLight, borderColor: colors.success }]}>
+                  <Feather name="check-circle" size={15} color={colors.success} />
+                  <Text style={[styles.infoNoteText, { color: colors.success }]}>
+                    Code gesendet an {user?.email}. Bitte prüfe deinen Posteingang.
+                  </Text>
+                </View>
+
+                {/* Code input */}
+                <View style={styles.modalField}>
+                  <Text style={[styles.modalFieldLabel, { color: colors.mutedForeground }]}>Bestätigungscode</Text>
+                  <TextInput
+                    ref={codeInputRef}
+                    style={[styles.codeInput, { backgroundColor: colors.card, borderColor: pwCode.length === 6 ? colors.success : colors.border, color: colors.foreground }]}
+                    value={pwCode}
+                    onChangeText={(t) => { setPwCode(t.replace(/\D/g, "").slice(0, 6)); setPwError(""); }}
+                    placeholder="000000"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                  />
+                  <TouchableOpacity onPress={() => { setPwStep("request"); setPwCode(""); setPwError(""); }}>
+                    <Text style={[styles.resendLink, { color: colors.primary }]}>Neuen Code anfordern</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ModalField
+                  label="Neues Passwort" value={pwNew}
+                  onChangeText={(t) => { setPwNew(t); setPwError(""); }}
+                  icon="lock" placeholder="Mindestens 6 Zeichen"
+                  secureTextEntry colors={colors}
+                />
+                <ModalField
+                  label="Passwort bestätigen" value={pwConfirm}
+                  onChangeText={(t) => { setPwConfirm(t); setPwError(""); }}
+                  icon="lock" placeholder="Passwort wiederholen"
+                  secureTextEntry colors={colors}
+                />
+
+                {pwError !== "" && (
+                  <View style={[styles.errorBox, { backgroundColor: "#FFF0F3", borderColor: colors.destructive }]}>
+                    <Feather name="alert-circle" size={14} color={colors.destructive} />
+                    <Text style={[styles.errorText, { color: colors.destructive }]}>{pwError}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: pwLoading ? colors.mutedForeground : colors.primary }]}
+                  onPress={handleConfirmChange}
+                  disabled={pwLoading}
+                >
+                  <Feather name="check" size={16} color="#fff" />
+                  <Text style={styles.primaryBtnText}>
+                    {pwLoading ? "Wird geändert…" : "Passwort ändern"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -372,20 +465,14 @@ export default function ProfileScreen() {
 }
 
 function SectionHeader({ label, colors }: { label: string; colors: ReturnType<typeof useColors> }) {
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>{label}</Text>
-  );
+  return <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>{label}</Text>;
 }
 
 function ListRow({
   icon, label, value, onPress, colors, showDivider,
 }: {
-  icon: string;
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  colors: ReturnType<typeof useColors>;
-  showDivider?: boolean;
+  icon: string; label: string; value?: string;
+  onPress?: () => void; colors: ReturnType<typeof useColors>; showDivider?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -435,12 +522,9 @@ function ModalField({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingHorizontal: 20, paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
   headerTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
   content: { padding: 16, gap: 8 },
@@ -454,8 +538,7 @@ const styles = StyleSheet.create({
   profileEmail: { fontSize: 13, marginTop: 2 },
   editProfileBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, borderRadius: 10, borderWidth: 1.2,
-    paddingVertical: 10,
+    gap: 8, borderRadius: 10, borderWidth: 1.2, paddingVertical: 10,
   },
   editProfileBtnText: { fontSize: 14, fontWeight: "600" },
 
@@ -465,16 +548,14 @@ const styles = StyleSheet.create({
   },
   infoCell: {
     flex: 1, alignItems: "center", justifyContent: "center",
-    paddingVertical: 14, gap: 3,
-    borderRightWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14, gap: 3, borderRightWidth: StyleSheet.hairlineWidth,
   },
   infoCellLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
   infoCellValue: { fontSize: 13, fontWeight: "600" },
 
   sectionHeader: {
-    fontSize: 13, fontWeight: "600",
-    textTransform: "uppercase", letterSpacing: 0.5,
-    marginTop: 8, marginBottom: 2, marginLeft: 4,
+    fontSize: 13, fontWeight: "600", textTransform: "uppercase",
+    letterSpacing: 0.5, marginTop: 8, marginBottom: 2, marginLeft: 4,
   },
   listCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   listRow: {
@@ -486,10 +567,7 @@ const styles = StyleSheet.create({
   listLabel: { fontSize: 15 },
   listValue: { fontSize: 14 },
 
-  segmented: {
-    flexDirection: "row", borderRadius: 10, borderWidth: 1,
-    padding: 3, gap: 2,
-  },
+  segmented: { flexDirection: "row", borderRadius: 10, borderWidth: 1, padding: 3, gap: 2 },
   segBtn: { paddingHorizontal: 12, paddingVertical: 6 },
   segBtnText: { fontSize: 13, fontWeight: "600" },
 
@@ -514,13 +592,42 @@ const styles = StyleSheet.create({
   modalFieldLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
   modalInputRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    borderRadius: 12, borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
   },
   modalInput: { flex: 1, fontSize: 15 },
   infoNote: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    padding: 14, borderRadius: 12, borderWidth: 1,
+  },
+  infoNoteText: { fontSize: 13, lineHeight: 18, flex: 1 },
+  infoNoteEmail: { fontSize: 14, fontWeight: "700", marginTop: 3 },
+
+  stepRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 0 },
+  stepItem: { alignItems: "center", gap: 6, width: 120 },
+  stepDot: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: "center", justifyContent: "center",
+  },
+  stepDotText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  stepLabel: { fontSize: 12, fontWeight: "600", textAlign: "center" },
+  stepLine: { flex: 1, height: 2, marginBottom: 24 },
+
+  codeInput: {
+    fontSize: 28, fontWeight: "800", letterSpacing: 12,
+    textAlign: "center", borderRadius: 12, borderWidth: 1.5,
+    paddingVertical: 16, paddingHorizontal: 20,
+  },
+  resendLink: { fontSize: 13, fontWeight: "600", textAlign: "right", marginTop: 6 },
+
+  errorBox: {
     flexDirection: "row", alignItems: "center", gap: 8,
     padding: 12, borderRadius: 10, borderWidth: 1,
   },
-  infoNoteText: { fontSize: 13 },
+  errorText: { fontSize: 13, flex: 1 },
+
+  primaryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 10, borderRadius: 14, paddingVertical: 16,
+  },
+  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

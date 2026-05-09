@@ -20,6 +20,8 @@ import {
   serverUpdateTrip,
   serverDeleteTrip,
   serverBatchUpsertTrips,
+  serverRequestChangeCode,
+  serverConfirmChangePassword,
 } from "@/lib/api";
 
 export interface Trip {
@@ -69,6 +71,8 @@ interface AppContextType {
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
   updateProfile: (name: string, plate: string) => Promise<void>;
   updatePassword: (email: string, newPassword: string) => Promise<void>;
+  requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
+  confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   trips: Trip[];
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
@@ -548,6 +552,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await storeSession(key, passwordHash);
   }, []);
 
+  const requestPasswordChangeCode = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    const token = serverTokenRef.current;
+    if (!token) return { success: false, error: "Nicht mit Server verbunden. Bitte zuerst anmelden." };
+    return serverRequestChangeCode(token);
+  }, []);
+
+  const confirmPasswordChange = useCallback(async (code: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    const token = serverTokenRef.current;
+    if (!token) return { success: false, error: "Nicht mit Server verbunden." };
+    const result = await serverConfirmChangePassword(token, code, newPassword);
+    if (result.success && user) {
+      const key = user.email.toLowerCase().trim();
+      const accounts = await loadAccounts();
+      if (accounts[key]) {
+        const passwordHash = await sha256Hex(newPassword);
+        accounts[key].passwordHash = passwordHash;
+        await saveAccounts(accounts);
+        await storeSession(key, passwordHash);
+      }
+    }
+    return result;
+  }, [user]);
+
   const addTrip = useCallback(async (t: Trip) => {
     setTrips((prev) => {
       const next = [t, ...prev];
@@ -861,6 +888,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         register,
         updateProfile,
         updatePassword,
+        requestPasswordChangeCode,
+        confirmPasswordChange,
         trips,
         addTrip,
         deleteTrip,
