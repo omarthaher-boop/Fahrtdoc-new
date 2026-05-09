@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
@@ -18,6 +19,8 @@ import TripCard from "@/components/TripCard";
 import { useApp, Trip } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { exportPDF } from "@/utils/exportPDF";
+
+const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 type TypeFilter = "all" | "business" | "private";
@@ -66,6 +69,52 @@ export default function HistoryScreen() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const skipNextPersistRef = React.useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(FILTER_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const saved = JSON.parse(raw);
+            if (saved.periodFilter !== undefined) setPeriodFilter(saved.periodFilter);
+            if (saved.typeFilter !== undefined) setTypeFilter(saved.typeFilter);
+            if (saved.dateFrom !== undefined) setDateFrom(saved.dateFrom);
+            if (saved.dateTo !== undefined) setDateTo(saved.dateTo);
+            if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
+          } catch {}
+        }
+        setFiltersLoaded(true);
+      })
+      .catch(() => setFiltersLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!filtersLoaded) return;
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+    AsyncStorage.setItem(
+      FILTER_STORAGE_KEY,
+      JSON.stringify({ periodFilter, typeFilter, dateFrom, dateTo, showDateRange })
+    ).catch(() => {});
+  }, [filtersLoaded, periodFilter, typeFilter, dateFrom, dateTo, showDateRange]);
+
+  const resetFilters = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    skipNextPersistRef.current = true;
+    setPeriodFilter("all");
+    setTypeFilter("all");
+    setDateFrom("");
+    setDateTo("");
+    setShowDateRange(false);
+    AsyncStorage.removeItem(FILTER_STORAGE_KEY).catch(() => {});
+  };
+
+  const isFiltersActive =
+    periodFilter !== "all" || typeFilter !== "all" || !!dateFrom || !!dateTo;
 
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -210,6 +259,12 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Fahrten</Text>
+        {isFiltersActive && (
+          <TouchableOpacity onPress={resetFilters} style={[styles.resetBtn, { borderColor: colors.destructive }]}>
+            <Feather name="x" size={12} color={colors.destructive} />
+            <Text style={[styles.resetBtnText, { color: colors.destructive }]}>Filter zurücksetzen</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Filter Row 1: period */}
@@ -458,12 +513,25 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   title: {
     fontSize: 28,
     fontWeight: "800",
     letterSpacing: -0.4,
   },
+  resetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  resetBtnText: { fontSize: 12, fontWeight: "600" },
   filterRow1Wrap: { paddingBottom: 8 },
   filterRow2Wrap: { paddingBottom: 10 },
   filterRow: {
