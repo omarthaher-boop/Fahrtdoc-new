@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/useColors";
 export default function AuthScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { setUser } = useApp();
+  const { register, login } = useApp();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -37,22 +37,37 @@ export default function AuthScreen() {
         setError("Bitte alle Felder ausfüllen.");
         return;
       }
+      if (password.length < 6) {
+        setError("Passwort muss mindestens 6 Zeichen lang sein.");
+        return;
+      }
     } else {
       if (!email.trim() || !password.trim()) {
         setError("Bitte E-Mail und Passwort eingeben.");
         return;
       }
     }
+
     setLoading(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await new Promise((r) => setTimeout(r, 600));
-    await setUser({
-      name: mode === "register" ? name : email.split("@")[0] || "Fahrer",
-      email,
-      plate: mode === "register" ? plate.toUpperCase() : "B-DL-123",
-    });
-    setLoading(false);
-    router.replace("/(main)/home");
+    await new Promise((r) => setTimeout(r, 400));
+
+    if (mode === "register") {
+      await register(
+        { name, email: email.trim(), plate: plate.toUpperCase() },
+        password
+      );
+      setLoading(false);
+      router.replace("/(main)/home");
+    } else {
+      const ok = await login(email.trim(), password);
+      setLoading(false);
+      if (!ok) {
+        setError("Falsches Passwort. Bitte erneut versuchen.");
+        return;
+      }
+      router.replace("/(main)/home");
+    }
   };
 
   return (
@@ -148,8 +163,24 @@ export default function AuthScreen() {
             </View>
           </View>
 
+          {/* Passwort vergessen – only in login mode */}
+          {mode === "login" && (
+            <TouchableOpacity
+              style={styles.forgotWrap}
+              onPress={() => router.push("/forgot-password")}
+              testID="forgot-password-link"
+            >
+              <Text style={[styles.forgotText, { color: colors.primary }]}>
+                Passwort vergessen?
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {error ? (
-            <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+            <View style={[styles.errorBanner, { backgroundColor: "#FFF0F3", borderColor: colors.destructive }]}>
+              <Feather name="alert-circle" size={14} color={colors.destructive} />
+              <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+            </View>
           ) : null}
 
           <TouchableOpacity
@@ -287,10 +318,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
   },
+  forgotWrap: {
+    alignSelf: "flex-end",
+    marginTop: -6,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+  },
   errorText: {
     fontSize: 13,
     fontWeight: "500",
-    textAlign: "center",
+    flex: 1,
   },
   submitBtn: {
     borderRadius: 14,

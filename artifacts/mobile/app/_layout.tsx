@@ -24,6 +24,8 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="(main)" />
     </Stack>
   );

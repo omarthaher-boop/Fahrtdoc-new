@@ -37,6 +37,9 @@ export interface UserProfile {
 interface AppContextType {
   user: UserProfile | null;
   setUser: (u: UserProfile | null) => void;
+  register: (profile: UserProfile, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
+  updatePassword: (email: string, newPassword: string) => Promise<void>;
   trips: Trip[];
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
@@ -149,6 +152,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(u);
     if (u) await AsyncStorage.setItem("user", JSON.stringify(u));
     else await AsyncStorage.removeItem("user");
+  }, []);
+
+  const register = useCallback(async (profile: UserProfile, password: string) => {
+    const creds = await AsyncStorage.getItem("credentials");
+    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
+    credsMap[profile.email.trim().toLowerCase()] = password;
+    await AsyncStorage.setItem("credentials", JSON.stringify(credsMap));
+    setUserState(profile);
+    await AsyncStorage.setItem("user", JSON.stringify(profile));
+  }, []);
+
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const creds = await AsyncStorage.getItem("credentials");
+    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
+    const key = email.trim().toLowerCase();
+    if (credsMap[key] !== undefined && credsMap[key] !== password) {
+      return false;
+    }
+    const u = await AsyncStorage.getItem("user");
+    if (u) {
+      const parsed: UserProfile = JSON.parse(u);
+      if (parsed.email.trim().toLowerCase() === key) {
+        setUserState(parsed);
+        return true;
+      }
+    }
+    const fallbackProfile: UserProfile = {
+      name: email.split("@")[0] || "Fahrer",
+      email,
+      plate: "B-DL-123",
+    };
+    setUserState(fallbackProfile);
+    await AsyncStorage.setItem("user", JSON.stringify(fallbackProfile));
+    return true;
+  }, []);
+
+  const updatePassword = useCallback(async (email: string, newPassword: string) => {
+    const creds = await AsyncStorage.getItem("credentials");
+    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
+    credsMap[email.trim().toLowerCase()] = newPassword;
+    await AsyncStorage.setItem("credentials", JSON.stringify(credsMap));
   }, []);
 
   const addTrip = useCallback(async (t: Trip) => {
@@ -311,6 +355,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         setUser,
+        register,
+        login,
+        updatePassword,
         trips,
         addTrip,
         deleteTrip,
