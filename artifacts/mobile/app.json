@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "DriveLog",
-    "slug": "mobile",
+    "name": "Fahrtdoc",
+    "slug": "fahrtdoc",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "fahrtdoc",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -14,11 +14,14 @@
       "backgroundColor": "#F8FAFB"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fahrtdoc.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.fahrtdoc.app"
+    },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [
