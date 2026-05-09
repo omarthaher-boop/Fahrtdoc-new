@@ -33,7 +33,8 @@ function buildHTML(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  typeLabel?: string
 ): string {
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
@@ -63,6 +64,7 @@ function buildHTML(
     ? `<img src="${user.logoUri}" style="max-height:48px; max-width:160px; object-fit:contain; display:block; margin-bottom:6px;" alt="Logo" />`
     : "";
   const headerLabel = user?.companyName ? user.companyName : "FahrtDoc";
+  const subLabel = typeLabel ? typeLabel : "Fahrtenbuch";
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -132,7 +134,7 @@ function buildHTML(
     <div>
       ${logoHtml}
       <div class="brand-name">${headerLabel}</div>
-      <div class="brand-sub">Fahrtenbuch</div>
+      <div class="brand-sub">${subLabel}</div>
     </div>
     <div class="meta">
       ${user ? `<strong>${user.name}</strong><br>` : ""}
@@ -171,7 +173,7 @@ function buildHTML(
     </tfoot>
   </table>
   <div class="footer">
-    <span>${headerLabel} · Fahrtenbuch-Export</span>
+    <span>${headerLabel} · ${subLabel}-Export</span>
     <span>Erstellt am ${exportedAt}</span>
   </div>
 </body>
@@ -182,7 +184,9 @@ async function exportPDFWeb(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  filename = "Fahrtenbuch.pdf",
+  typeLabel?: string
 ): Promise<void> {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -210,6 +214,7 @@ async function exportPDFWeb(
   doc.setDrawColor(...navy);
 
   const brandLabel = user?.companyName || "FahrtDoc";
+  const subLabel = typeLabel ?? "Fahrtenbuch";
 
   if (user?.logoUri) {
     try {
@@ -244,7 +249,7 @@ async function exportPDFWeb(
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(90, 106, 154);
-  doc.text("Fahrtenbuch", margin, y + 6);
+  doc.text(subLabel, margin, y + 6);
 
   doc.setFontSize(9);
   doc.setTextColor(68, 68, 68);
@@ -377,19 +382,21 @@ async function exportPDFWeb(
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray);
-  doc.text(`${brandLabel} · Fahrtenbuch-Export`, margin, y);
+  doc.text(`${brandLabel} · ${subLabel}-Export`, margin, y);
   doc.text(`Erstellt am ${exportedAt}`, pageW - margin, y, { align: "right" });
 
-  doc.save("Fahrtenbuch.pdf");
+  doc.save(filename);
 }
 
 async function exportPDFNative(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  dialogTitle = "Fahrtenbuch exportieren",
+  typeLabel?: string
 ): Promise<void> {
-  const html = buildHTML(trips, user, dateFrom, dateTo);
+  const html = buildHTML(trips, user, dateFrom, dateTo, typeLabel);
   const Print = await import("expo-print");
   const Sharing = await import("expo-sharing");
 
@@ -399,7 +406,7 @@ async function exportPDFNative(
   if (isAvailable) {
     await Sharing.shareAsync(uri, {
       mimeType: "application/pdf",
-      dialogTitle: "Fahrtenbuch exportieren",
+      dialogTitle,
       UTI: "com.adobe.pdf",
     });
   } else {
@@ -425,5 +432,69 @@ export async function exportPDF(
     await exportPDFWeb(trips, user, dateFrom, dateTo);
   } else {
     await exportPDFNative(trips, user, dateFrom, dateTo);
+  }
+}
+
+export async function exportSplitPDF(
+  trips: Trip[],
+  user: UserProfile | null,
+  dateFrom = "",
+  dateTo = ""
+): Promise<void> {
+  if (trips.length === 0) {
+    Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
+    return;
+  }
+
+  const businessTrips = trips.filter((t) => t.type === "business");
+  const privateTrips = trips.filter((t) => t.type === "private");
+
+  if (businessTrips.length === 0 && privateTrips.length === 0) {
+    Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
+    return;
+  }
+
+  if (Platform.OS === "web") {
+    if (businessTrips.length > 0) {
+      await exportPDFWeb(
+        businessTrips,
+        user,
+        dateFrom,
+        dateTo,
+        "Fahrtenbuch_Geschaeftlich.pdf",
+        "Geschäftliche Fahrten"
+      );
+    }
+    if (privateTrips.length > 0) {
+      await exportPDFWeb(
+        privateTrips,
+        user,
+        dateFrom,
+        dateTo,
+        "Fahrtenbuch_Privat.pdf",
+        "Private Fahrten"
+      );
+    }
+  } else {
+    if (businessTrips.length > 0) {
+      await exportPDFNative(
+        businessTrips,
+        user,
+        dateFrom,
+        dateTo,
+        "Geschäftliche Fahrten exportieren",
+        "Geschäftliche Fahrten"
+      );
+    }
+    if (privateTrips.length > 0) {
+      await exportPDFNative(
+        privateTrips,
+        user,
+        dateFrom,
+        dateTo,
+        "Private Fahrten exportieren",
+        "Private Fahrten"
+      );
+    }
   }
 }
