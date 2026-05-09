@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 function sanitizeKey(email: string): string {
@@ -8,9 +7,9 @@ function sanitizeKey(email: string): string {
 
 async function getOrCreateDataKey(email: string): Promise<CryptoKey> {
   const storeKey = sanitizeKey(email);
-  const rawHex = await SecureStore.getItemAsync(storeKey);
-  if (rawHex) {
-    const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((h) => parseInt(h, 16)));
+  const stored = localStorage.getItem(storeKey);
+  if (stored) {
+    const bytes = new Uint8Array(stored.match(/.{2}/g)!.map((h) => parseInt(h, 16)));
     return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, [
       "encrypt",
       "decrypt",
@@ -24,7 +23,7 @@ async function getOrCreateDataKey(email: string): Promise<CryptoKey> {
   const hex = Array.from(new Uint8Array(raw))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  await SecureStore.setItemAsync(storeKey, hex);
+  localStorage.setItem(storeKey, hex);
   return key;
 }
 
@@ -74,6 +73,6 @@ export async function secureGetItem(email: string, key: string): Promise<string 
 
 export async function secureRemoveDataKey(email: string): Promise<void> {
   if (Platform.OS === "web") {
-    await SecureStore.deleteItemAsync(sanitizeKey(email));
+    localStorage.removeItem(sanitizeKey(email));
   }
 }
