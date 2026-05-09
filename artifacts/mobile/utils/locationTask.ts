@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as TaskManager from "expo-task-manager";
 
 export const LOCATION_TASK_NAME = "DRIVELOG_BG_LOCATION";
-export const BG_POSITIONS_KEY = "drivelog_bg_positions";
+export const BG_POSITIONS_KEY = "fahrtdoc_bg_positions";
 
 export interface BgPosition {
   lat: number;

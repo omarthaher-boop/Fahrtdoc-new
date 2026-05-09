@@ -38,9 +38,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "DriveLog benötigt deinen Standort, um Fahrten zu erfassen.",
-          "locationWhenInUsePermission": "DriveLog benötigt deinen Standort, um Fahrten zu erfassen.",
-          "locationAlwaysPermission": "DriveLog benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
+          "locationAlwaysAndWhenInUsePermission": "Fahrtdoc benötigt deinen Standort, um Fahrten zu erfassen.",
+          "locationWhenInUsePermission": "Fahrtdoc benötigt deinen Standort, um Fahrten zu erfassen.",
+          "locationAlwaysPermission": "Fahrtdoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
