@@ -1,8 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 
+function sanitizeKey(email: string): string {
+  return `dk_${email.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
+}
+
 async function getOrCreateDataKey(email: string): Promise<CryptoKey> {
-  const storeKey = `dk_${email.toLowerCase()}`;
+  const storeKey = sanitizeKey(email);
   const rawHex = await SecureStore.getItemAsync(storeKey);
   if (rawHex) {
     const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((h) => parseInt(h, 16)));
@@ -64,5 +68,5 @@ export async function secureGetItem(email: string, key: string): Promise<string 
 }
 
 export async function secureRemoveDataKey(email: string): Promise<void> {
-  await SecureStore.deleteItemAsync(`dk_${email.toLowerCase()}`);
+  await SecureStore.deleteItemAsync(sanitizeKey(email));
 }

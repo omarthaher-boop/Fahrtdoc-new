@@ -153,6 +153,31 @@ async function saveAccounts(accounts: Record<string, StoredAccount>): Promise<vo
   await AsyncStorage.setItem("accounts", JSON.stringify(accounts));
 }
 
+async function migrateOldCredentials(
+  email: string,
+  password: string
+): Promise<StoredAccount | "not_found" | "wrong_password"> {
+  const raw = await AsyncStorage.getItem("credentials");
+  if (!raw) return "not_found";
+  try {
+    const creds = JSON.parse(raw) as { email?: string; password?: string; name?: string; plate?: string };
+    if (!creds.email || creds.email.toLowerCase().trim() !== email) return "not_found";
+    if (creds.password !== password) return "wrong_password";
+    const passwordHash = await sha256Hex(password);
+    const account: StoredAccount = {
+      name: creds.name ?? "",
+      plate: creds.plate ?? "",
+      passwordHash,
+    };
+    const accounts = await loadAccounts();
+    accounts[email] = account;
+    await saveAccounts(accounts);
+    return account;
+  } catch {
+    return "not_found";
+  }
+}
+
 async function makeSessionToken(passwordHash: string, nonce: string): Promise<string> {
   return sha256Hex(passwordHash + ":" + nonce);
 }
@@ -252,8 +277,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ): Promise<"ok" | "not_found" | "wrong_password"> => {
     const key = email.toLowerCase().trim();
     const accounts = await loadAccounts();
-    const account = accounts[key];
-    if (!account) return "not_found";
+    let account = accounts[key];
+
+    if (!account) {
+      const migrated = await migrateOldCredentials(key, password);
+      if (migrated === "wrong_password") return "wrong_password";
+      if (migrated === "not_found") return "not_found";
+      account = migrated;
+    }
+
     const hash = await sha256Hex(password);
     if (hash !== account.passwordHash) return "wrong_password";
     await storeSession(key, account.passwordHash);
@@ -267,6 +299,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (parsed.length > 0) loaded = parsed;
       } catch {
         // keep seed
+      }
+    } else {
+      const oldTrips = await AsyncStorage.getItem("trips");
+      if (oldTrips) {
+        try {
+          const parsed: Trip[] = JSON.parse(oldTrips);
+          if (parsed.length > 0) {
+            loaded = parsed;
+            await secureSetItem(key, tripsKey(key), JSON.stringify(parsed));
+          }
+        } catch {
+          // keep seed
+        }
       }
     }
     setTrips(loaded);
@@ -342,10 +387,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const editTrip = useCallback((id: string, changes: Partial<Trip>) => {
     setTrips((prev) => {
       const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
-      AsyncStorage.setItem("trips", JSON.stringify(next));
+      setUserState((u) => {
+        if (u) persistTrips(next, u.email);
+        return u;
+      });
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   const startTrip = useCallback(
     async (type: "business" | "private") => {
