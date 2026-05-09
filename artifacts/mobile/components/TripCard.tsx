@@ -15,6 +15,9 @@ interface Props {
   trip: Trip;
   onDelete?: (id: string) => void;
   onEdit?: (trip: Trip) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 const fmtTime = (iso: string) =>
@@ -28,7 +31,14 @@ const fmtDurMin = (s: number) => {
   return h > 0 ? `${h}h ${rem}min` : `${m} Min`;
 };
 
-export default function TripCard({ trip, onDelete, onEdit }: Props) {
+export default function TripCard({
+  trip,
+  onDelete,
+  onEdit,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
+}: Props) {
   const colors = useColors();
   const isBusiness = trip.type === "business";
   const accentColor = isBusiness ? colors.primary : colors.success;
@@ -45,10 +55,44 @@ export default function TripCard({ trip, onDelete, onEdit }: Props) {
     onEdit?.(trip);
   };
 
+  const handleCardPress = () => {
+    if (!selectionMode) return;
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    onToggleSelect?.(trip.id);
+  };
+
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity
+      activeOpacity={selectionMode ? 0.75 : 1}
+      onPress={handleCardPress}
+      style={[
+        styles.card,
+        {
+          backgroundColor: selected ? "#EEF3FF" : colors.card,
+          borderColor: selected ? colors.primary : colors.border,
+          borderWidth: selected ? 1.5 : 1,
+        },
+      ]}
+    >
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <View style={styles.checkboxWrap}>
+          <View
+            style={[
+              styles.checkbox,
+              {
+                backgroundColor: selected ? colors.primary : "transparent",
+                borderColor: selected ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            {selected && <Feather name="check" size={11} color="#fff" />}
+          </View>
+        </View>
+      )}
+
       {/* Left blue accent bar */}
-      <View style={[styles.leftBar, { backgroundColor: colors.primary }]} />
+      <View style={[styles.leftBar, { backgroundColor: selected ? colors.primary : colors.primary }]} />
 
       <View style={styles.inner}>
         {/* Top row: type badge + time + edit + delete */}
@@ -68,20 +112,24 @@ export default function TripCard({ trip, onDelete, onEdit }: Props) {
             <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
               {fmtTime(trip.date)}
             </Text>
-            <TouchableOpacity
-              onPress={handleEdit}
-              style={[styles.actionBtn, { borderColor: colors.border }]}
-              testID={`edit-${trip.id}`}
-            >
-              <Feather name="edit-2" size={13} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleDelete}
-              style={[styles.actionBtn, { borderColor: colors.border }]}
-              testID={`delete-${trip.id}`}
-            >
-              <Feather name="trash-2" size={13} color={colors.destructive} />
-            </TouchableOpacity>
+            {!selectionMode && (
+              <>
+                <TouchableOpacity
+                  onPress={handleEdit}
+                  style={[styles.actionBtn, { borderColor: colors.border }]}
+                  testID={`edit-${trip.id}`}
+                >
+                  <Feather name="edit-2" size={13} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  style={[styles.actionBtn, { borderColor: colors.border }]}
+                  testID={`delete-${trip.id}`}
+                >
+                  <Feather name="trash-2" size={13} color={colors.destructive} />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -128,7 +176,7 @@ export default function TripCard({ trip, onDelete, onEdit }: Props) {
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -136,9 +184,22 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     borderRadius: 14,
-    borderWidth: 1,
     marginBottom: 10,
     overflow: "hidden",
+  },
+  checkboxWrap: {
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   leftBar: {
     width: 4,

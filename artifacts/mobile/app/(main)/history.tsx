@@ -66,6 +66,10 @@ export default function HistoryScreen() {
   const [dateTo, setDateTo] = useState("");
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
 
+  // Selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   const PERIOD_OPTIONS: { label: string; value: PeriodFilter }[] = [
     { label: "Alle", value: "all" },
     { label: "Letzter Monat", value: 1 },
@@ -105,8 +109,15 @@ export default function HistoryScreen() {
     });
   }, [trips, cutoff, typeFilter, dateFrom, dateTo]);
 
-  const totalKm = useMemo(() => filtered.reduce((a, b) => a + b.km, 0), [filtered]);
-  const totalDur = useMemo(() => filtered.reduce((a, b) => a + b.dur, 0), [filtered]);
+  // Which trips the stats card and export act on
+  const selectedTrips = useMemo(
+    () => filtered.filter((t) => selectedIds.has(t.id)),
+    [filtered, selectedIds]
+  );
+  const displayTrips = selectionMode && selectedIds.size > 0 ? selectedTrips : filtered;
+
+  const statsKm = useMemo(() => displayTrips.reduce((a, b) => a + b.km, 0), [displayTrips]);
+  const statsDur = useMemo(() => displayTrips.reduce((a, b) => a + b.dur, 0), [displayTrips]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
@@ -115,23 +126,55 @@ export default function HistoryScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
+  // --- Selection handlers ---
+  const toggleSelectionMode = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (selectionMode) {
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+    } else {
+      setSelectionMode(true);
+    }
+  };
+
+  const toggleTrip = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setSelectedIds(new Set(filtered.map((t) => t.id)));
+  };
+
+  const clearSelection = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setSelectedIds(new Set());
+  };
+
+  // --- Export handlers ---
   const handleEmailExport = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    const lines = filtered.map(
+    const toExport = displayTrips;
+    const lines = toExport.map(
       (t) =>
         `${new Date(t.date).toLocaleDateString("de-DE")}  |  ${t.type === "business" ? "Geschäftl." : "Privat"}  |  ${t.startAddr} → ${t.endAddr}  |  ${t.km.toFixed(1)} km  |  ${fmtDur(t.dur)}`
     );
-    const subject = `DriveLog Fahrtenbuch – ${filtered.length} Fahrten (${totalKm.toFixed(1)} km)`;
+    const subject = `DriveLog Fahrtenbuch – ${toExport.length} Fahrten (${statsKm.toFixed(1)} km)`;
     const body = [
       "DriveLog Fahrtenbuch",
       "=".repeat(40),
-      `${filtered.length} Fahrten · ${totalKm.toFixed(1)} km gesamt`,
+      `${toExport.length} Fahrten · ${statsKm.toFixed(1)} km gesamt`,
       "",
       "Datum            | Typ         | Start → Ziel                          | Strecke | Dauer",
       "-".repeat(90),
       ...lines,
       "-".repeat(90),
-      `Gesamt: ${totalKm.toFixed(1)} km · ${fmtDur(totalDur)}`,
+      `Gesamt: ${statsKm.toFixed(1)} km · ${fmtDur(statsDur)}`,
       "",
       `Exportiert mit DriveLog am ${new Date().toLocaleDateString("de-DE")}`,
     ].join("\n");
@@ -141,7 +184,7 @@ export default function HistoryScreen() {
 
   const handleExportPDF = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    await exportPDF(filtered, user, dateFrom, dateTo);
+    await exportPDF(displayTrips, user, dateFrom, dateTo);
   };
 
   const handleEdit = (trip: Trip) => {
@@ -185,9 +228,10 @@ export default function HistoryScreen() {
         </ScrollView>
       </View>
 
-      {/* Filter Row 2: type + date range */}
+      {/* Filter Row 2: type + date range + selection toggle */}
       <View style={[styles.filterRow2Wrap, { backgroundColor: colors.background }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {/* Von–Bis */}
           <TouchableOpacity
             onPress={() => { setShowDateRange((p) => !p); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
             style={[
@@ -205,6 +249,7 @@ export default function HistoryScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Business / Privat */}
           {(["business", "private"] as const).map((t) => {
             const active = typeFilter === t;
             return (
@@ -231,6 +276,28 @@ export default function HistoryScreen() {
               </TouchableOpacity>
             );
           })}
+
+          {/* Auswahl toggle */}
+          <TouchableOpacity
+            onPress={toggleSelectionMode}
+            style={[
+              styles.pill,
+              styles.pillWithIcon,
+              {
+                backgroundColor: selectionMode ? colors.accent : colors.card,
+                borderColor: selectionMode ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Feather
+              name={selectionMode ? "check-square" : "square"}
+              size={13}
+              color={selectionMode ? colors.primary : colors.mutedForeground}
+            />
+            <Text style={[styles.pillText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
+              Auswahl
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -282,20 +349,50 @@ export default function HistoryScreen() {
         </View>
       )}
 
+      {/* Selection bar */}
+      {selectionMode && (
+        <View style={[styles.selectionBar, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+          <Feather name="check-square" size={14} color={colors.primary} />
+          <Text style={[styles.selectionCount, { color: colors.primary }]}>
+            {selectedIds.size === 0
+              ? "Keine ausgewählt"
+              : `${selectedIds.size} von ${filtered.length} ausgewählt`}
+          </Text>
+          <View style={styles.selectionActions}>
+            <TouchableOpacity
+              onPress={selectAll}
+              style={[styles.selectionBtn, { borderColor: colors.primary }]}
+            >
+              <Text style={[styles.selectionBtnText, { color: colors.primary }]}>Alle</Text>
+            </TouchableOpacity>
+            {selectedIds.size > 0 && (
+              <TouchableOpacity
+                onPress={clearSelection}
+                style={[styles.selectionBtn, { borderColor: colors.mutedForeground }]}
+              >
+                <Text style={[styles.selectionBtnText, { color: colors.mutedForeground }]}>Keine</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Stats summary card */}
-      <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
+      <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
         <View style={styles.statItem}>
           <Feather name="list" size={18} color={colors.primary} />
           <View>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{filtered.length}</Text>
-            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>Fahrten</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{displayTrips.length}</Text>
+            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
+              {selectionMode && selectedIds.size > 0 ? "ausgewählt" : "Fahrten"}
+            </Text>
           </View>
         </View>
         <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
         <View style={styles.statItem}>
           <Feather name="navigation" size={18} color={colors.primary} />
           <View>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{totalKm.toFixed(1)} km</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{statsKm.toFixed(1)} km</Text>
             <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>Gesamtstrecke</Text>
           </View>
         </View>
@@ -346,6 +443,9 @@ export default function HistoryScreen() {
                   trip={t}
                   onDelete={deleteTrip}
                   onEdit={handleEdit}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.has(t.id)}
+                  onToggleSelect={toggleTrip}
                 />
               ))}
             </View>
@@ -442,6 +542,36 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   clearDateText: { fontSize: 12, fontWeight: "600" },
+  selectionBar: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectionCount: {
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  selectionActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  selectionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  selectionBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
   statsCard: {
     borderRadius: 14,
     borderWidth: 1,
