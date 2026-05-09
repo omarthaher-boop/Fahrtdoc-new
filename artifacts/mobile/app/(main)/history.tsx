@@ -2,9 +2,9 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import {
+  Linking,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -115,23 +115,28 @@ export default function HistoryScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  const handleExportAll = async () => {
+  const handleEmailExport = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     const lines = filtered.map(
       (t) =>
-        `${new Date(t.date).toLocaleDateString("de-DE")} | ${t.type === "business" ? "Geschäftl." : "Privat"} | ${t.startAddr} → ${t.endAddr} | ${t.km.toFixed(1)} km | ${fmtDur(t.dur)}`
+        `${new Date(t.date).toLocaleDateString("de-DE")}  |  ${t.type === "business" ? "Geschäftl." : "Privat"}  |  ${t.startAddr} → ${t.endAddr}  |  ${t.km.toFixed(1)} km  |  ${fmtDur(t.dur)}`
     );
-    const text = `DriveLog Fahrtenbuch\n${filtered.length} Fahrten · ${totalKm.toFixed(1)} km\n\n${lines.join("\n")}`;
-    if (Platform.OS === "web") {
-      const blob = new Blob([text], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "Fahrtenbuch.txt";
-      a.click();
-    } else {
-      await Share.share({ message: text, title: "DriveLog Fahrtenbuch" });
-    }
+    const subject = `DriveLog Fahrtenbuch – ${filtered.length} Fahrten (${totalKm.toFixed(1)} km)`;
+    const body = [
+      "DriveLog Fahrtenbuch",
+      "=".repeat(40),
+      `${filtered.length} Fahrten · ${totalKm.toFixed(1)} km gesamt`,
+      "",
+      "Datum            | Typ         | Start → Ziel                          | Strecke | Dauer",
+      "-".repeat(90),
+      ...lines,
+      "-".repeat(90),
+      `Gesamt: ${totalKm.toFixed(1)} km · ${fmtDur(totalDur)}`,
+      "",
+      `Exportiert mit DriveLog am ${new Date().toLocaleDateString("de-DE")}`,
+    ].join("\n");
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    await Linking.openURL(mailto);
   };
 
   const handleExportPDF = async () => {
@@ -303,11 +308,10 @@ export default function HistoryScreen() {
             <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={handleExportAll}
+            onPress={handleEmailExport}
             style={[styles.exportBtn, { borderColor: colors.primary }]}
           >
-            <Feather name="check-square" size={13} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]}>Alle</Text>
+            <Feather name="mail" size={15} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
