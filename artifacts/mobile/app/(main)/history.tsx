@@ -277,27 +277,6 @@ export default function HistoryScreen() {
             );
           })}
 
-          {/* Auswahl toggle */}
-          <TouchableOpacity
-            onPress={toggleSelectionMode}
-            style={[
-              styles.pill,
-              styles.pillWithIcon,
-              {
-                backgroundColor: selectionMode ? colors.accent : colors.card,
-                borderColor: selectionMode ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            <Feather
-              name={selectionMode ? "check-square" : "square"}
-              size={13}
-              color={selectionMode ? colors.primary : colors.mutedForeground}
-            />
-            <Text style={[styles.pillText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
-              Auswahl
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -349,34 +328,6 @@ export default function HistoryScreen() {
         </View>
       )}
 
-      {/* Selection bar */}
-      {selectionMode && (
-        <View style={[styles.selectionBar, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-          <Feather name="check-square" size={14} color={colors.primary} />
-          <Text style={[styles.selectionCount, { color: colors.primary }]}>
-            {selectedIds.size === 0
-              ? "Keine ausgewählt"
-              : `${selectedIds.size} von ${filtered.length} ausgewählt`}
-          </Text>
-          <View style={styles.selectionActions}>
-            <TouchableOpacity
-              onPress={selectAll}
-              style={[styles.selectionBtn, { borderColor: colors.primary }]}
-            >
-              <Text style={[styles.selectionBtnText, { color: colors.primary }]}>Alle</Text>
-            </TouchableOpacity>
-            {selectedIds.size > 0 && (
-              <TouchableOpacity
-                onPress={clearSelection}
-                style={[styles.selectionBtn, { borderColor: colors.mutedForeground }]}
-              >
-                <Text style={[styles.selectionBtnText, { color: colors.mutedForeground }]}>Keine</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      )}
-
       {/* Stats summary card */}
       <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
         <View style={styles.statItem}>
@@ -411,6 +362,34 @@ export default function HistoryScreen() {
             <Feather name="mail" size={15} color={colors.primary} />
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Selection bar — directly above trip list */}
+      <View style={[styles.selectionHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+        <TouchableOpacity onPress={toggleSelectionMode} style={styles.selectionToggle}>
+          <Feather
+            name={selectionMode ? "check-square" : "square"}
+            size={15}
+            color={selectionMode ? colors.primary : colors.mutedForeground}
+          />
+          <Text style={[styles.selectionToggleText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
+            {selectionMode && selectedIds.size > 0
+              ? `${selectedIds.size} von ${filtered.length} ausgewählt`
+              : "Auswahl"}
+          </Text>
+        </TouchableOpacity>
+        {selectionMode && (
+          <View style={styles.selectionQuick}>
+            <TouchableOpacity onPress={selectAll} style={[styles.selQuickBtn, { borderColor: colors.primary }]}>
+              <Text style={[styles.selQuickText, { color: colors.primary }]}>Alle</Text>
+            </TouchableOpacity>
+            {selectedIds.size > 0 && (
+              <TouchableOpacity onPress={clearSelection} style={[styles.selQuickBtn, { borderColor: colors.mutedForeground }]}>
+                <Text style={[styles.selQuickText, { color: colors.mutedForeground }]}>Keine</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Trip list grouped by date */}
@@ -542,33 +521,34 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   clearDateText: { fontSize: 12, fontWeight: "600" },
-  selectionBar: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  selectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  selectionCount: {
+  selectionToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  selectionToggleText: {
     fontSize: 13,
     fontWeight: "600",
-    flex: 1,
   },
-  selectionActions: {
+  selectionQuick: {
     flexDirection: "row",
     gap: 6,
   },
-  selectionBtn: {
+  selQuickBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
   },
-  selectionBtnText: {
+  selQuickText: {
     fontSize: 12,
     fontWeight: "700",
   },
