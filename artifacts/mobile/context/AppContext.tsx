@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { Platform } from "react-native";
+import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
 
 export interface Trip {
@@ -128,11 +129,7 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
 };
 
 async function sha256Hex(text: string): Promise<string> {
-  const encoded = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return ExpoCrypto.digestStringAsync(ExpoCrypto.CryptoDigestAlgorithm.SHA256, text);
 }
 
 function tripsKey(email: string): string {
