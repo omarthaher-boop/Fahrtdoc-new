@@ -31,10 +31,9 @@ const fmtDate = (iso: string) =>
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, setUser, trips, deleteTrip } = useApp();
+  const { user, logout, updateProfile, trips } = useApp();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
   const [plate, setPlate] = useState(user?.plate ?? "");
 
   const totalKm = trips.reduce((a, b) => a + b.km, 0);
@@ -43,8 +42,8 @@ export default function ProfileScreen() {
   const businessKm = businessTrips.reduce((a, b) => a + b.km, 0);
 
   const handleSave = async () => {
-    if (!name.trim() || !email.trim() || !plate.trim()) return;
-    await setUser({ name, email, plate: plate.toUpperCase() });
+    if (!name.trim() || !plate.trim()) return;
+    await updateProfile(name.trim(), plate.trim().toUpperCase());
     setEditing(false);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
@@ -73,12 +72,11 @@ export default function ProfileScreen() {
         {
           text: "Abmelden",
           style: "destructive",
-          onPress: async () => { await setUser(null); router.replace("/"); },
+          onPress: async () => { await logout(); router.replace("/"); },
         },
       ]);
     } else {
-      setUser(null);
-      router.replace("/");
+      logout().then(() => router.replace("/"));
     }
   };
 
@@ -128,8 +126,10 @@ export default function ProfileScreen() {
             ) : (
               <View style={[styles.profileInfo, { gap: 10 }]}>
                 <EditField label="Name" value={name} onChangeText={setName} icon="user" colors={colors} />
-                <EditField label="E-Mail" value={email} onChangeText={setEmail} icon="mail" keyboardType="email-address" autoCapitalize="none" colors={colors} />
                 <EditField label="Kennzeichen" value={plate} onChangeText={(t) => setPlate(t.toUpperCase())} icon="truck" autoCapitalize="characters" colors={colors} />
+                <Text style={[styles.emailNote, { color: colors.mutedForeground }]}>
+                  E-Mail: {user?.email}
+                </Text>
               </View>
             )}
           </View>
@@ -265,6 +265,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   plateText: { fontSize: 13, fontWeight: "700" },
+  emailNote: { fontSize: 12, marginTop: 2 },
   statsCard: { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14 },
   cardTitle: { fontSize: 16, fontWeight: "700" },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },

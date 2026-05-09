@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/useColors";
 export default function AuthScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { register, login } = useApp();
+  const { login, register } = useApp();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -50,23 +50,27 @@ export default function AuthScreen() {
 
     setLoading(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await new Promise((r) => setTimeout(r, 400));
-
-    if (mode === "register") {
-      await register(
-        { name, email: email.trim(), plate: plate.toUpperCase() },
-        password
-      );
-      setLoading(false);
-      router.replace("/(main)/home");
-    } else {
-      const ok = await login(email.trim(), password);
-      setLoading(false);
-      if (!ok) {
-        setError("Falsches Passwort. Bitte erneut versuchen.");
-        return;
+    try {
+      if (mode === "register") {
+        const result = await register(name.trim(), email.trim(), plate.trim(), password);
+        if (result === "exists") {
+          setError("Diese E-Mail-Adresse ist bereits registriert.");
+          return;
+        }
+      } else {
+        const result = await login(email.trim(), password);
+        if (result === "not_found") {
+          setError("Kein Konto mit dieser E-Mail-Adresse gefunden.");
+          return;
+        }
+        if (result === "wrong_password") {
+          setError("Falsches Passwort. Bitte versuche es erneut.");
+          return;
+        }
       }
       router.replace("/(main)/home");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -163,7 +167,6 @@ export default function AuthScreen() {
             </View>
           </View>
 
-          {/* Passwort vergessen – only in login mode */}
           {mode === "login" && (
             <TouchableOpacity
               style={styles.forgotWrap}

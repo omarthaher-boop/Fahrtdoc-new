@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { Platform } from "react-native";
+import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
 
 export interface Trip {
   id: string;
@@ -35,11 +36,25 @@ export interface UserProfile {
   plate: string;
 }
 
+interface StoredAccount {
+  name: string;
+  plate: string;
+  passwordHash: string;
+}
+
+interface SessionRecord {
+  email: string;
+  nonce: string;
+  sessionToken: string;
+}
+
 interface AppContextType {
   user: UserProfile | null;
-  setUser: (u: UserProfile | null) => void;
-  register: (profile: UserProfile, password: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<boolean>;
+  loading: boolean;
+  logout: () => Promise<void>;
+  login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password">;
+  register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
+  updateProfile: (name: string, plate: string) => Promise<void>;
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   trips: Trip[];
   addTrip: (t: Trip) => void;
@@ -112,8 +127,79 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
   }
 };
 
+async function sha256Hex(text: string): Promise<string> {
+  const encoded = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function tripsKey(email: string): string {
+  return `trips_${email}`;
+}
+
+async function loadAccounts(): Promise<Record<string, StoredAccount>> {
+  const raw = await AsyncStorage.getItem("accounts");
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, StoredAccount>;
+  } catch {
+    return {};
+  }
+}
+
+async function saveAccounts(accounts: Record<string, StoredAccount>): Promise<void> {
+  await AsyncStorage.setItem("accounts", JSON.stringify(accounts));
+}
+
+async function makeSessionToken(passwordHash: string, nonce: string): Promise<string> {
+  return sha256Hex(passwordHash + ":" + nonce);
+}
+
+async function storeSession(email: string, passwordHash: string): Promise<void> {
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const sessionToken = await makeSessionToken(passwordHash, nonce);
+  const record: SessionRecord = { email, nonce, sessionToken };
+  await AsyncStorage.setItem("session", JSON.stringify(record));
+}
+
+async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips: Trip[] } | null> {
+  const raw = await AsyncStorage.getItem("session");
+  if (!raw) return null;
+  let session: SessionRecord;
+  try {
+    session = JSON.parse(raw) as SessionRecord;
+  } catch {
+    return null;
+  }
+  const accounts = await loadAccounts();
+  const account = accounts[session.email];
+  if (!account) return null;
+  const expected = await makeSessionToken(account.passwordHash, session.nonce);
+  if (expected !== session.sessionToken) {
+    await AsyncStorage.removeItem("session");
+    return null;
+  }
+  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate };
+  const raw2 = await secureGetItem(session.email, tripsKey(session.email));
+  let trips: Trip[] = SEED_TRIPS;
+  if (raw2) {
+    try {
+      const parsed: Trip[] = JSON.parse(raw2);
+      if (parsed.length > 0) trips = parsed;
+    } catch {
+      // fall back to seed
+    }
+  }
+  return { profile, trips };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [paused, setPaused] = useState(false);
@@ -126,17 +212,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const u = await AsyncStorage.getItem("user");
-      if (u) setUserState(JSON.parse(u));
-      const t = await AsyncStorage.getItem("trips");
-      if (t) {
-        const stored: Trip[] = JSON.parse(t);
-        setTrips(stored.length > 0 ? stored : SEED_TRIPS);
-      } else {
-        setTrips(SEED_TRIPS);
-      }
-    })();
+    verifyAndRestoreSession()
+      .then((result) => {
+        if (result) {
+          setUserState(result.profile);
+          setTrips(result.trips);
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -157,68 +240,104 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
 
-  const setUser = useCallback(async (u: UserProfile | null) => {
-    setUserState(u);
-    if (u) await AsyncStorage.setItem("user", JSON.stringify(u));
-    else await AsyncStorage.removeItem("user");
+  const logout = useCallback(async () => {
+    setUserState(null);
+    setTrips([]);
+    await AsyncStorage.removeItem("session");
   }, []);
 
-  const register = useCallback(async (profile: UserProfile, password: string) => {
-    const creds = await AsyncStorage.getItem("credentials");
-    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
-    credsMap[profile.email.trim().toLowerCase()] = password;
-    await AsyncStorage.setItem("credentials", JSON.stringify(credsMap));
+  const login = useCallback(async (
+    email: string,
+    password: string
+  ): Promise<"ok" | "not_found" | "wrong_password"> => {
+    const key = email.toLowerCase().trim();
+    const accounts = await loadAccounts();
+    const account = accounts[key];
+    if (!account) return "not_found";
+    const hash = await sha256Hex(password);
+    if (hash !== account.passwordHash) return "wrong_password";
+    await storeSession(key, account.passwordHash);
+    const profile: UserProfile = { name: account.name, email: key, plate: account.plate };
     setUserState(profile);
-    await AsyncStorage.setItem("user", JSON.stringify(profile));
-  }, []);
-
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    const creds = await AsyncStorage.getItem("credentials");
-    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
-    const key = email.trim().toLowerCase();
-    if (credsMap[key] !== undefined && credsMap[key] !== password) {
-      return false;
-    }
-    const u = await AsyncStorage.getItem("user");
-    if (u) {
-      const parsed: UserProfile = JSON.parse(u);
-      if (parsed.email.trim().toLowerCase() === key) {
-        setUserState(parsed);
-        return true;
+    const raw = await secureGetItem(key, tripsKey(key));
+    let loaded: Trip[] = SEED_TRIPS;
+    if (raw) {
+      try {
+        const parsed: Trip[] = JSON.parse(raw);
+        if (parsed.length > 0) loaded = parsed;
+      } catch {
+        // keep seed
       }
     }
-    const fallbackProfile: UserProfile = {
-      name: email.split("@")[0] || "Fahrer",
-      email,
-      plate: "B-DL-123",
-    };
-    setUserState(fallbackProfile);
-    await AsyncStorage.setItem("user", JSON.stringify(fallbackProfile));
-    return true;
+    setTrips(loaded);
+    return "ok";
   }, []);
 
+  const register = useCallback(async (
+    name: string,
+    email: string,
+    plate: string,
+    password: string
+  ): Promise<"ok" | "exists"> => {
+    const key = email.toLowerCase().trim();
+    const accounts = await loadAccounts();
+    if (accounts[key]) return "exists";
+    const passwordHash = await sha256Hex(password);
+    accounts[key] = { name, plate, passwordHash };
+    await saveAccounts(accounts);
+    await storeSession(key, passwordHash);
+    const profile: UserProfile = { name, email: key, plate };
+    setUserState(profile);
+    await secureSetItem(key, tripsKey(key), JSON.stringify(SEED_TRIPS));
+    setTrips(SEED_TRIPS);
+    return "ok";
+  }, []);
+
+  const updateProfile = useCallback(async (name: string, plate: string) => {
+    if (!user) return;
+    const accounts = await loadAccounts();
+    if (!accounts[user.email]) return;
+    accounts[user.email].name = name;
+    accounts[user.email].plate = plate;
+    await saveAccounts(accounts);
+    setUserState((u) => u ? { ...u, name, plate } : u);
+  }, [user]);
+
   const updatePassword = useCallback(async (email: string, newPassword: string) => {
-    const creds = await AsyncStorage.getItem("credentials");
-    const credsMap: Record<string, string> = creds ? JSON.parse(creds) : {};
-    credsMap[email.trim().toLowerCase()] = newPassword;
-    await AsyncStorage.setItem("credentials", JSON.stringify(credsMap));
+    const key = email.toLowerCase().trim();
+    const accounts = await loadAccounts();
+    if (!accounts[key]) return;
+    const passwordHash = await sha256Hex(newPassword);
+    accounts[key].passwordHash = passwordHash;
+    await saveAccounts(accounts);
+    await storeSession(key, passwordHash);
+  }, []);
+
+  const persistTrips = useCallback((next: Trip[], email: string) => {
+    secureSetItem(email, tripsKey(email), JSON.stringify(next));
   }, []);
 
   const addTrip = useCallback(async (t: Trip) => {
     setTrips((prev) => {
       const next = [t, ...prev];
-      AsyncStorage.setItem("trips", JSON.stringify(next));
+      setUserState((u) => {
+        if (u) persistTrips(next, u.email);
+        return u;
+      });
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   const deleteTrip = useCallback(async (id: string) => {
     setTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      AsyncStorage.setItem("trips", JSON.stringify(next));
+      setUserState((u) => {
+        if (u) persistTrips(next, u.email);
+        return u;
+      });
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   const editTrip = useCallback((id: string, changes: Partial<Trip>) => {
     setTrips((prev) => {
@@ -340,7 +459,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reverseGeocode(last.lat, last.lon).then((addr) => {
         setTrips((prev) => {
           const next = prev.map((t) => (t.id === newTrip.id ? { ...t, endAddr: addr } : t));
-          AsyncStorage.setItem("trips", JSON.stringify(next));
+          setUserState((u) => {
+            if (u) persistTrips(next, u.email);
+            return u;
+          });
           return next;
         });
       });
@@ -352,7 +474,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGpsStatus("waiting");
     addTrip(newTrip);
     return newTrip;
-  }, [activeTrip, paused, pauseStartedAt, totalPausedMs, addTrip]);
+  }, [activeTrip, paused, pauseStartedAt, totalPausedMs, addTrip, persistTrips]);
 
   const togglePause = useCallback(() => {
     if (!paused) {
@@ -371,9 +493,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider
       value={{
         user,
-        setUser,
-        register,
+        loading,
+        logout,
         login,
+        register,
+        updateProfile,
         updatePassword,
         trips,
         addTrip,
