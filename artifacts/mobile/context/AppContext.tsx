@@ -10,6 +10,7 @@ import React, {
 import { Platform } from "react-native";
 import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
+import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 
 export interface Trip {
   id: string;
@@ -68,7 +69,7 @@ interface AppContextType {
   gpsStatus: "ok" | "denied" | "waiting";
   livePos: { lat: number; lon: number } | null;
   startTrip: (type: "business" | "private") => Promise<void>;
-  stopTrip: () => Trip | null;
+  stopTrip: () => Promise<Trip | null>;
   togglePause: () => void;
   elapsed: number;
 }
@@ -218,6 +219,11 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
   }
   return { profile, trips };
 }
+
+// Maximum acceptable GPS accuracy (meters). Points less accurate than this are discarded.
+const MAX_GPS_ACCURACY_M = 30;
+// Minimum movement distance (km) to count — filters GPS jitter
+const MIN_MOVE_KM = 0.005;
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<UserProfile | null>(null);
@@ -422,10 +428,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setGpsStatus("denied");
             beginTracking(52.52, 13.405);
           },
-          { timeout: 5000 }
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
         navigator.geolocation?.watchPosition(
           (pos) => {
+            if (pos.coords.accuracy > MAX_GPS_ACCURACY_M) return;
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
             setLivePos({ lat, lon });
@@ -433,6 +440,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               if (!prev) return prev;
               const last = prev.positions[prev.positions.length - 1];
               const d = haversine(last.lat, last.lon, lat, lon);
+              if (d < MIN_MOVE_KM) return prev;
               return {
                 ...prev,
                 distance: prev.distance + d,
@@ -441,28 +449,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             });
           },
           undefined,
-          { enableHighAccuracy: true }
+          { enableHighAccuracy: true, maximumAge: 0 }
         );
       } else {
         const Location = await import("expo-location");
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
+
+        // 1. Foreground permission
+        const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+        if (fgStatus !== "granted") {
           setGpsStatus("denied");
           beginTracking(52.52, 13.405);
           return;
         }
-        const loc = await Location.getCurrentPositionAsync({});
-        beginTracking(loc.coords.latitude, loc.coords.longitude);
+
+        // 2. Background permission (best-effort — required for background tracking)
+        try {
+          await Location.requestBackgroundPermissionsAsync();
+        } catch {
+          // Permission may not be available in Expo Go — continue with foreground only
+        }
+
+        // 3. High-accuracy initial fix
+        const initial = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+        });
+        beginTracking(initial.coords.latitude, initial.coords.longitude);
+
+        // 4. Clear background position store for this new trip
+        await AsyncStorage.removeItem(BG_POSITIONS_KEY);
+
+        // 5. Start background location task (persists positions even when app is backgrounded)
+        try {
+          const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+          if (!alreadyRunning) {
+            await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+              accuracy: Location.Accuracy.BestForNavigation,
+              timeInterval: 2000,
+              distanceInterval: 5,
+              foregroundService: {
+                notificationTitle: "DriveLog",
+                notificationBody: "Fahrt wird aufgezeichnet …",
+                notificationColor: "#0070D8",
+              },
+              pausesUpdatesAutomatically: false,
+              showsBackgroundLocationIndicator: true,
+              activityType: Location.ActivityType.AutomotiveNavigation,
+            });
+          }
+        } catch {
+          // Falls back gracefully if background task can't start (Expo Go limitation)
+        }
+
+        // 6. Foreground watch — keeps React state & live banner updated
         const sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, distanceInterval: 10 },
-          (loc2) => {
-            const lat = loc2.coords.latitude;
-            const lon = loc2.coords.longitude;
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 2000,
+            distanceInterval: 5,
+          },
+          (loc) => {
+            // Discard readings with poor accuracy
+            if (loc.coords.accuracy !== null && loc.coords.accuracy > MAX_GPS_ACCURACY_M) return;
+            const lat = loc.coords.latitude;
+            const lon = loc.coords.longitude;
             setLivePos({ lat, lon });
             setActiveTrip((prev) => {
               if (!prev) return prev;
               const last = prev.positions[prev.positions.length - 1];
               const d = haversine(last.lat, last.lon, lat, lon);
+              // Ignore sub-5m jitter
+              if (d < MIN_MOVE_KM) return prev;
               return {
                 ...prev,
                 distance: prev.distance + d,
@@ -477,8 +533,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const stopTrip = useCallback((): Trip | null => {
+  const stopTrip = useCallback(async (): Promise<Trip | null> => {
     if (!activeTrip) return null;
+
+    // Stop foreground watch
     if (watchRef.current !== null) {
       if (Platform.OS !== "web") {
         (watchRef.current as unknown as { remove: () => void })?.remove?.();
@@ -487,19 +545,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       watchRef.current = null;
     }
+
+    // Stop background location task and merge its positions
+    let finalDistance = activeTrip.distance;
+    if (Platform.OS !== "web") {
+      try {
+        const Location = await import("expo-location");
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+        if (isRunning) {
+          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        }
+      } catch {
+        // Non-fatal
+      }
+
+      // Read background positions and recalculate distance
+      try {
+        const bgRaw = await AsyncStorage.getItem(BG_POSITIONS_KEY);
+        if (bgRaw) {
+          const bgPositions = JSON.parse(bgRaw) as BgPosition[];
+          if (bgPositions.length > 1) {
+            let bgDist = 0;
+            for (let i = 1; i < bgPositions.length; i++) {
+              const d = haversine(
+                bgPositions[i - 1].lat,
+                bgPositions[i - 1].lon,
+                bgPositions[i].lat,
+                bgPositions[i].lon
+              );
+              if (d >= MIN_MOVE_KM) bgDist += d;
+            }
+            // Background track may be more complete (captures positions during backgrounding)
+            finalDistance = Math.max(finalDistance, bgDist);
+          }
+        }
+        await AsyncStorage.removeItem(BG_POSITIONS_KEY);
+      } catch {
+        // Non-fatal — use in-memory distance
+      }
+    }
+
     let pMs = totalPausedMs;
     if (paused && pauseStartedAt) pMs += Date.now() - pauseStartedAt;
     const durSec = Math.max(1, Math.floor((Date.now() - activeTrip.startTime - pMs) / 1000));
     const last = activeTrip.positions[activeTrip.positions.length - 1];
+
     const newTrip: Trip = {
       id: activeTrip.id,
       date: new Date(activeTrip.startTime).toISOString(),
       startAddr: activeTrip.startAddr || "Unbekannt",
       endAddr: last ? `${last.lat.toFixed(4)}°, ${last.lon.toFixed(4)}°` : "Unbekannt",
-      km: Math.max(0.1, activeTrip.distance),
+      km: Math.max(0.1, finalDistance),
       dur: durSec,
       type: activeTrip.type,
     };
+
     if (last) {
       reverseGeocode(last.lat, last.lon).then((addr) => {
         setTrips((prev) => {
@@ -512,6 +612,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       });
     }
+
     setActiveTrip(null);
     setPaused(false);
     setPauseStartedAt(null);

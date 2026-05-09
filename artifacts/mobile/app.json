@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.fahrtdoc.app"
+      "bundleIdentifier": "com.fahrtdoc.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
       "package": "com.fahrtdoc.app"
@@ -36,7 +39,10 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "DriveLog benötigt deinen Standort, um Fahrten zu erfassen.",
-          "locationWhenInUsePermission": "DriveLog benötigt deinen Standort, um Fahrten zu erfassen."
+          "locationWhenInUsePermission": "DriveLog benötigt deinen Standort, um Fahrten zu erfassen.",
+          "locationAlwaysPermission": "DriveLog benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],
