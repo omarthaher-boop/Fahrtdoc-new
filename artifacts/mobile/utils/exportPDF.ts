@@ -59,6 +59,11 @@ function buildHTML(
     year: "numeric",
   });
 
+  const logoHtml = user?.logoUri
+    ? `<img src="${user.logoUri}" style="max-height:48px; max-width:160px; object-fit:contain; display:block; margin-bottom:6px;" alt="Logo" />`
+    : "";
+  const headerLabel = user?.companyName ? user.companyName : "DriveLog";
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -125,7 +130,8 @@ function buildHTML(
 <body>
   <div class="header">
     <div>
-      <div class="brand-name">DriveLog</div>
+      ${logoHtml}
+      <div class="brand-name">${headerLabel}</div>
       <div class="brand-sub">Fahrtenbuch</div>
     </div>
     <div class="meta">
@@ -165,7 +171,7 @@ function buildHTML(
     </tfoot>
   </table>
   <div class="footer">
-    <span>DriveLog · Fahrtenbuch-Export</span>
+    <span>${headerLabel} · Fahrtenbuch-Export</span>
     <span>Erstellt am ${exportedAt}</span>
   </div>
 </body>
@@ -203,10 +209,37 @@ async function exportPDFWeb(
   doc.setFillColor(...navy);
   doc.setDrawColor(...navy);
 
-  doc.setFontSize(22);
+  const brandLabel = user?.companyName || "DriveLog";
+
+  if (user?.logoUri) {
+    try {
+      const loadImg = (src: string): Promise<HTMLImageElement> =>
+        new Promise((res, rej) => {
+          const img = new window.Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = src;
+        });
+      const img = await loadImg(user.logoUri);
+      const ratio = img.naturalWidth / img.naturalHeight;
+      const maxW = 40;
+      const maxH = 16;
+      let w = maxW;
+      let h = maxW / ratio;
+      if (h > maxH) { h = maxH; w = maxH * ratio; }
+      const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
+      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
+      doc.addImage(user.logoUri, fmt, margin, y, w, h);
+      y += h + 2;
+    } catch {
+      // skip logo if loading fails
+    }
+  }
+
+  doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...navy);
-  doc.text("DriveLog", margin, y);
+  doc.text(brandLabel, margin, y);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -344,7 +377,7 @@ async function exportPDFWeb(
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray);
-  doc.text("DriveLog · Fahrtenbuch-Export", margin, y);
+  doc.text(`${brandLabel} · Fahrtenbuch-Export`, margin, y);
   doc.text(`Erstellt am ${exportedAt}`, pageW - margin, y, { align: "right" });
 
   doc.save("Fahrtenbuch.pdf");

@@ -1,10 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -30,7 +32,7 @@ type PwStep = "request" | "verify";
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateProfile, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
+  const { user, logout, updateProfile, updateCompanyInfo, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
 
   const [defaultTripType, setDefaultTripType] = useState<TripType>("business");
   const [appLock, setAppLock] = useState(false);
@@ -48,6 +50,10 @@ export default function ProfileScreen() {
   const [pwError, setPwError] = useState("");
   const [pwCodeSent, setPwCodeSent] = useState(false);
   const codeInputRef = useRef<TextInput>(null);
+
+  const [firmenkopfModalVisible, setFirmenkopfModalVisible] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState(user?.companyName ?? "");
+  const [editLogoUri, setEditLogoUri] = useState(user?.logoUri ?? "");
 
   useEffect(() => {
     AsyncStorage.getItem(PREF_DEFAULT_TRIP).then((v) => {
@@ -142,6 +148,44 @@ export default function ProfileScreen() {
     Alert.alert("Passwort geändert", "Dein Passwort wurde erfolgreich aktualisiert.");
   };
 
+  const handleOpenFirmenkopf = () => {
+    setEditCompanyName(user?.companyName ?? "");
+    setEditLogoUri(user?.logoUri ?? "");
+    setFirmenkopfModalVisible(true);
+  };
+
+  const handlePickLogo = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Zugriff benötigt", "Bitte erlauben Sie den Zugriff auf Ihre Fotos, um ein Logo hochzuladen.");
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [4, 2],
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (asset.base64) {
+        const mime = asset.mimeType ?? "image/jpeg";
+        setEditLogoUri(`data:${mime};base64,${asset.base64}`);
+      } else {
+        setEditLogoUri(asset.uri);
+      }
+    }
+  };
+
+  const handleSaveFirmenkopf = async () => {
+    await updateCompanyInfo(editCompanyName.trim(), editLogoUri);
+    setFirmenkopfModalVisible(false);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   const handleLogout = () => {
     if (Platform.OS !== "web") {
       Alert.alert("Abmelden", "Wirklich abmelden?", [
@@ -223,6 +267,7 @@ export default function ProfileScreen() {
           <SectionHeader label="Konto" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="user" label="Persönliche Daten" onPress={handleOpenEdit} colors={colors} showDivider />
+            <ListRow icon="briefcase" label="Firmenkopf & Logo" value={user?.companyName || undefined} onPress={handleOpenFirmenkopf} colors={colors} showDivider />
             <ListRow icon="navigation" label="Fahrprofil & Fahrzeugdaten" onPress={showComingSoon} colors={colors} />
           </View>
 
@@ -460,6 +505,74 @@ export default function ProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Firmenkopf & Logo Modal */}
+      <Modal visible={firmenkopfModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView
+          style={[styles.modalScreen, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setFirmenkopfModalVisible(false)}>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Firmenkopf & Logo</Text>
+            <TouchableOpacity onPress={handleSaveFirmenkopf}>
+              <Text style={[styles.modalSave, { color: colors.primary }]}>Speichern</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <ModalField
+              label="Firmenname (optional)" value={editCompanyName}
+              onChangeText={setEditCompanyName}
+              icon="briefcase" placeholder="Musterfirma GmbH" colors={colors}
+            />
+            <View style={styles.logoSection}>
+              <Text style={[styles.modalFieldLabel, { color: colors.mutedForeground }]}>Logo</Text>
+              {editLogoUri ? (
+                <View style={[styles.logoPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Image
+                    source={{ uri: editLogoUri }}
+                    style={styles.logoPreviewImg}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.logoBtnRow}>
+                    <TouchableOpacity
+                      style={[styles.logoBtn, { backgroundColor: colors.accent, borderColor: colors.border }]}
+                      onPress={handlePickLogo}
+                    >
+                      <Feather name="refresh-cw" size={13} color={colors.primary} />
+                      <Text style={[styles.logoBtnText, { color: colors.primary }]}>Ersetzen</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.logoBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                      onPress={() => setEditLogoUri("")}
+                    >
+                      <Feather name="trash-2" size={13} color={colors.destructive} />
+                      <Text style={[styles.logoBtnText, { color: colors.destructive }]}>Entfernen</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.logoUploadBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                  onPress={handlePickLogo}
+                >
+                  <Feather name="upload" size={20} color={colors.primary} />
+                  <Text style={[styles.logoUploadText, { color: colors.primary }]}>Logo hochladen</Text>
+                  <Text style={[styles.logoUploadSub, { color: colors.mutedForeground }]}>PNG, JPG · empfohlen 4:2 Format</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.infoNote, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+              <Feather name="file-text" size={14} color={colors.primary} />
+              <Text style={[styles.infoNoteText, { color: colors.primary }]}>
+                Firmenname und Logo erscheinen im PDF-Briefkopf.
+              </Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -630,4 +743,25 @@ const styles = StyleSheet.create({
     gap: 10, borderRadius: 14, paddingVertical: 16,
   },
   primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  logoSection: { gap: 8 },
+  logoPreviewCard: {
+    borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
+    padding: 14, gap: 12, alignItems: "center",
+  },
+  logoPreviewImg: { width: 160, height: 80, borderRadius: 6 },
+  logoBtnRow: { flexDirection: "row", gap: 10 },
+  logoBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 8, borderWidth: 1,
+  },
+  logoBtnText: { fontSize: 13, fontWeight: "600" },
+  logoUploadBtn: {
+    borderRadius: 12, borderWidth: 1,
+    borderStyle: "dashed", alignItems: "center",
+    justifyContent: "center", padding: 24, gap: 6,
+  },
+  logoUploadText: { fontSize: 14, fontWeight: "600" },
+  logoUploadSub: { fontSize: 12 },
 });

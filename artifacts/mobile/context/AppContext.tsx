@@ -48,12 +48,16 @@ export interface UserProfile {
   name: string;
   email: string;
   plate: string;
+  companyName?: string;
+  logoUri?: string;
 }
 
 interface StoredAccount {
   name: string;
   plate: string;
   passwordHash: string;
+  companyName?: string;
+  logoUri?: string;
 }
 
 interface SessionRecord {
@@ -70,6 +74,7 @@ interface AppContextType {
   login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
   updateProfile: (name: string, plate: string) => Promise<void>;
+  updateCompanyInfo: (companyName: string, logoUri: string) => Promise<void>;
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
   confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -229,7 +234,7 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
     await AsyncStorage.removeItem("session");
     return null;
   }
-  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate };
+  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri };
   const raw2 = await secureGetItem(session.email, tripsKey(session.email));
   let trips: Trip[] = SEED_TRIPS;
   if (raw2) {
@@ -446,7 +451,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const hash = await sha256Hex(password);
     if (hash !== account.passwordHash) return "wrong_password";
     await storeSession(key, account.passwordHash);
-    const profile: UserProfile = { name: account.name, email: key, plate: account.plate };
+    const profile: UserProfile = { name: account.name, email: key, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri };
     setUserState(profile);
 
     const raw = await secureGetItem(key, tripsKey(key));
@@ -540,6 +545,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     accounts[user.email].plate = plate;
     await saveAccounts(accounts);
     setUserState((u) => u ? { ...u, name, plate } : u);
+  }, [user]);
+
+  const updateCompanyInfo = useCallback(async (companyName: string, logoUri: string) => {
+    if (!user) return;
+    const accounts = await loadAccounts();
+    if (!accounts[user.email]) return;
+    accounts[user.email].companyName = companyName;
+    accounts[user.email].logoUri = logoUri;
+    await saveAccounts(accounts);
+    setUserState((u) => u ? { ...u, companyName, logoUri } : u);
   }, [user]);
 
   const updatePassword = useCallback(async (email: string, newPassword: string) => {
@@ -887,6 +902,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         updateProfile,
+        updateCompanyInfo,
         updatePassword,
         requestPasswordChangeCode,
         confirmPasswordChange,
