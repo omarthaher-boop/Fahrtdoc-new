@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActiveTripBanner from "@/components/ActiveTripBanner";
+import SaveTripSheet from "@/components/SaveTripSheet";
 import StatCard from "@/components/StatCard";
 import TripCard from "@/components/TripCard";
 import { useApp } from "@/context/AppContext";
@@ -230,6 +231,9 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Save Trip Sheet — shown after stopping a trip */}
+      <SaveTripSheet />
 
       {/* Start Trip Confirm Modal */}
       <Modal visible={showStartModal} transparent animationType="fade">

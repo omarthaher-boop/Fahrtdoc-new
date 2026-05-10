@@ -92,6 +92,10 @@ interface AppContextType {
   stopTrip: () => Promise<Trip | null>;
   togglePause: () => void;
   elapsed: number;
+  pendingTrip: Trip | null;
+  pendingTripCoords: { startLat: number; startLon: number; endLat: number; endLon: number } | null;
+  finalizeTrip: (trip: Trip) => Promise<void>;
+  discardPendingTrip: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -314,6 +318,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [gpsStatus, setGpsStatus] = useState<"ok" | "denied" | "waiting">("waiting");
   const [livePos, setLivePos] = useState<{ lat: number; lon: number } | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [pendingTrip, setPendingTrip] = useState<Trip | null>(null);
+  const [pendingTripCoords, setPendingTripCoords] = useState<{ startLat: number; startLon: number; endLat: number; endLon: number } | null>(null);
   const watchRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTokenRef = useRef<string | null>(null);
@@ -610,6 +616,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [persistTripsLocal]);
 
+  const finalizeTrip = useCallback(async (trip: Trip) => {
+    setPendingTrip(null);
+    setPendingTripCoords(null);
+    await addTrip(trip);
+  }, [addTrip]);
+
+  const discardPendingTrip = useCallback(() => {
+    setPendingTrip(null);
+    setPendingTripCoords(null);
+  }, []);
+
   const deleteTrip = useCallback(async (id: string) => {
     setTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
@@ -843,6 +860,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const durSec = Math.max(1, Math.floor((Date.now() - activeTrip.startTime - pMs) / 1000));
     const last = activeTrip.positions[activeTrip.positions.length - 1];
 
+    // Capture positions for route calculation before clearing activeTrip
+    const firstPos = activeTrip.positions.length > 0 ? activeTrip.positions[0] : null;
+    setPendingTripCoords(firstPos && last ? {
+      startLat: firstPos.lat,
+      startLon: firstPos.lon,
+      endLat: last.lat,
+      endLon: last.lon,
+    } : null);
+
     const newTrip: Trip = {
       id: activeTrip.id,
       date: new Date(activeTrip.startTime).toISOString(),
@@ -853,20 +879,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: activeTrip.type,
     };
 
+    // Async: geocode end address and update pending trip display
     if (last) {
       reverseGeocode(last.lat, last.lon).then((addr) => {
-        setTrips((prev) => {
-          const next = prev.map((t) => (t.id === newTrip.id ? { ...t, endAddr: addr } : t));
-          setUserState((u) => {
-            if (u) persistTripsLocal(next, u.email);
-            return u;
-          });
-          const token = serverTokenRef.current;
-          if (token) {
-            serverUpdateTrip(token, newTrip.id, { endAddr: addr });
-          }
-          return next;
-        });
+        setPendingTrip((prev) => (prev ? { ...prev, endAddr: addr } : null));
       });
     }
 
@@ -875,9 +891,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPauseStartedAt(null);
     setTotalPausedMs(0);
     setGpsStatus("waiting");
-    addTrip(newTrip);
+    setPendingTrip(newTrip);
     return newTrip;
-  }, [activeTrip, paused, pauseStartedAt, totalPausedMs, addTrip, persistTripsLocal]);
+  }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
 
   const togglePause = useCallback(() => {
     if (!paused) {
@@ -920,6 +936,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         stopTrip,
         togglePause,
         elapsed,
+        pendingTrip,
+        pendingTripCoords,
+        finalizeTrip,
+        discardPendingTrip,
       }}
     >
       {children}

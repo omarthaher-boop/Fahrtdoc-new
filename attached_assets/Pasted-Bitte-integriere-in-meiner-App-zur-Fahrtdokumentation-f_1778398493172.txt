@@ -1,0 +1,55 @@
+Bitte integriere in meiner App zur Fahrtdokumentation folgende Funktion für die Fahrterfassung:
+
+Am Ende einer laufenden Fahrt soll die Fahrt nicht sofort beendet und gespeichert werden. Stattdessen soll ein Dialog / Bestätigungsfenster erscheinen mit zwei Optionen:
+
+1. „Fahrt bearbeiten“
+2. „Fahrt speichern“
+
+Wenn der Nutzer „Fahrt bearbeiten“ auswählt:
+- Soll er zurück zur Bearbeitungsansicht der aktuellen Fahrt gelangen.
+- Dort sollen Startadresse, Zieladresse, gefahrene Kilometer, Datum, Uhrzeit und weitere Fahrtdaten weiterhin bearbeitbar sein.
+
+Wenn der Nutzer „Fahrt speichern“ auswählt:
+- Soll die App anhand der Startadresse und Zieladresse mögliche Routen berechnen.
+- Nutze dafür, je nach vorhandener Integration, Google Maps API, Apple Maps / MapKit oder eine vergleichbare Karten-/Routen-API.
+- Es sollen mehrere mögliche Strecken angezeigt werden, jeweils mit:
+  - Streckenname oder Beschreibung
+  - Entfernung in Kilometern
+  - geschätzter Fahrzeit
+  - Hinweis, welche Route die kürzeste Strecke ist
+  - optional Hinweis, welche Route die schnellste Strecke ist
+
+Wichtig:
+- Die tatsächlich vom Fahrer erfassten Kilometer sollen weiterhin angezeigt werden.
+- Zusätzlich soll der Fahrer die Möglichkeit haben, statt der tatsächlich gefahrenen Kilometer eine der vorgeschlagenen Routen auszuwählen.
+- Wenn der Fahrer eine vorgeschlagene Route auswählt, sollen deren Kilometer automatisch in die Fahrt übernommen werden.
+- Danach soll die Fahrt in der Fahrtenliste gespeichert werden.
+
+Die Ansicht vor dem endgültigen Speichern soll also ungefähr so funktionieren:
+
+Titel: „Fahrt speichern?“
+
+Angezeigte Informationen:
+- Startadresse
+- Zieladresse
+- tatsächlich gefahrene Kilometer
+- vorgeschlagene Routen mit Kilometerangabe
+
+Beispiel:
+- Gefahrene Kilometer: 18,7 km
+- Route 1: Kürzeste Strecke – 16,9 km
+- Route 2: Schnellste Strecke – 18,2 km
+- Route 3: Alternative Strecke – 19,1 km
+
+Der Nutzer kann auswählen:
+- „Gefahrene Kilometer übernehmen“
+- oder eine der vorgeschlagenen Routen auswählen
+
+Nach Auswahl soll die Fahrt mit den ausgewählten Kilometern gespeichert und in der Fahrtenliste angezeigt werden.
+
+Bitte achte darauf, dass:
+- bestehende Fahrtdaten nicht verloren gehen
+- der Speichervorgang erst nach Bestätigung erfolgt
+- die Funktion sauber in den bestehenden Fahrterfassungs-Flow integriert wird
+- Fehler abgefangen werden, falls keine Route gefunden wird oder die Karten-API nicht erreichbar ist
+- in diesem Fall sollen die tatsächlich erfassten Kilometer gespeichert werden können
