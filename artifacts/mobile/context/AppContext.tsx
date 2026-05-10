@@ -50,6 +50,10 @@ export interface UserProfile {
   plate: string;
   companyName?: string;
   logoUri?: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  vehicleColor?: string;
 }
 
 interface StoredAccount {
@@ -58,6 +62,10 @@ interface StoredAccount {
   passwordHash: string;
   companyName?: string;
   logoUri?: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  vehicleColor?: string;
 }
 
 interface SessionRecord {
@@ -75,6 +83,7 @@ interface AppContextType {
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
   updateProfile: (name: string, plate: string) => Promise<void>;
   updateCompanyInfo: (companyName: string, logoUri: string) => Promise<void>;
+  updateVehicleData: (brand: string, model: string, year: string, color: string) => Promise<void>;
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
   confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -239,7 +248,7 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
     await AsyncStorage.removeItem("session");
     return null;
   }
-  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri };
+  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor };
   const raw2 = await secureGetItem(session.email, tripsKey(session.email));
   let trips: Trip[] = SEED_TRIPS;
   if (raw2) {
@@ -458,7 +467,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const hash = await sha256Hex(password);
     if (hash !== account.passwordHash) return "wrong_password";
     await storeSession(key, account.passwordHash);
-    const profile: UserProfile = { name: account.name, email: key, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri };
+    const profile: UserProfile = { name: account.name, email: key, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor };
     setUserState(profile);
 
     const raw = await secureGetItem(key, tripsKey(key));
@@ -562,6 +571,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     accounts[user.email].logoUri = logoUri;
     await saveAccounts(accounts);
     setUserState((u) => u ? { ...u, companyName, logoUri } : u);
+  }, [user]);
+
+  const updateVehicleData = useCallback(async (brand: string, model: string, year: string, color: string) => {
+    if (!user) return;
+    const accounts = await loadAccounts();
+    if (!accounts[user.email]) return;
+    accounts[user.email].vehicleBrand = brand;
+    accounts[user.email].vehicleModel = model;
+    accounts[user.email].vehicleYear = year;
+    accounts[user.email].vehicleColor = color;
+    await saveAccounts(accounts);
+    setUserState((u) => u ? { ...u, vehicleBrand: brand, vehicleModel: model, vehicleYear: year, vehicleColor: color } : u);
   }, [user]);
 
   const updatePassword = useCallback(async (email: string, newPassword: string) => {
@@ -920,6 +941,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         register,
         updateProfile,
         updateCompanyInfo,
+        updateVehicleData,
         updatePassword,
         requestPasswordChangeCode,
         confirmPasswordChange,

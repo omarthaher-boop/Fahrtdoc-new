@@ -8,21 +8,23 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 function NativeMainTabs() {
+  const { t } = useLanguage();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="home">
         <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Übersicht</Label>
+        <Label>{t("nav.home")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
         <Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
-        <Label>Fahrten</Label>
+        <Label>{t("nav.trips")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>Profil</Label>
+        <Label>{t("nav.profile")}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -31,6 +33,7 @@ function NativeMainTabs() {
 function ClassicMainTabs() {
   const colors = useColors();
   const colorScheme = useColorScheme();
+  const { t } = useLanguage();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
@@ -64,7 +67,7 @@ function ClassicMainTabs() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "Übersicht",
+          title: t("nav.home"),
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="house" tintColor={color} size={24} />
@@ -76,7 +79,7 @@ function ClassicMainTabs() {
       <Tabs.Screen
         name="history"
         options={{
-          title: "Fahrten",
+          title: t("nav.trips"),
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="list.bullet" tintColor={color} size={24} />
@@ -88,7 +91,7 @@ function ClassicMainTabs() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
+          title: t("nav.profile"),
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="person" tintColor={color} size={24} />

@@ -1,0 +1,89 @@
+1. Wie starte ich eine Fahrt?
+Du kannst eine Fahrt direkt über den Schnellstart auf dem Dashboard starten. Wähle dafür entweder „Geschäftlich“ oder „Privat“. Danach beginnt die App mit der Aufzeichnung von Strecke, Zeit und Standort.
+
+2. Wie beende ich eine laufende Fahrt?
+Öffne den Fahrtenaufzeichnungs-Screen und tippe auf „Fahrt beenden“. Danach wird die Fahrt gespeichert und erscheint in deiner Fahrtenliste.
+
+3. Was bedeutet „Geschäftlich“ und „Privat“?
+„Geschäftlich“ ist für berufliche oder geschäftliche Fahrten gedacht. „Privat“ ist für persönliche Fahrten. Du kannst die Fahrtart später in den Fahrtdetails ändern.
+
+4. Kann ich eine Fahrt nachträglich bearbeiten?
+Ja. Öffne den Bereich „Fahrten“, wähle eine Fahrt aus und tippe auf das Bearbeiten-Symbol. Du kannst z. B. Fahrtart, Startadresse, Zieladresse, Kommentar oder Kilometer anpassen.
+
+5. Warum steht bei einer Fahrt „Zielpunkt unbekannt“?
+Das kann passieren, wenn das GPS-Signal schwach war, die App während der Fahrt geschlossen wurde oder keine stabile Standortverbindung bestand. Du kannst den Zielpunkt manuell ergänzen.
+
+6. Funktioniert die App auch ohne Internet?
+Ja. Fahrten können offline gespeichert werden. Sobald wieder eine Internetverbindung besteht, werden die Daten automatisch synchronisiert.
+
+7. Was bedeutet „Synchronisiert“?
+„Synchronisiert“ bedeutet, dass deine Fahrtdaten erfolgreich gespeichert und mit deinem Konto abgeglichen wurden.
+
+8. Warum wurde meine Fahrt nicht automatisch erkannt?
+Mögliche Gründe sind deaktivierte Standortberechtigungen, ausgeschaltetes Hintergrund-Tracking, Energiesparmodus oder ein schwaches GPS-Signal. Prüfe die Tracking- und Standort-Einstellungen in deinem Profil.
+
+9. Muss GPS immer aktiviert sein?
+Für eine genaue Fahrtenaufzeichnung sollte GPS aktiviert sein. Ohne GPS können Strecke und Adressen unvollständig oder ungenau sein.
+
+10. Was ist Hintergrund-Tracking?
+Hintergrund-Tracking erlaubt der App, Fahrten auch dann zu erkennen, wenn sie nicht geöffnet ist. Diese Funktion sollte aktiviert bleiben, wenn automatische Fahrterkennung genutzt werden soll.
+
+11. Kann ich Tracking pausieren?
+Ja. Im Profilbereich unter „Tracking & Fahrterkennung“ kannst du das Tracking pausieren. Während der Pause werden keine Fahrten automatisch aufgezeichnet.
+
+12. Wie ändere ich meine Standard-Fahrtart?
+Gehe zu Profil > Einstellungen > Standard-Fahrtart. Dort kannst du wählen, ob neue Fahrten standardmäßig als „Geschäftlich“ oder „Privat“ angelegt werden.
+
+13. Kann ich Fahrten als PDF exportieren?
+Ja. Im Bereich „Fahrten“ kannst du Fahrten filtern und anschließend als PDF exportieren. Der Export kann für ausgewählte oder alle Fahrten erstellt werden.
+
+14. Kann ich Fahrten nach Zeitraum filtern?
+Ja. Du kannst nach „Letzter Monat“, „3 Monate“, „6 Monate“, „Dieses Jahr“ oder einem eigenen Zeitraum „Von – Bis“ filtern.
+
+15. Kann ich nur geschäftliche oder private Fahrten anzeigen?
+Ja. In der Fahrtenübersicht kannst du nach „Geschäftlich“ oder „Privat“ filtern.
+
+16. Was bedeutet der Status „Bearbeitet“?
+„Bearbeitet“ zeigt an, dass eine Fahrt nachträglich manuell geändert wurde.
+
+17. Kann ich eine Fahrt löschen?
+Ja. In der Fahrtenliste kannst du über das Papierkorb-Symbol eine Fahrt löschen. Vor dem endgültigen Löschen sollte eine Bestätigung angezeigt werden.
+
+18. Wie ändere ich mein Fahrzeug oder Kennzeichen?
+Gehe zu Profil > Fahrprofil & Fahrzeugdaten. Dort kannst du dein Fahrzeug, Kennzeichen und relevante Fahrzeugdaten bearbeiten.
+
+19. Wie ändere ich meine persönlichen Daten?
+Gehe zu Profil > Persönliche Daten. Dort kannst du Name, E-Mail, Telefonnummer und weitere Angaben bearbeiten.
+
+20. Wie ändere ich das Design?
+Gehe zu Profil > Design. Dort kannst du zwischen hellem und dunklem Design wählen.
+
+21. Wie ändere ich die Sprache?
+Gehe zu Profil > Sprache und wähle die gewünschte App-Sprache aus.
+
+22. Wie aktiviere ich Face ID oder App-Sperre?
+Gehe zu Profil > Sicherheit & Datenschutz > Face ID / App-Sperre und aktiviere die Funktion. Dadurch wird die App zusätzlich geschützt.
+
+23. Sind meine Daten geschützt?
+Ja. Fahrtdaten sollten verschlüsselt gespeichert und nur für dein Konto verwendet werden. Sensible Funktionen wie App-Sperre, Datenschutzoptionen und Passwortänderung befinden sich im Bereich „Sicherheit & Datenschutz“.
+
+24. Wie ändere ich mein Passwort?
+Gehe zu Profil > Sicherheit & Datenschutz > Passwort ändern. Gib dein aktuelles Passwort und anschließend ein neues sicheres Passwort ein.
+
+25. Warum bekomme ich keine Benachrichtigungen?
+Prüfe, ob Benachrichtigungen in der App aktiviert sind und ob dein Smartphone Benachrichtigungen für die App erlaubt. Kontrolliere außerdem den Energiesparmodus.
+
+26. Was passiert beim Abmelden?
+Beim Abmelden wird dein Konto von diesem Gerät getrennt. Nicht synchronisierte Fahrten sollten vor dem Abmelden gespeichert oder synchronisiert werden.
+
+27. Was passiert, wenn ich die App lösche?
+Nicht synchronisierte lokale Daten können verloren gehen. Synchronisierte Fahrten bleiben mit deinem Konto verbunden.
+
+28. Wie sehe ich die App-Version?
+Gehe zu Profil > Support > App-Version. Dort findest du die aktuelle Version, z. B. v2.4.1.
+
+29. Wen kontaktiere ich bei Problemen?
+Gehe zu Profil > Support > Kontakt. Dort findest du die Kontaktmöglichkeiten für Hilfe, technische Probleme oder Fragen zu deinem Konto.
+
+30. Kann ich mehrere Fahrzeuge verwenden?
+Optional kann die App mehrere Fahrzeuge unterstützen. Falls aktiviert, kannst du im Bereich „Fahrprofil & Fahrzeugdaten“ Fahrzeuge hinzufügen, wechseln oder bearbeiten.
