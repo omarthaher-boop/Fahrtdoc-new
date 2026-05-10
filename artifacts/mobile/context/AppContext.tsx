@@ -213,7 +213,8 @@ async function makeSessionToken(passwordHash: string, nonce: string): Promise<st
 }
 
 async function storeSession(email: string, passwordHash: string): Promise<void> {
-  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+  const nonceBytes = await ExpoCrypto.getRandomBytesAsync(16);
+  const nonce = Array.from(nonceBytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
   const sessionToken = await makeSessionToken(passwordHash, nonce);
