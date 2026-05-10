@@ -17,6 +17,7 @@ import SaveTripSheet from "@/components/SaveTripSheet";
 import StatCard from "@/components/StatCard";
 import TripCard from "@/components/TripCard";
 import { useApp } from "@/context/AppContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 const fmtDur = (s: number) => {
@@ -27,21 +28,23 @@ const fmtDur = (s: number) => {
 };
 
 type Period = 1 | 3 | 6 | 12;
-const PERIOD_LABELS: Record<Period, string> = {
-  1: "1 Mon.",
-  3: "3 Mon.",
-  6: "6 Mon.",
-  12: "Dieses Jahr",
-};
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const { user, trips, activeTrip, startTrip, gpsStatus } = useApp();
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
   const [starting, setStarting] = useState(false);
+
+  const PERIOD_LABELS: Record<Period, string> = {
+    1: t("home.period.1"),
+    3: t("home.period.3"),
+    6: t("home.period.6"),
+    12: t("home.period.12"),
+  };
 
   const cutoff = useMemo(() => {
     const d = new Date();
@@ -79,14 +82,16 @@ export default function HomeScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
+  const pendingLabel = pendingType === "business" ? t("home.businessTrip") : t("home.privateTrip");
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View>
-          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Hallo,</Text>
+          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{t("home.greeting")}</Text>
           <Text style={[styles.userName, { color: colors.foreground }]}>
-            {user?.name?.split(" ")[0] ?? "Fahrer"}
+            {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
           </Text>
         </View>
         <View style={[styles.plateBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
@@ -105,7 +110,7 @@ export default function HomeScreen() {
         {/* Quick Start */}
         {!activeTrip && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Schnellstart</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.quickStart")}</Text>
             <View style={styles.quickRow}>
               <TouchableOpacity
                 style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -116,8 +121,8 @@ export default function HomeScreen() {
                 <View style={[styles.quickIcon, { backgroundColor: colors.accent }]}>
                   <Feather name="briefcase" size={22} color={colors.primary} />
                 </View>
-                <Text style={[styles.quickLabel, { color: colors.foreground }]}>Geschäftsreise</Text>
-                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>Arbeit & Dienst</Text>
+                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{t("home.businessTrip")}</Text>
+                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>{t("home.businessSub")}</Text>
                 <Feather name="arrow-right" size={16} color={colors.primary} style={styles.quickArrow} />
               </TouchableOpacity>
 
@@ -130,8 +135,8 @@ export default function HomeScreen() {
                 <View style={[styles.quickIcon, { backgroundColor: colors.successLight }]}>
                   <Feather name="user" size={22} color={colors.success} />
                 </View>
-                <Text style={[styles.quickLabel, { color: colors.foreground }]}>Private Fahrt</Text>
-                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>Persönlich</Text>
+                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{t("home.privateTrip")}</Text>
+                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>{t("home.privateSub")}</Text>
                 <Feather name="arrow-right" size={16} color={colors.success} style={styles.quickArrow} />
               </TouchableOpacity>
             </View>
@@ -139,7 +144,7 @@ export default function HomeScreen() {
               <View style={[styles.gpsBanner, { backgroundColor: colors.warningLight ?? "#FFF8E7", borderColor: colors.warning ?? "#FFB703" }]}>
                 <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
                 <Text style={[styles.gpsBannerText, { color: colors.warning ?? "#FFB703" }]}>
-                  GPS blockiert – Simulation aktiv
+                  {t("home.gpsBlocked")}
                 </Text>
               </View>
             )}
@@ -148,7 +153,7 @@ export default function HomeScreen() {
 
         {/* Period filter */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Statistiken</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.stats")}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
             {([1, 3, 6, 12] as Period[]).map((p) => (
               <TouchableOpacity
@@ -171,19 +176,19 @@ export default function HomeScreen() {
 
           {/* Stats grid */}
           <View style={styles.statsGrid}>
-            <StatCard label="Gesamt km" value={totalKm.toFixed(0)} unit="km" accent={colors.primary} />
-            <StatCard label="Fahrten" value={String(periodTrips.length)} accent={colors.success} />
+            <StatCard label={t("home.totalKm")} value={totalKm.toFixed(0)} unit="km" accent={colors.primary} />
+            <StatCard label={t("home.trips")} value={String(periodTrips.length)} accent={colors.success} />
           </View>
           <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard label="Fahrzeit" value={fmtDur(totalDur)} mini accent={colors.primary} />
-            <StatCard label="Geschäftl." value={businessCount + " Fahrten"} mini accent={colors.primary} />
-            <StatCard label="Privat" value={privateCount + " Fahrten"} mini accent={colors.success} />
+            <StatCard label={t("home.driveDuration")} value={fmtDur(totalDur)} mini accent={colors.primary} />
+            <StatCard label={t("home.businessShort")} value={businessCount + " " + t("home.trips")} mini accent={colors.primary} />
+            <StatCard label={t("home.privateShort")} value={privateCount + " " + t("home.trips")} mini accent={colors.success} />
           </View>
 
           {/* Distribution bar */}
           {periodTrips.length > 0 && (
             <View style={[styles.distCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.distLabel, { color: colors.mutedForeground }]}>Zweckverteilung</Text>
+              <Text style={[styles.distLabel, { color: colors.mutedForeground }]}>{t("home.distribution")}</Text>
               <View style={[styles.distBar, { backgroundColor: colors.border }]}>
                 {businessCount > 0 && (
                   <View style={[styles.distSegment, { flex: businessCount, backgroundColor: colors.primary }]}>
@@ -203,12 +208,12 @@ export default function HomeScreen() {
               <View style={styles.legendRow}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.legendText, { color: colors.sub }]}>Geschäftl. {businessKm.toFixed(0)} km</Text>
+                  <Text style={[styles.legendText, { color: colors.sub }]}>{t("home.businessShort")} {businessKm.toFixed(0)} km</Text>
                 </View>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
                   <Text style={[styles.legendText, { color: colors.sub }]}>
-                    Privat {periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0).toFixed(0)} km
+                    {t("home.privateShort")} {periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0).toFixed(0)} km
                   </Text>
                 </View>
               </View>
@@ -218,12 +223,12 @@ export default function HomeScreen() {
 
         {/* Recent trips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Letzte Fahrten</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.recentTrips")}</Text>
           {periodTrips.length === 0 ? (
             <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="map" size={32} color={colors.mutedForeground} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Keine Fahrten in diesem Zeitraum
+                {t("home.noTrips")}
               </Text>
             </View>
           ) : (
@@ -247,10 +252,10 @@ export default function HomeScreen() {
               />
             </View>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              {pendingType === "business" ? "Geschäftsreise" : "Private Fahrt"} starten?
+              {pendingLabel} {t("home.startTripSuffix")}
             </Text>
             <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-              GPS wird aktiviert und die Strecke automatisch aufgezeichnet.
+              {t("home.modalSub")}
             </Text>
             <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: pendingType === "business" ? colors.primary : colors.success }]}
@@ -258,10 +263,10 @@ export default function HomeScreen() {
               testID="confirm-start"
             >
               <Feather name="play" size={16} color="#FFFFFF" />
-              <Text style={styles.modalBtnText}>Fahrt starten</Text>
+              <Text style={styles.modalBtnText}>{t("home.startBtn")}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowStartModal(false)}>
-              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Abbrechen</Text>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

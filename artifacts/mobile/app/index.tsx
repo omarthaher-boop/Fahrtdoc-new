@@ -16,11 +16,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "@/context/AppContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function AuthScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const { login, register } = useApp();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -35,16 +37,16 @@ export default function AuthScreen() {
     setError("");
     if (mode === "register") {
       if (!name.trim() || !email.trim() || !plate.trim() || !password.trim()) {
-        setError("Bitte alle Felder ausfüllen.");
+        setError(t("auth.error.allFields"));
         return;
       }
       if (password.length < 6) {
-        setError("Passwort muss mindestens 6 Zeichen lang sein.");
+        setError(t("auth.error.shortPassword"));
         return;
       }
     } else {
       if (!email.trim() || !password.trim()) {
-        setError("Bitte E-Mail und Passwort eingeben.");
+        setError(t("auth.error.emailPassword"));
         return;
       }
     }
@@ -55,17 +57,17 @@ export default function AuthScreen() {
       if (mode === "register") {
         const result = await register(name.trim(), email.trim(), plate.trim(), password);
         if (result === "exists") {
-          setError("Diese E-Mail-Adresse ist bereits registriert.");
+          setError(t("auth.error.emailExists"));
           return;
         }
       } else {
         const result = await login(email.trim(), password);
         if (result === "not_found") {
-          setError("Kein Konto mit dieser E-Mail-Adresse gefunden.");
+          setError(t("auth.error.notFound"));
           return;
         }
         if (result === "wrong_password") {
-          setError("Falsches Passwort. Bitte versuche es erneut.");
+          setError(t("auth.error.wrongPassword"));
           return;
         }
       }
@@ -100,7 +102,7 @@ export default function AuthScreen() {
           />
           <Text style={[styles.appName, { color: colors.foreground }]}>FahrtDoc</Text>
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            Dein digitales Fahrtenbuch
+            {t("auth.tagline")}
           </Text>
         </View>
 
@@ -113,7 +115,7 @@ export default function AuthScreen() {
               onPress={() => { setMode(m); setError(""); }}
             >
               <Text style={[styles.toggleText, { color: mode === m ? colors.foreground : colors.mutedForeground }]}>
-                {m === "login" ? "Anmelden" : "Registrieren"}
+                {m === "login" ? t("auth.login") : t("auth.register")}
               </Text>
             </TouchableOpacity>
           ))}
@@ -123,19 +125,19 @@ export default function AuthScreen() {
         <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {mode === "register" && (
             <InputField
-              label="Vollständiger Name"
+              label={t("auth.fullName")}
               value={name}
               onChangeText={setName}
-              placeholder="Max Mustermann"
+              placeholder={t("auth.namePlaceholder")}
               icon="user"
               colors={colors}
             />
           )}
           <InputField
-            label="E-Mail"
+            label={t("auth.emailLabel")}
             value={email}
             onChangeText={setEmail}
-            placeholder="email@beispiel.de"
+            placeholder={t("auth.emailPlaceholder")}
             icon="mail"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -143,17 +145,17 @@ export default function AuthScreen() {
           />
           {mode === "register" && (
             <InputField
-              label="Kennzeichen"
+              label={t("vehicle.plate")}
               value={plate}
-              onChangeText={(t) => setPlate(t.toUpperCase())}
-              placeholder="B-DL 1234"
+              onChangeText={(text) => setPlate(text.toUpperCase())}
+              placeholder={t("auth.platePlaceholder")}
               icon="truck"
               autoCapitalize="characters"
               colors={colors}
             />
           )}
           <View>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Passwort</Text>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("auth.password")}</Text>
             <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <Feather name="lock" size={16} color={colors.mutedForeground} />
               <TextInput
@@ -177,7 +179,7 @@ export default function AuthScreen() {
               testID="forgot-password-link"
             >
               <Text style={[styles.forgotText, { color: colors.primary }]}>
-                Passwort vergessen?
+                {t("auth.forgotPassword")}
               </Text>
             </TouchableOpacity>
           )}
@@ -199,16 +201,14 @@ export default function AuthScreen() {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.submitText}>
-                {mode === "login" ? "Anmelden" : "Konto erstellen"}
+                {mode === "login" ? t("auth.login") : t("auth.createAccount")}
               </Text>
             )}
           </TouchableOpacity>
         </View>
 
         <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-          {mode === "login"
-            ? "Noch kein Konto? Jetzt registrieren."
-            : "Alle Daten werden lokal gespeichert."}
+          {mode === "login" ? t("auth.hint.login") : t("auth.hint.register")}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
