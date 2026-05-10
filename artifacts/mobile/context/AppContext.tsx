@@ -145,7 +145,7 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     const tid = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`,
-      { signal: ctrl.signal }
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (support@fahrtdoc.de)" } }
     );
     clearTimeout(tid);
     const d = await r.json();

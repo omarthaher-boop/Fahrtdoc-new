@@ -173,6 +173,15 @@ const de: Record<string, string> = {
   "auth.emailPlaceholder": "email@beispiel.de",
   "auth.namePlaceholder": "Max Mustermann",
   "auth.platePlaceholder": "B-DL 1234",
+  "error.title": "Fehler",
+  "error.nameRequired": "Bitte gib einen Namen ein.",
+  "pw.error.noCode": "Bitte gib den Code ein.",
+  "pw.error.tooShort": "Das Passwort muss mindestens 8 Zeichen haben.",
+  "pw.error.mismatch": "Die Passwoerter stimmen nicht ueberein.",
+  "pw.error.sendFailed": "Fehler beim Senden des Codes.",
+  "pw.error.invalid": "Ungueltiger Code oder Fehler.",
+  "pw.success.title": "Erfolg",
+  "pw.success.text": "Dein Passwort wurde geaendert.",
 };
 
 const en: Record<string, string> = {
@@ -344,6 +353,15 @@ const en: Record<string, string> = {
   "auth.emailPlaceholder": "email@example.com",
   "auth.namePlaceholder": "John Smith",
   "auth.platePlaceholder": "AB-CD 1234",
+  "error.title": "Error",
+  "error.nameRequired": "Please enter a name.",
+  "pw.error.noCode": "Please enter the code.",
+  "pw.error.tooShort": "Password must be at least 8 characters.",
+  "pw.error.mismatch": "Passwords do not match.",
+  "pw.error.sendFailed": "Failed to send code.",
+  "pw.error.invalid": "Invalid code or error.",
+  "pw.success.title": "Success",
+  "pw.success.text": "Your password has been changed.",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

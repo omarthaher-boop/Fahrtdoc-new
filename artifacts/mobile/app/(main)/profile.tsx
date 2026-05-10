@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -42,11 +43,6 @@ const PREF = {
   notifPrivacy: "pref_notif_datenschutz",
 } as const;
 
-const THEME_LABELS: Record<ThemePreference, string> = {
-  light: "Hell",
-  dark: "Dunkel",
-  system: "Systemeinstellung",
-};
 
 const FAQ_DATA: { q: string; a: string }[] = [
     { q: "Wie starte ich eine neue Fahrt manuell?", a: "Oeffne den Tab Uebersicht und tippe auf die Schaltflaeche Fahrt starten. Du kannst Startort und Fahrtart auswaehlen, bevor die Aufzeichnung beginnt." },
@@ -289,7 +285,11 @@ function FaqItem({
   );
 }
 
-function haptic() {}
+function haptic() {
+  if (Platform.OS !== "web") {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -411,13 +411,13 @@ export default function ProfileScreen() {
 
   const handleSaveProfile = useCallback(async () => {
     if (!editName.trim()) {
-      Alert.alert("Fehler", "Bitte gib einen Namen ein.");
+      Alert.alert(t("error.title"), t("error.nameRequired"));
       return;
     }
     await updateProfile(editName.trim(), editPlate.trim());
     setEditModalVisible(false);
     haptic();
-  }, [editName, editPlate, updateProfile]);
+  }, [editName, editPlate, updateProfile, t]);
 
   const handleOpenVehicle = useCallback(() => {
     setEditVehicleBrand(user?.vehicleBrand ?? "");
@@ -466,14 +466,14 @@ export default function ProfileScreen() {
     if (result.success) {
       setPwStep("verify");
     } else {
-      setPwError(result.error ?? "Fehler beim Senden des Codes.");
+      setPwError(result.error ?? t("pw.error.sendFailed"));
     }
-  }, [requestPasswordChangeCode]);
+  }, [requestPasswordChangeCode, t]);
 
   const handleConfirmPasswordChange = useCallback(async () => {
-    if (!pwCode.trim()) { setPwError("Bitte gib den Code ein."); return; }
-    if (pwNew.length < 8) { setPwError("Das Passwort muss mindestens 8 Zeichen haben."); return; }
-    if (pwNew !== pwConfirm) { setPwError("Die Passwörter stimmen nicht überein."); return; }
+    if (!pwCode.trim()) { setPwError(t("pw.error.noCode")); return; }
+    if (pwNew.length < 8) { setPwError(t("pw.error.tooShort")); return; }
+    if (pwNew !== pwConfirm) { setPwError(t("pw.error.mismatch")); return; }
     setPwLoading(true);
     setPwError("");
     const result = await confirmPasswordChange(pwCode.trim(), pwNew);
@@ -481,11 +481,11 @@ export default function ProfileScreen() {
     if (result.success) {
       if (user) await updatePassword(user.email, pwNew);
       closePwModal();
-      Alert.alert("Erfolg", "Dein Passwort wurde geändert.");
+      Alert.alert(t("pw.success.title"), t("pw.success.text"));
     } else {
-      setPwError(result.error ?? "Ungültiger Code oder Fehler.");
+      setPwError(result.error ?? t("pw.error.invalid"));
     }
-  }, [pwCode, pwNew, pwConfirm, confirmPasswordChange, updatePassword, user, closePwModal]);
+  }, [pwCode, pwNew, pwConfirm, confirmPasswordChange, updatePassword, user, closePwModal, t]);
 
   const handleLogout = useCallback(() => {
     if (Platform.OS !== "web") {
@@ -608,7 +608,7 @@ export default function ProfileScreen() {
               </View>
             </View>
             <ListRow icon="globe" label={t("row.language")} value={langLabel} onPress={() => setLanguageModalVisible(true)} colors={colors} showDivider />
-            <ListRow icon={themeIcon} label={t("row.design")} value={THEME_LABELS[themePreference]} onPress={() => setThemeModalVisible(true)} colors={colors} />
+            <ListRow icon={themeIcon} label={t("row.design")} value={t(`theme.${themePreference}`)} onPress={() => setThemeModalVisible(true)} colors={colors} />
           </View>
 
           <SectionHeader label={t("section.security")} colors={colors} />
@@ -670,7 +670,7 @@ export default function ProfileScreen() {
                     <Feather name={icon} size={17} color={active ? "#fff" : colors.mutedForeground} />
                   </View>
                   <Text style={[styles.themeOptionLabel, { color: active ? colors.primary : colors.foreground, fontWeight: active ? "700" : "400" }]}>
-                    {THEME_LABELS[opt]}
+                    {t(`theme.${opt}`)}
                   </Text>
                   {active && <Feather name="check" size={17} color={colors.primary} style={{ marginLeft: "auto" }} />}
                 </TouchableOpacity>
