@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   StyleSheet,
   Text,
@@ -21,7 +22,7 @@ interface Props {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
-  onRetrySync?: (id: string) => void;
+  onRetrySync?: (id: string) => void | Promise<void>;
 }
 
 const fmtTime = (iso: string) =>
@@ -48,6 +49,15 @@ export default function TripCard({
   const colors = useColors();
   const { t } = useLanguage();
   const isBusiness = trip.type === "business";
+  const [isSyncing, setIsSyncing] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const accentColor = isBusiness ? colors.primary : colors.success;
   const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
   const dur = fmtDurMin(trip.dur);
@@ -216,17 +226,42 @@ export default function TripCard({
           </View>
           <View style={styles.badgeRow}>
             {trip.waypointSyncPending && (
-              <TouchableOpacity
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                  onRetrySync?.(trip.id);
-                }}
-                style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}
-                activeOpacity={0.7}
-              >
-                <Feather name="upload-cloud" size={11} color="#E65100" />
-                <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncPending")}</Text>
-              </TouchableOpacity>
+              onRetrySync ? (
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (isSyncing) return;
+                    if (Platform.OS !== "web") Haptics.selectionAsync();
+                    setIsSyncing(true);
+                    try {
+                      await onRetrySync(trip.id);
+                    } finally {
+                      if (mountedRef.current) setIsSyncing(false);
+                    }
+                  }}
+                  style={[
+                    styles.syncBadge,
+                    isSyncing
+                      ? { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }
+                      : { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" },
+                  ]}
+                  activeOpacity={isSyncing ? 1 : 0.7}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <ActivityIndicator size={11} color="#E65100" />
+                  ) : (
+                    <Feather name="upload-cloud" size={11} color="#E65100" />
+                  )}
+                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>
+                    {isSyncing ? t("trip.syncRetrying") : t("trip.syncPending")}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}>
+                  <Feather name="upload-cloud" size={11} color="#E65100" />
+                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncPending")}</Text>
+                </View>
+              )
             )}
             {trip.edited && (
               <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
