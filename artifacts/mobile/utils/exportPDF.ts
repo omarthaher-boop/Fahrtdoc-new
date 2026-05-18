@@ -4,7 +4,12 @@ import type { Trip, UserProfile } from "@/context/AppContext";
 // ─── CSV helpers ─────────────────────────────────────────────────────────────
 
 function csvCell(value: string | number): string {
-  const s = String(value);
+  let s = String(value);
+  // Neutralize spreadsheet formula injection: prefix metacharacter-led values
+  // with a single quote so spreadsheet apps treat the cell as plain text.
+  if (s.length > 0 && (s[0] === "=" || s[0] === "+" || s[0] === "-" || s[0] === "@")) {
+    s = "'" + s;
+  }
   if (s.includes(",") || s.includes('"') || s.includes("\n")) {
     return `"${s.replace(/"/g, '""')}"`;
   }
