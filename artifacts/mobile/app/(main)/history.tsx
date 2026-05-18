@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EditTripModal from "@/components/EditTripModal";
 import TripCard from "@/components/TripCard";
+import TripDetailModal from "@/components/TripDetailModal";
 import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
@@ -81,6 +82,7 @@ export default function HistoryScreen() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [filtersLoaded, setFiltersLoaded] = useState(false);
   const skipNextPersistRef = React.useRef(false);
 
@@ -267,6 +269,10 @@ export default function HistoryScreen() {
       return;
     }
     await exportCSV(displayTrips);
+  };
+
+  const handleView = (trip: Trip) => {
+    setViewingTrip(trip);
   };
 
   const handleEdit = (trip: Trip) => {
@@ -538,6 +544,7 @@ export default function HistoryScreen() {
                   trip={tripItem}
                   onDelete={deleteTrip}
                   onEdit={handleEdit}
+                  onView={handleView}
                   selectionMode={selectionMode}
                   selected={selectedIds.has(tripItem.id)}
                   onToggleSelect={toggleTrip}
@@ -554,6 +561,13 @@ export default function HistoryScreen() {
         visible={editingTrip !== null}
         onClose={() => setEditingTrip(null)}
         onSave={handleSaveEdit}
+      />
+
+      {/* Trip detail / route map modal */}
+      <TripDetailModal
+        trip={viewingTrip}
+        visible={viewingTrip !== null}
+        onClose={() => setViewingTrip(null)}
       />
     </View>
   );

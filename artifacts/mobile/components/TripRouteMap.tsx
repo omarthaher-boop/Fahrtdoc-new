@@ -1,0 +1,443 @@
+import { Feather } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import Svg, {
+  Circle,
+  G,
+  Line,
+  Path,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from "react-native-svg";
+import { Trip } from "@/context/AppContext";
+import { useColors } from "@/hooks/useColors";
+
+interface Coord {
+  lat: number;
+  lon: number;
+}
+
+interface MapPoint extends Coord {
+  label: string;
+  type: "start" | "waypoint" | "end";
+  waypointIndex?: number;
+}
+
+async function geocodeAddress(addr: string): Promise<Coord | null> {
+  if (!addr) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/search` +
+      `?q=${encodeURIComponent(addr)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept-Language": "de", "User-Agent": "DriveLog/1.0" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+    if (!data?.length) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const SVG_W = 300;
+const SVG_H = 210;
+const PAD = 40;
+
+const LABEL_W = 100;
+const LABEL_H = 30;
+const LABEL_FONT_PRIMARY = 7.5;
+const LABEL_FONT_SECONDARY = 6;
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+function projectPoints(
+  points: MapPoint[]
+): Array<MapPoint & { x: number; y: number }> {
+  if (points.length === 0) return [];
+
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+
+  const latRange = maxLat - minLat || 0.002;
+  const lonRange = maxLon - minLon || 0.002;
+
+  const innerW = SVG_W - PAD * 2;
+  const innerH = SVG_H - PAD * 2;
+
+  const latScale = innerH / latRange;
+  const lonScale = innerW / lonRange;
+  const scale = Math.min(latScale, lonScale);
+
+  const projW = lonRange * scale;
+  const projH = latRange * scale;
+  const offsetX = PAD + (innerW - projW) / 2;
+  const offsetY = PAD + (innerH - projH) / 2;
+
+  return points.map((p) => ({
+    ...p,
+    x: offsetX + (p.lon - minLon) * scale,
+    y: offsetY + (maxLat - p.lat) * scale,
+  }));
+}
+
+export default function TripRouteMap({ trip }: { trip: Trip }) {
+  const colors = useColors();
+  const [points, setPoints] = useState<MapPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+
+      const waypoints = trip.waypoints ?? [];
+
+      const [startCoord, endCoord] = await Promise.all([
+        geocodeAddress(trip.startAddr),
+        geocodeAddress(trip.endAddr),
+      ]);
+
+      if (cancelled) return;
+
+      const allPoints: MapPoint[] = [];
+
+      if (startCoord) {
+        allPoints.push({
+          ...startCoord,
+          label: trip.startAddr,
+          type: "start",
+        });
+      }
+      waypoints.forEach((wp, i) => {
+        allPoints.push({
+          lat: wp.lat,
+          lon: wp.lon,
+          label: wp.addr,
+          type: "waypoint",
+          waypointIndex: i,
+        });
+      });
+      if (endCoord) {
+        allPoints.push({
+          ...endCoord,
+          label: trip.endAddr,
+          type: "end",
+        });
+      }
+
+      if (allPoints.length === 0) {
+        setError("Keine Koordinaten verfügbar");
+        setLoading(false);
+        return;
+      }
+
+      setPoints(allPoints);
+      setLoading(false);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // Use a stable waypoint signature so edits to waypoints re-trigger the map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip.id, trip.startAddr, trip.endAddr, JSON.stringify(trip.waypoints)]);
+
+  const WAYPOINT_COLOR = "#F59E0B";
+  const START_COLOR = colors.primary;
+  const END_COLOR = colors.mutedForeground;
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.placeholder,
+          { backgroundColor: colors.secondary, borderColor: colors.border },
+        ]}
+      >
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={[styles.placeholderText, { color: colors.mutedForeground }]}>
+          Karte wird geladen …
+        </Text>
+      </View>
+    );
+  }
+
+  if (error || points.length === 0) {
+    return (
+      <View
+        style={[
+          styles.placeholder,
+          { backgroundColor: colors.secondary, borderColor: colors.border },
+        ]}
+      >
+        <Feather name="alert-circle" size={22} color={colors.mutedForeground} />
+        <Text style={[styles.placeholderText, { color: colors.mutedForeground }]}>
+          {error ?? "Keine Kartendaten verfügbar"}
+        </Text>
+      </View>
+    );
+  }
+
+  const projected = projectPoints(points);
+  const polylinePoints = projected.map((p) => `${p.x},${p.y}`).join(" ");
+  const waypointCount = (trip.waypoints ?? []).length;
+
+  return (
+    <View
+      style={[
+        styles.mapContainer,
+        { borderColor: colors.border, backgroundColor: "#EFF4FA" },
+      ]}
+    >
+      <Svg
+        width="100%"
+        height={SVG_H}
+        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Subtle grid */}
+        {[0.25, 0.5, 0.75].map((frac) => (
+          <React.Fragment key={`grid-${frac}`}>
+            <Line
+              x1={SVG_W * frac}
+              y1={0}
+              x2={SVG_W * frac}
+              y2={SVG_H}
+              stroke="#C8D5E8"
+              strokeWidth={0.5}
+              strokeDasharray="4,4"
+            />
+            <Line
+              x1={0}
+              y1={SVG_H * frac}
+              x2={SVG_W}
+              y2={SVG_H * frac}
+              stroke="#C8D5E8"
+              strokeWidth={0.5}
+              strokeDasharray="4,4"
+            />
+          </React.Fragment>
+        ))}
+
+        {/* Route line */}
+        {projected.length > 1 && (
+          <Polyline
+            points={polylinePoints}
+            fill="none"
+            stroke={colors.primary}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.75}
+          />
+        )}
+
+        {/* Markers */}
+        {projected.map((pt, idx) => {
+          if (pt.type === "start") {
+            return (
+              <G key={`m-${idx}`}>
+                <Circle cx={pt.x} cy={pt.y} r={9} fill={START_COLOR} />
+                <Circle cx={pt.x} cy={pt.y} r={3.5} fill="white" />
+              </G>
+            );
+          }
+
+          if (pt.type === "end") {
+            return (
+              <G key={`m-${idx}`}>
+                <Circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={9}
+                  fill="white"
+                  stroke={END_COLOR}
+                  strokeWidth={2.5}
+                />
+                <Circle cx={pt.x} cy={pt.y} r={3.5} fill={END_COLOR} />
+              </G>
+            );
+          }
+
+          if (pt.type === "waypoint") {
+            const wpNum = (pt.waypointIndex ?? 0) + 1;
+            const s = 7;
+            const pinPath = [
+              `M ${pt.x} ${pt.y - s * 2}`,
+              `L ${pt.x + s} ${pt.y}`,
+              `L ${pt.x} ${pt.y + s * 0.5}`,
+              `L ${pt.x - s} ${pt.y}`,
+              "Z",
+            ].join(" ");
+
+            // Place label to the right when pin is in left half, else left
+            const labelOnRight = pt.x < SVG_W / 2;
+            const GAP = 10;
+            const labelX = labelOnRight ? pt.x + s + GAP : pt.x - s - GAP - LABEL_W;
+            // Vertically centre label on pin tip
+            const labelY = pt.y - s * 2 - LABEL_H / 2;
+            const clampedLabelY = Math.max(2, Math.min(SVG_H - LABEL_H - 2, labelY));
+
+            const primaryLine = `Zwischenstopp ${wpNum}`;
+            const secondaryLine = truncate(pt.label, 18);
+
+            return (
+              <G key={`m-${idx}`}>
+                {/* Pin diamond */}
+                <Path d={pinPath} fill={WAYPOINT_COLOR} />
+                <SvgText
+                  x={pt.x}
+                  y={pt.y - s * 0.85}
+                  textAnchor="middle"
+                  fontSize={7}
+                  fontWeight="bold"
+                  fill="white"
+                >
+                  {wpNum}
+                </SvgText>
+
+                {/* Label callout bubble */}
+                <Rect
+                  x={labelX}
+                  y={clampedLabelY}
+                  width={LABEL_W}
+                  height={LABEL_H}
+                  rx={5}
+                  ry={5}
+                  fill="white"
+                  stroke={WAYPOINT_COLOR}
+                  strokeWidth={1}
+                  opacity={0.95}
+                />
+                <SvgText
+                  x={labelX + 6}
+                  y={clampedLabelY + LABEL_FONT_PRIMARY + 3}
+                  fontSize={LABEL_FONT_PRIMARY}
+                  fontWeight="bold"
+                  fill="#92400E"
+                >
+                  {primaryLine}
+                </SvgText>
+                {secondaryLine.length > 0 && (
+                  <SvgText
+                    x={labelX + 6}
+                    y={clampedLabelY + LABEL_FONT_PRIMARY + 3 + LABEL_FONT_SECONDARY + 3}
+                    fontSize={LABEL_FONT_SECONDARY}
+                    fill="#78716C"
+                  >
+                    {secondaryLine}
+                  </SvgText>
+                )}
+              </G>
+            );
+          }
+
+          return null;
+        })}
+      </Svg>
+
+      {/* Legend */}
+      <View
+        style={[styles.legend, { borderTopColor: colors.border }]}
+      >
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: START_COLOR }]} />
+          <Text style={[styles.legendText, { color: colors.mutedForeground }]}>
+            Start
+          </Text>
+        </View>
+        {waypointCount > 0 && (
+          <View style={styles.legendItem}>
+            <View
+              style={[styles.legendDot, { backgroundColor: WAYPOINT_COLOR }]}
+            />
+            <Text
+              style={[styles.legendText, { color: colors.mutedForeground }]}
+            >
+              {waypointCount === 1
+                ? "1 Zwischenstopp"
+                : `${waypointCount} Zwischenstopps`}
+            </Text>
+          </View>
+        )}
+        <View style={styles.legendItem}>
+          <View
+            style={[
+              styles.legendDot,
+              styles.legendDotHollow,
+              { borderColor: END_COLOR },
+            ]}
+          />
+          <Text style={[styles.legendText, { color: colors.mutedForeground }]}>
+            Ziel
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  placeholder: {
+    height: 140,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  placeholderText: {
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
+  mapContainer: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendDotHollow: {
+    backgroundColor: "white",
+    borderWidth: 2,
+  },
+  legendText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+});

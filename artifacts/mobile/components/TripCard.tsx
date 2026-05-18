@@ -16,6 +16,7 @@ interface Props {
   trip: Trip;
   onDelete?: (id: string) => void;
   onEdit?: (trip: Trip) => void;
+  onView?: (trip: Trip) => void;
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
@@ -36,6 +37,7 @@ export default function TripCard({
   trip,
   onDelete,
   onEdit,
+  onView,
   selectionMode = false,
   selected = false,
   onToggleSelect,
@@ -55,6 +57,11 @@ export default function TripCard({
   const handleEdit = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     onEdit?.(trip);
+  };
+
+  const handleView = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    onView?.(trip);
   };
 
   const handleCardPress = () => {
@@ -116,6 +123,15 @@ export default function TripCard({
             </Text>
             {!selectionMode && (
               <>
+                {onView && (
+                  <TouchableOpacity
+                    onPress={handleView}
+                    style={[styles.actionBtn, { borderColor: colors.border }]}
+                    testID={`view-${trip.id}`}
+                  >
+                    <Feather name="map" size={13} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   onPress={handleEdit}
                   style={[styles.actionBtn, { borderColor: colors.border }]}
