@@ -24,6 +24,14 @@ import {
   serverConfirmChangePassword,
 } from "@/lib/api";
 
+export interface Waypoint {
+  addr: string;
+  lat: number;
+  lon: number;
+  timestamp: number;
+  note?: string;
+}
+
 export interface Trip {
   id: string;
   date: string;
@@ -33,6 +41,7 @@ export interface Trip {
   dur: number;
   type: "business" | "private";
   edited?: boolean;
+  waypoints?: Waypoint[];
 }
 
 export interface ActiveTrip {
@@ -42,6 +51,7 @@ export interface ActiveTrip {
   startAddr: string;
   distance: number;
   positions: { lat: number; lon: number }[];
+  waypoints?: Waypoint[];
 }
 
 export interface UserProfile {
@@ -99,7 +109,7 @@ interface AppContextType {
   livePos: { lat: number; lon: number } | null;
   startTrip: (type: "business" | "private") => Promise<void>;
   stopTrip: () => Promise<Trip | null>;
-  togglePause: () => void;
+  togglePause: (waypoint?: Waypoint) => void;
   elapsed: number;
   pendingTrip: Trip | null;
   pendingTripCoords: { startLat: number; startLon: number; endLat: number; endLon: number } | null;
@@ -276,6 +286,13 @@ function apiTripToLocal(t: ApiTrip): Trip {
   };
 }
 
+/** Strip local-only fields (waypoints) that the server schema does not accept. */
+function tripToApiPayload(t: Trip): ApiTrip {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { waypoints: _wp, ...rest } = t;
+  return rest;
+}
+
 // Maximum acceptable GPS accuracy (meters). Points less accurate than this are discarded.
 const MAX_GPS_ACCURACY_M = 30;
 // Minimum movement distance (km) to count — filters GPS jitter
@@ -288,7 +305,9 @@ const MIN_MOVE_KM = 0.005;
  * - Server soft-deletions propagate: any local trip whose ID is marked
  *   deleted on the server is removed from the local state.
  * - Server wins on same-ID conflicts: when both sides have a non-deleted
- *   trip with the same ID, the server version is used.
+ *   trip with the same ID, the server version is used — except for
+ *   local-only fields that the server does not store (e.g. waypoints),
+ *   which are preserved from the local copy.
  * - Local-only trips (ID not present on server at all) are kept locally
  *   and returned in `localOnly` so the caller can upload them.
  */
@@ -301,9 +320,21 @@ function mergeTrips(
     serverApiTrips.filter((t) => !t.deleted).map((t) => [t.id, apiTripToLocal(t)])
   );
 
-  const merged: Trip[] = [...serverActiveById.values()];
-  const localOnly: Trip[] = [];
+  // Build local lookup to recover fields the server does not persist (waypoints)
+  const localById = new Map(localTrips.map((t) => [t.id, t]));
 
+  const merged: Trip[] = [];
+  for (const [id, serverTrip] of serverActiveById) {
+    const localTrip = localById.get(id);
+    // Preserve local waypoints since the server schema does not carry them
+    if (localTrip?.waypoints && localTrip.waypoints.length > 0) {
+      merged.push({ ...serverTrip, waypoints: localTrip.waypoints });
+    } else {
+      merged.push(serverTrip);
+    }
+  }
+
+  const localOnly: Trip[] = [];
   for (const lt of localTrips) {
     if (serverDeletedIds.has(lt.id)) continue;
     if (!serverActiveById.has(lt.id)) {
@@ -352,9 +383,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
               finalTrips = merged;
               if (localOnly.length > 0) {
-                serverBatchUpsertTrips(result.serverToken, localOnly);
+                serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
               } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && result.trips.length > 0) {
-                serverBatchUpsertTrips(result.serverToken, result.trips);
+                serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
               }
             }
           }
@@ -407,9 +438,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (serverApiTrips !== null) {
       const { merged, localOnly } = mergeTrips(localTrips, serverApiTrips);
       if (localOnly.length > 0) {
-        await serverBatchUpsertTrips(token, localOnly);
+        await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && localTrips.length > 0) {
-        await serverBatchUpsertTrips(token, localTrips);
+        await serverBatchUpsertTrips(token, localTrips.map(tripToApiPayload));
       }
       return merged;
     }
@@ -453,7 +484,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           finalTrips = merged;
         } else {
           finalTrips = SEED_TRIPS;
-          await serverBatchUpsertTrips(serverResult.token, SEED_TRIPS);
+          await serverBatchUpsertTrips(serverResult.token, SEED_TRIPS.map(tripToApiPayload));
         }
 
         const profile: UserProfile = { name: serverResult.name, email: key, plate: serverResult.plate };
@@ -513,7 +544,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       serverTokenRef.current = token;
       const { merged, localOnly } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
       if (localOnly.length > 0) {
-        await serverBatchUpsertTrips(token, localOnly);
+        await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       }
       finalTrips = merged;
     }
@@ -547,7 +578,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await secureSetItem(key, serverTokenKey(key), result.token);
       setServerToken(result.token);
       serverTokenRef.current = result.token;
-      await serverBatchUpsertTrips(result.token, SEED_TRIPS);
+      await serverBatchUpsertTrips(result.token, SEED_TRIPS.map(tripToApiPayload));
     }
 
     return "ok";
@@ -629,7 +660,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token) {
-      serverCreateTrip(token, t).then((ok) => {
+      serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
         if (!ok) {
           // Local state is updated; if create failed, the trip will be uploaded
           // as a local-only trip during the next successful login/restore merge.
@@ -681,7 +712,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token) {
-      serverUpdateTrip(token, id, changes).then((ok) => {
+      // Strip local-only fields before sending to server
+      const { waypoints: _wp, ...serverChanges } = changes as Partial<Trip> & { waypoints?: unknown };
+      serverUpdateTrip(token, id, serverChanges).then((ok) => {
         if (!ok) {
           // Local state is updated; if the server update failed, the server
           // retains the old version which will win on the next merge/re-login.
@@ -899,6 +932,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       km: Math.max(0.1, finalDistance),
       dur: durSec,
       type: activeTrip.type,
+      waypoints: activeTrip.waypoints && activeTrip.waypoints.length > 0 ? activeTrip.waypoints : undefined,
     };
 
     // Async: geocode end address and update pending trip display
@@ -917,8 +951,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newTrip;
   }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
 
-  const togglePause = useCallback(() => {
+  const togglePause = useCallback((waypoint?: Waypoint) => {
     if (!paused) {
+      // Guard: bail out if no active trip exists at execution time.
+      // This prevents stale async geocoding callbacks from corrupting state
+      // when the user stops the trip while geocoding is in flight.
+      if (!activeTrip) return;
+      if (waypoint) {
+        setActiveTrip((prev) =>
+          prev ? { ...prev, waypoints: [...(prev.waypoints ?? []), waypoint] } : prev
+        );
+      }
       setPaused(true);
       setPauseStartedAt(Date.now());
     } else {
@@ -928,7 +971,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPaused(false);
       setPauseStartedAt(null);
     }
-  }, [paused, pauseStartedAt]);
+  }, [paused, pauseStartedAt, activeTrip]);
 
   return (
     <AppContext.Provider

@@ -41,8 +41,14 @@ function buildHTML(
   const dateRange = getDateRange(trips, dateFrom, dateTo);
 
   const rows = trips
-    .map(
-      (t) => `
+    .map((t) => {
+      const waypointRows = (t.waypoints ?? [])
+        .map(
+          (wp, i) =>
+            `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}</td><td></td><td></td></tr>`
+        )
+        .join("");
+      return `
       <tr>
         <td>${fmtDate(t.date)}</td>
         <td class="${t.type === "business" ? "badge-business" : "badge-private"}">${fmtType(t.type)}</td>
@@ -50,8 +56,8 @@ function buildHTML(
         <td>${t.endAddr}</td>
         <td class="num">${t.km.toFixed(1)}</td>
         <td class="num">${fmtDur(t.dur)}</td>
-      </tr>`
-    )
+      </tr>${waypointRows}`;
+    })
     .join("");
 
   const exportedAt = new Date().toLocaleDateString("de-DE", {
@@ -359,6 +365,32 @@ async function exportPDFWeb(
       cellX += colWidths[i];
     });
     y += rowH;
+
+    // Waypoint sub-rows
+    if (t.waypoints && t.waypoints.length > 0) {
+      t.waypoints.forEach((wp, wpIdx) => {
+        if (y + rowH > pageH - bottomMargin) {
+          doc.addPage();
+          y = 20;
+          y = drawTableHeader(y);
+        }
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(90, 106, 154);
+        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${wp.addr}`;
+        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
+        const truncated = waypointLabel.length > maxChars ? waypointLabel.slice(0, maxChars - 1) + "…" : waypointLabel;
+        const wpX = margin + 2 + colWidths[0] + colWidths[1];
+        doc.text(truncated, wpX, y + 5);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(17, 17, 17);
+        doc.setDrawColor(232, 234, 240);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y + rowH, margin + contentW, y + rowH);
+        y += rowH;
+      });
+    }
   });
 
   const totalsH = rowH + 1;

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { Trip } from "@/context/AppContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Props {
   trip: Trip;
@@ -40,6 +41,7 @@ export default function TripCard({
   onToggleSelect,
 }: Props) {
   const colors = useColors();
+  const { t } = useLanguage();
   const isBusiness = trip.type === "business";
   const accentColor = isBusiness ? colors.primary : colors.success;
   const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
@@ -141,6 +143,17 @@ export default function TripCard({
               {trip.startAddr || "Startpunkt unbekannt"}
             </Text>
           </View>
+          {(trip.waypoints ?? []).map((wp, idx) => (
+            <React.Fragment key={wp.timestamp}>
+              <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
+              <View style={styles.addrRow}>
+                <Feather name="map-pin" size={9} color={colors.primary} style={{ flexShrink: 0, opacity: 0.7 }} />
+                <Text style={[styles.addrWaypointText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {`${t("waypoint.label")} ${idx + 1}: ${wp.addr}`}
+                </Text>
+              </View>
+            </React.Fragment>
+          ))}
           <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
           <View style={styles.addrRow}>
             <View style={[styles.dotHollow, { borderColor: colors.mutedForeground }]} />
@@ -278,6 +291,11 @@ const styles = StyleSheet.create({
   },
   addrText: {
     fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
+  },
+  addrWaypointText: {
+    fontSize: 12,
     fontWeight: "500",
     flex: 1,
   },

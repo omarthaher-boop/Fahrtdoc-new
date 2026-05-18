@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EditTripModal from "@/components/EditTripModal";
 import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 import { fetchRoutes, RouteOption } from "@/utils/routeService";
 
 const fmtDur = (s: number) => {
@@ -28,6 +29,7 @@ export default function SaveTripSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { pendingTrip, pendingTripCoords, finalizeTrip } = useApp();
+  const { t } = useLanguage();
 
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
@@ -142,6 +144,25 @@ export default function SaveTripSheet() {
                       {draftTrip?.startAddr || "—"}
                     </Text>
                   </View>
+                  {(draftTrip?.waypoints ?? []).map((wp, idx) => (
+                    <React.Fragment key={wp.timestamp}>
+                      <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
+                      <View style={styles.addrRow}>
+                        <Feather name="map-pin" size={10} color={colors.primary} style={styles.waypointIcon} />
+                        <Text
+                          style={[styles.addrLabelText, { color: colors.mutedForeground }]}
+                        >
+                          {`${t("waypoint.label")} ${idx + 1}: `}
+                        </Text>
+                        <Text
+                          style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
+                          numberOfLines={1}
+                        >
+                          {wp.addr}
+                        </Text>
+                      </View>
+                    </React.Fragment>
+                  ))}
                   <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
                   <View style={styles.addrRow}>
                     <View
@@ -423,7 +444,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   addrConnector: { width: 2, height: 12, marginLeft: 4 },
-  addrText: { fontSize: 13, fontWeight: "600", flex: 1 },
+  addrText: { fontSize: 13, fontWeight: "600" },
+  addrLabelText: { fontSize: 11, fontWeight: "600" },
+  waypointIcon: { flexShrink: 0 },
   infoChipRow: {
     flexDirection: "row",
     gap: 16,

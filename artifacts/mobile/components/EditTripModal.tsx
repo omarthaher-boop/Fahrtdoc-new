@@ -14,7 +14,8 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { Trip } from "@/context/AppContext";
+import { Trip, Waypoint } from "@/context/AppContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Props {
   trip: Trip | null;
@@ -25,11 +26,13 @@ interface Props {
 
 export default function EditTripModal({ trip, visible, onClose, onSave }: Props) {
   const colors = useColors();
+  const { t } = useLanguage();
   const [type, setType] = useState<"business" | "private">("business");
   const [startAddr, setStartAddr] = useState("");
   const [endAddr, setEndAddr] = useState("");
   const [km, setKm] = useState("");
   const [durMin, setDurMin] = useState("");
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
 
   useEffect(() => {
     if (trip) {
@@ -38,8 +41,13 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       setEndAddr(trip.endAddr);
       setKm(trip.km.toFixed(1));
       setDurMin(String(Math.round(trip.dur / 60)));
+      setWaypoints(trip.waypoints ? [...trip.waypoints] : []);
     }
   }, [trip]);
+
+  const handleWaypointChange = (idx: number, addr: string) => {
+    setWaypoints((prev) => prev.map((wp, i) => (i === idx ? { ...wp, addr } : wp)));
+  };
 
   const handleSave = () => {
     if (!trip) return;
@@ -53,6 +61,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       km: isNaN(kmNum) ? trip.km : kmNum,
       dur: isNaN(durNum) ? trip.dur : durNum * 60,
       edited: true,
+      waypoints: waypoints.length > 0 ? waypoints : undefined,
     });
     onClose();
   };
@@ -117,6 +126,25 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                 />
               </View>
             </View>
+
+            {/* Waypoints */}
+            {waypoints.map((wp, idx) => (
+              <View style={styles.fieldGroup} key={wp.timestamp}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+                  {`${t("waypoint.label")} ${idx + 1}`}
+                </Text>
+                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <Feather name="map-pin" size={14} color={colors.primary} />
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground }]}
+                    value={wp.addr}
+                    onChangeText={(text) => handleWaypointChange(idx, text)}
+                    placeholder="Adresse"
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                </View>
+              </View>
+            ))}
 
             {/* End address */}
             <View style={styles.fieldGroup}>

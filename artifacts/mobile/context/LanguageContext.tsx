@@ -182,6 +182,13 @@ const de: Record<string, string> = {
   "pw.error.invalid": "Ungueltiger Code oder Fehler.",
   "pw.success.title": "Erfolg",
   "pw.success.text": "Dein Passwort wurde geaendert.",
+  "pause.dialog.title": "Zwischenstopp erfassen?",
+  "pause.dialog.message": "Möchtest du den aktuellen Standort als Zwischenstopp speichern?",
+  "pause.withWaypoint": "Ja, als Zwischenstopp speichern",
+  "pause.withoutWaypoint": "Nein, nur pausieren",
+  "waypoint.label": "Zwischenstopp",
+  "waypoint.addressUnavailable": "Adresse nicht verfügbar",
+  "waypoint.locating": "Standort wird ermittelt…",
 };
 
 const en: Record<string, string> = {
@@ -362,6 +369,13 @@ const en: Record<string, string> = {
   "pw.error.invalid": "Invalid code or error.",
   "pw.success.title": "Success",
   "pw.success.text": "Your password has been changed.",
+  "pause.dialog.title": "Record stop?",
+  "pause.dialog.message": "Do you want to save your current location as a waypoint?",
+  "pause.withWaypoint": "Yes, save as waypoint",
+  "pause.withoutWaypoint": "No, just pause",
+  "waypoint.label": "Waypoint",
+  "waypoint.addressUnavailable": "Address unavailable",
+  "waypoint.locating": "Locating…",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
