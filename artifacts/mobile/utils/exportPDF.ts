@@ -18,6 +18,9 @@ const fmtDate = (iso: string): string =>
 const fmtType = (type: "business" | "private"): string =>
   type === "business" ? "Geschäftl." : "Privat";
 
+const escHtml = (s: string): string =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 function getDateRange(trips: Trip[], dateFrom: string, dateTo: string): string {
   if (trips.length === 0) return "–";
   if (dateFrom && dateTo) return `${dateFrom} – ${dateTo}`;
@@ -44,8 +47,12 @@ function buildHTML(
     .map((t) => {
       const waypointRows = (t.waypoints ?? [])
         .map(
-          (wp, i) =>
-            `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}</td><td></td><td></td></tr>`
+          (wp, i) => {
+            const noteHtml = wp.note
+              ? `<br><span style="font-style:italic;color:#888;font-size:8.5pt;">${escHtml(wp.note)}</span>`
+              : "";
+            return `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td></tr>`;
+          }
         )
         .join("");
       return `
@@ -369,26 +376,35 @@ async function exportPDFWeb(
     // Waypoint sub-rows
     if (t.waypoints && t.waypoints.length > 0) {
       t.waypoints.forEach((wp, wpIdx) => {
-        if (y + rowH > pageH - bottomMargin) {
+        const hasNote = !!wp.note;
+        const wpRowH = hasNote ? rowH + 5 : rowH;
+        if (y + wpRowH > pageH - bottomMargin) {
           doc.addPage();
           y = 20;
           y = drawTableHeader(y);
         }
+        const wpX = margin + 2 + colWidths[0] + colWidths[1];
+        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(90, 106, 154);
         const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${wp.addr}`;
-        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
         const truncated = waypointLabel.length > maxChars ? waypointLabel.slice(0, maxChars - 1) + "…" : waypointLabel;
-        const wpX = margin + 2 + colWidths[0] + colWidths[1];
         doc.text(truncated, wpX, y + 5);
+        if (hasNote) {
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "italic");
+          doc.setTextColor(136, 136, 136);
+          const noteTruncated = wp.note!.length > maxChars ? wp.note!.slice(0, maxChars - 1) + "…" : wp.note!;
+          doc.text(`    ${noteTruncated}`, wpX, y + 10);
+        }
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(17, 17, 17);
         doc.setDrawColor(232, 234, 240);
         doc.setLineWidth(0.2);
-        doc.line(margin, y + rowH, margin + contentW, y + rowH);
-        y += rowH;
+        doc.line(margin, y + wpRowH, margin + contentW, y + wpRowH);
+        y += wpRowH;
       });
     }
   });

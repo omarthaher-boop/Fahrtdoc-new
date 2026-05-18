@@ -49,6 +49,10 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
     setWaypoints((prev) => prev.map((wp, i) => (i === idx ? { ...wp, addr } : wp)));
   };
 
+  const handleWaypointNoteChange = (idx: number, note: string) => {
+    setWaypoints((prev) => prev.map((wp, i) => (i === idx ? { ...wp, note } : wp)));
+  };
+
   const handleSave = () => {
     if (!trip) return;
     const kmNum = parseFloat(km.replace(",", "."));
@@ -140,6 +144,16 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     value={wp.addr}
                     onChangeText={(text) => handleWaypointChange(idx, text)}
                     placeholder="Adresse"
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                </View>
+                <View style={[styles.noteRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <Feather name="file-text" size={13} color={colors.mutedForeground} />
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground }]}
+                    value={wp.note ?? ""}
+                    onChangeText={(text) => handleWaypointNoteChange(idx, text)}
+                    placeholder="Notiz (optional)"
                     placeholderTextColor={colors.mutedForeground}
                   />
                 </View>
@@ -296,6 +310,16 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 2,
     flexShrink: 0,
+  },
+  noteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 10,
+    marginTop: 6,
   },
   twoColRow: { flexDirection: "row", gap: 12 },
   saveBtn: {

@@ -148,9 +148,16 @@ export default function TripCard({
               <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
               <View style={styles.addrRow}>
                 <Feather name="map-pin" size={9} color={colors.primary} style={{ flexShrink: 0, opacity: 0.7 }} />
-                <Text style={[styles.addrWaypointText, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {`${t("waypoint.label")} ${idx + 1}: ${wp.addr}`}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.addrWaypointText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {`${t("waypoint.label")} ${idx + 1}: ${wp.addr}`}
+                  </Text>
+                  {!!wp.note && (
+                    <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {wp.note}
+                    </Text>
+                  )}
+                </View>
               </View>
             </React.Fragment>
           ))}
@@ -297,7 +304,12 @@ const styles = StyleSheet.create({
   addrWaypointText: {
     fontSize: 12,
     fontWeight: "500",
-    flex: 1,
+  },
+  waypointNote: {
+    fontSize: 11,
+    fontStyle: "italic",
+    opacity: 0.75,
+    marginTop: 1,
   },
   bottomRow: {
     flexDirection: "row",
