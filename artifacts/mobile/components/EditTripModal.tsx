@@ -65,7 +65,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       km: isNaN(kmNum) ? trip.km : kmNum,
       dur: isNaN(durNum) ? trip.dur : durNum * 60,
       edited: true,
-      waypoints: waypoints.length > 0 ? waypoints : undefined,
+      waypoints: waypoints,
     });
     onClose();
   };
