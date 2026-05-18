@@ -339,15 +339,17 @@ const MIN_MOVE_KM = 0.005;
  * - Server soft-deletions propagate: any local trip whose ID is marked
  *   deleted on the server is removed from the local state.
  * - Server wins on same-ID conflicts: when both sides have a non-deleted
- *   trip with the same ID, the server version is used (including waypoints,
- *   which are now persisted on the server).
+ *   trip with the same ID, the server version is used. Exception: if the
+ *   server copy has no waypoints but the local copy does, the local
+ *   waypoints are injected into the merged result and returned in
+ *   `waypointPatch` so the caller can patch the server.
  * - Local-only trips (ID not present on server at all) are kept locally
  *   and returned in `localOnly` so the caller can upload them.
  */
 function mergeTrips(
   localTrips: Trip[],
   serverApiTrips: ApiTrip[]
-): { merged: Trip[]; localOnly: Trip[] } {
+): { merged: Trip[]; localOnly: Trip[]; waypointPatch: Trip[] } {
   const serverDeletedIds = new Set(serverApiTrips.filter((t) => t.deleted).map((t) => t.id));
   const serverActiveById = new Map(
     serverApiTrips.filter((t) => !t.deleted).map((t) => [t.id, apiTripToLocal(t)])
@@ -359,16 +361,26 @@ function mergeTrips(
   }
 
   const localOnly: Trip[] = [];
+  const waypointPatch: Trip[] = [];
   for (const lt of localTrips) {
     if (serverDeletedIds.has(lt.id)) continue;
     if (!serverActiveById.has(lt.id)) {
       merged.push(lt);
       localOnly.push(lt);
+    } else if (lt.waypoints && lt.waypoints.length > 0) {
+      const serverTrip = serverActiveById.get(lt.id)!;
+      if (!serverTrip.waypoints || serverTrip.waypoints.length === 0) {
+        waypointPatch.push(lt);
+        const idx = merged.findIndex((m) => m.id === lt.id);
+        if (idx !== -1) {
+          merged[idx] = { ...merged[idx], waypoints: lt.waypoints };
+        }
+      }
     }
   }
 
   merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  return { merged, localOnly };
+  return { merged, localOnly, waypointPatch };
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -404,12 +416,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             serverTokenRef.current = result.serverToken;
             const serverApiTrips = await fetchServerTrips(result.serverToken);
             if (serverApiTrips !== null) {
-              const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
+              const { merged, localOnly, waypointPatch } = mergeTrips(result.trips, serverApiTrips);
               finalTrips = merged;
               if (localOnly.length > 0) {
                 serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
               } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && result.trips.length > 0) {
                 serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
+              }
+              if (waypointPatch.length > 0) {
+                for (const t of waypointPatch) {
+                  serverUpdateTrip(result.serverToken, t.id, { waypoints: t.waypoints });
+                }
               }
             }
           }
@@ -460,11 +477,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     serverTokenRef.current = token;
     const serverApiTrips = await fetchServerTrips(token);
     if (serverApiTrips !== null) {
-      const { merged, localOnly } = mergeTrips(localTrips, serverApiTrips);
+      const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverApiTrips);
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && localTrips.length > 0) {
         await serverBatchUpsertTrips(token, localTrips.map(tripToApiPayload));
+      }
+      if (waypointPatch.length > 0) {
+        await Promise.all(waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints })));
       }
       return merged;
     }
@@ -566,9 +586,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await secureSetItem(key, serverTokenKey(key), token);
       setServerToken(token);
       serverTokenRef.current = token;
-      const { merged, localOnly } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
+      const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
+      }
+      if (waypointPatch.length > 0) {
+        await Promise.all(waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints })));
       }
       finalTrips = merged;
     }
