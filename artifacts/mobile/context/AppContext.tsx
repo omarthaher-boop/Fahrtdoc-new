@@ -38,6 +38,7 @@ export interface Trip {
   startAddr: string;
   endAddr: string;
   km: number;
+  kmRoute?: number;
   dur: number;
   type: "business" | "private";
   edited?: boolean;
@@ -147,6 +148,31 @@ const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const fetchOsrmRoute = async (
+  startLat: number,
+  startLon: number,
+  endLat: number,
+  endLon: number
+): Promise<number | null> => {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    const url = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=false`;
+    const r = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { "User-Agent": "FahrtDoc/2.4 (support@fahrtdoc.de)" },
+    });
+    clearTimeout(tid);
+    const d = await r.json();
+    if (d.code === "Ok" && Array.isArray(d.routes) && d.routes.length > 0) {
+      return Math.round((d.routes[0].distance / 1000) * 10) / 10;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
 const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
@@ -935,6 +961,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (last) {
       reverseGeocode(last.lat, last.lon).then((addr) => {
         setPendingTrip((prev) => (prev ? { ...prev, endAddr: addr } : null));
+      });
+    }
+
+    // Async: calculate shortest road route via OSRM and store in trip
+    if (firstPos && last) {
+      fetchOsrmRoute(firstPos.lat, firstPos.lon, last.lat, last.lon).then((kmRoute) => {
+        if (kmRoute !== null) {
+          setPendingTrip((prev) => (prev ? { ...prev, kmRoute } : null));
+        }
       });
     }
 

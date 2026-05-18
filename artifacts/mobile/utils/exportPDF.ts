@@ -43,6 +43,10 @@ function buildHTML(
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
   const dateRange = getDateRange(trips, dateFrom, dateTo);
 
+  const totalKmRoute = trips.some((t) => t.kmRoute !== undefined)
+    ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
+    : null;
+
   const rows = trips
     .map((t) => {
       const waypointRows = (t.waypoints ?? [])
@@ -51,7 +55,7 @@ function buildHTML(
             const noteHtml = wp.note
               ? `<br><span style="font-style:italic;color:#888;font-size:8.5pt;">${escHtml(wp.note)}</span>`
               : "";
-            return `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td></tr>`;
+            return `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td><td></td></tr>`;
           }
         )
         .join("");
@@ -62,6 +66,7 @@ function buildHTML(
         <td>${t.startAddr}</td>
         <td>${t.endAddr}</td>
         <td class="num">${t.km.toFixed(1)}</td>
+        <td class="num">${t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "–"}</td>
         <td class="num">${fmtDur(t.dur)}</td>
       </tr>${waypointRows}`;
     })
@@ -172,15 +177,16 @@ function buildHTML(
   <table>
     <thead>
       <tr>
-        <th>Datum</th><th>Typ</th><th>Start</th><th>Ziel</th>
-        <th class="num">km</th><th class="num">Dauer</th>
+        <th>Datum</th><th>Typ</th><th>Startadresse</th><th>Zieladresse</th>
+        <th class="num">GPS-Strecke (km)</th><th class="num">Kürzeste Route (km)</th><th class="num">Dauer</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
     <tfoot>
       <tr>
         <td colspan="4">Gesamt</td>
-        <td class="num">${totalKm.toFixed(1)} km</td>
+        <td class="num">${totalKm.toFixed(1)}</td>
+        <td class="num">${totalKmRoute !== null ? totalKmRoute.toFixed(1) : "–"}</td>
         <td class="num">${fmtDur(totalDur)}</td>
       </tr>
     </tfoot>
@@ -303,8 +309,8 @@ async function exportPDFWeb(
   });
   y += 22;
 
-  const colWidths = [28, 22, 88, 88, 22, 17];
-  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "km", "Dauer"];
+  const colWidths = [26, 20, 70, 70, 28, 28, 17];
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "GPS-Strecke", "Kurzeste Route", "Dauer"];
   const rowH = 8;
   const pageH = 210;
   const bottomMargin = 20;
@@ -357,6 +363,7 @@ async function exportPDFWeb(
       t.startAddr,
       t.endAddr,
       t.km.toFixed(1),
+      t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
     ];
     let cellX = margin + 2;
@@ -424,7 +431,17 @@ async function exportPDFWeb(
   colWidths.slice(0, 4).forEach((w) => { totX += w; });
   doc.text(`${totalKm.toFixed(1)} km`, totX + colWidths[4] - 4, y + 6, { align: "right" });
   totX += colWidths[4];
-  doc.text(fmtDur(totalDur), totX + colWidths[5] - 4, y + 6, { align: "right" });
+  const totalKmRouteJsPdf = trips.some((t) => t.kmRoute !== undefined)
+    ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
+    : null;
+  doc.text(
+    totalKmRouteJsPdf !== null ? `${totalKmRouteJsPdf.toFixed(1)} km` : "-",
+    totX + colWidths[5] - 4,
+    y + 6,
+    { align: "right" }
+  );
+  totX += colWidths[5];
+  doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
   y += totalsH + 10;
 
   doc.setFontSize(8);
