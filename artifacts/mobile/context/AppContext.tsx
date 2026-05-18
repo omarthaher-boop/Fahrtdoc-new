@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 import * as ExpoCrypto from "expo-crypto";
-import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
+import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import {
   type ApiTrip,
@@ -482,12 +482,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
 
   const logout = useCallback(async () => {
+    const email = user?.email ?? null;
+
+    // Stop foreground GPS watch
+    if (watchRef.current !== null) {
+      if (Platform.OS !== "web") {
+        (watchRef.current as unknown as { remove: () => void })?.remove?.();
+      } else {
+        navigator.geolocation?.clearWatch(watchRef.current);
+      }
+      watchRef.current = null;
+    }
+
+    // Stop background location task (native only)
+    if (Platform.OS !== "web") {
+      try {
+        const Location = await import("expo-location");
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+        if (isRunning) {
+          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
     setUserState(null);
+    setActiveTrip(null);
     setTrips([]);
     setServerToken(null);
     serverTokenRef.current = null;
-    await AsyncStorage.removeItem("session");
-  }, []);
+
+    const removals: Promise<void>[] = [
+      AsyncStorage.removeItem("session"),
+      AsyncStorage.removeItem(BG_POSITIONS_KEY),
+    ];
+    if (email) {
+      removals.push(AsyncStorage.removeItem(tripsKey(email)));
+      removals.push(AsyncStorage.removeItem(serverTokenKey(email)));
+      removals.push(secureRemoveDataKey(email));
+      removals.push(
+        loadAccounts().then((accounts) => {
+          delete accounts[email];
+          return saveAccounts(accounts);
+        })
+      );
+    }
+    await Promise.all(removals);
+  }, [user]);
 
   const persistTripsLocal = useCallback((next: Trip[], email: string) => {
     secureSetItem(email, tripsKey(email), JSON.stringify(next));

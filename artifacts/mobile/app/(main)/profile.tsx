@@ -32,7 +32,6 @@ const PREF = {
   offlineStorage: "pref_offline_storage",
   trackingPaused: "pref_tracking_paused",
   defaultTripType: "pref_default_trip_type",
-  appLock: "pref_app_lock",
   notifGeneral: "pref_notif_general",
   notifTrips: "pref_notif_trips",
   notifTracking: "pref_notif_tracking",
@@ -56,8 +55,6 @@ const FAQ_DATA: { q: string; a: string }[] = [
     { q: "In welchen Formaten kann ich exportieren?", a: "Aktuell unterstuetzt FahrtDoc den Export als PDF (druckfertig, fuer das Finanzamt geeignet) sowie als CSV (fuer Tabellenkalkulationen wie Excel oder Google Sheets)." },
     { q: "Wofuer braucht die App meinen Standort?", a: "Die Standortdaten werden ausschliesslich fuer die Fahrtaufzeichnung genutzt: zur Bestimmung von Start- und Zielort, zur Berechnung der Streckenlange und zur automatischen Fahrterkennung." },
     { q: "Wie aendere ich mein Passwort?", a: "Gehe zu Profil -> Sicherheit & Datenschutz -> Passwort aendern. Du erhaeltst einen Bestaestigungscode per E-Mail. Gib den Code zusammen mit deinem neuen Passwort ein." },
-    { q: "Was ist Face ID / App-Sperre?", a: "Mit der App-Sperre wird beim Oeffnen der App eine biometrische Authentifizierung (Face ID oder Fingerabdruck) oder eine PIN-Eingabe verlangt." },
-    { q: "Wie aktiviere ich Face ID?", a: "Gehe zu Profil -> Sicherheit & Datenschutz und aktiviere den Schalter Face ID / App-Sperre. Beim naechsten App-Start wirst du zur Einrichtung aufgefordert." },
     { q: "Was passiert, wenn ich mein Passwort vergesse?", a: "Auf dem Anmeldebildschirm gibt es die Option Passwort vergessen. Du erhaeltst einen Wiederherstellungslink per E-Mail. Folge den Anweisungen, um ein neues Passwort festzulegen." },
     { q: "Wie funktioniert die Datensynchronisation?", a: "Wenn du online bist, synchronisiert FahrtDoc deine Fahrten automatisch mit unserem Server. Neu aufgezeichnete Fahrten werden sofort hochgeladen." },
     { q: "Was passiert im Offline-Modus?", a: "Ohne Internetverbindung werden Fahrten lokal gespeichert. Sobald wieder eine Verbindung besteht, werden alle ausstehenden Fahrten automatisch synchronisiert." },
@@ -332,7 +329,6 @@ export default function ProfileScreen() {
   const [offlineStorage, setOfflineStorage] = useState(true);
   const [trackingPaused, setTrackingPaused] = useState(false);
   const [defaultTripType, setDefaultTripType] = useState<"business" | "private">("business");
-  const [appLock, setAppLock] = useState(false);
 
   const [pwStep, setPwStep] = useState<"request" | "verify">("request");
   const [pwLoading, setPwLoading] = useState(false);
@@ -347,7 +343,7 @@ export default function ProfileScreen() {
     const load = async () => {
       const vals = await AsyncStorage.multiGet([
         PREF.autoTracking, PREF.gpsTracking, PREF.bgTracking, PREF.offlineStorage,
-        PREF.trackingPaused, PREF.defaultTripType, PREF.appLock,
+        PREF.trackingPaused, PREF.defaultTripType,
         PREF.notifGeneral, PREF.notifTrips, PREF.notifTracking, PREF.notifGps,
         PREF.notifOffline, PREF.notifSync, PREF.notifLogin, PREF.notifPrivacy,
       ]);
@@ -358,7 +354,6 @@ export default function ProfileScreen() {
       if (m[PREF.offlineStorage] !== null) setOfflineStorage(m[PREF.offlineStorage] === "true");
       if (m[PREF.trackingPaused] !== null) setTrackingPaused(m[PREF.trackingPaused] === "true");
       if (m[PREF.defaultTripType] === "private") setDefaultTripType("private");
-      if (m[PREF.appLock] !== null) setAppLock(m[PREF.appLock] === "true");
       if (m[PREF.notifGeneral] !== null) setNotifGeneral(m[PREF.notifGeneral] === "true");
       if (m[PREF.notifTrips] !== null) setNotifTrips(m[PREF.notifTrips] === "true");
       if (m[PREF.notifTracking] !== null) setNotifTracking(m[PREF.notifTracking] === "true");
@@ -392,7 +387,6 @@ export default function ProfileScreen() {
   const handleOfflineStorage = useCallback((v: boolean) => { setOfflineStorage(v); savePref(PREF.offlineStorage, v); }, [savePref]);
   const handleTrackingPaused = useCallback((v: boolean) => { setTrackingPaused(v); savePref(PREF.trackingPaused, v); }, [savePref]);
   const handleDefaultTripType = useCallback((v: "business" | "private") => { setDefaultTripType(v); savePref(PREF.defaultTripType, v); }, [savePref]);
-  const handleAppLock = useCallback((v: boolean) => { setAppLock(v); savePref(PREF.appLock, v); }, [savePref]);
 
   const handleNotifGeneral = useCallback((v: boolean) => { setNotifGeneral(v); savePref(PREF.notifGeneral, v); }, [savePref]);
   const handleNotifTrips = useCallback((v: boolean) => { setNotifTrips(v); savePref(PREF.notifTrips, v); }, [savePref]);
@@ -614,16 +608,7 @@ export default function ProfileScreen() {
           <SectionHeader label={t("section.security")} colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="lock" label={t("row.changePassword")} onPress={openPwModal} colors={colors} showDivider />
-            <ListRow icon="shield" label={t("row.privacy")} onPress={() => setPrivacyModalVisible(true)} colors={colors} showDivider />
-            <View style={styles.listRow}>
-              <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
-                <Feather name="aperture" size={16} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("row.faceId")}</Text>
-              </View>
-              <Switch value={appLock} onValueChange={handleAppLock} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#fff" />
-            </View>
+            <ListRow icon="shield" label={t("row.privacy")} onPress={() => setPrivacyModalVisible(true)} colors={colors} />
           </View>
 
           <SectionHeader label={t("section.support")} colors={colors} />
