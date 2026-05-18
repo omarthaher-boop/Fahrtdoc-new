@@ -130,6 +130,13 @@ function buildHTML(
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
   const dateRange = getDateRange(trips, dateFrom, dateTo);
 
+  const bizTrips = trips.filter((t) => t.type === "business");
+  const prvTrips = trips.filter((t) => t.type === "private");
+  const bizKm = bizTrips.reduce((a, t) => a + t.km, 0);
+  const prvKm = prvTrips.reduce((a, t) => a + t.km, 0);
+  const bizKmPct = totalKm > 0 ? Math.round((bizKm / totalKm) * 100) : 0;
+  const prvKmPct = totalKm > 0 ? 100 - bizKmPct : 0;
+
   const totalKmRoute = trips.some((t) => t.kmRoute !== undefined)
     ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
     : null;
@@ -231,6 +238,18 @@ function buildHTML(
       display: flex; justify-content: space-between;
       border-top: 1px solid #e0e4f0; padding-top: 12px;
     }
+    .stats-section {
+      display: flex; gap: 0; margin-bottom: 16px;
+      border: 1px solid #e0e4f0; border-radius: 8px; overflow: hidden;
+    }
+    .stats-col { flex: 1; padding: 12px 16px; }
+    .stats-col + .stats-col { border-left: 1px solid #e0e4f0; background: #fafbfd; }
+    .stats-label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; color: #666; font-weight: 700; margin-bottom: 4px; }
+    .stats-km { font-size: 15pt; font-weight: 800; color: #1A2B6B; }
+    .stats-sub { font-size: 8.5pt; color: #888; margin-top: 2px; margin-bottom: 7px; }
+    .stats-bar-wrap { height: 5px; background: #e8eaf0; border-radius: 3px; overflow: hidden; }
+    .stats-bar-biz { height: 100%; background: #1A2B6B; border-radius: 3px; }
+    .stats-bar-prv { height: 100%; background: #aab6d8; border-radius: 3px; }
     @media print { body { padding: 0; } @page { size: A4 landscape; margin: 1.2cm 1.5cm; } }
   </style>
 </head>
@@ -259,6 +278,20 @@ function buildHTML(
     <div>
       <div class="summary-label">Fahrzeit gesamt</div>
       <div class="summary-value">${fmtDur(totalDur)}</div>
+    </div>
+  </div>
+  <div class="stats-section">
+    <div class="stats-col">
+      <div class="stats-label">Geschäftlich</div>
+      <div class="stats-km">${bizKm.toFixed(1)} km</div>
+      <div class="stats-sub">${bizTrips.length} Fahrten &middot; ${bizKmPct}% der Strecke</div>
+      <div class="stats-bar-wrap"><div class="stats-bar-biz" style="width:${bizKmPct}%"></div></div>
+    </div>
+    <div class="stats-col">
+      <div class="stats-label">Privat</div>
+      <div class="stats-km">${prvKm.toFixed(1)} km</div>
+      <div class="stats-sub">${prvTrips.length} Fahrten &middot; ${prvKmPct}% der Strecke</div>
+      <div class="stats-bar-wrap"><div class="stats-bar-prv" style="width:${prvKmPct}%"></div></div>
     </div>
   </div>
   <table>
@@ -300,6 +333,12 @@ async function exportPDFWeb(
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
   const dateRange = getDateRange(trips, dateFrom, dateTo);
+  const jsBizTrips = trips.filter((t) => t.type === "business");
+  const jsPrvTrips = trips.filter((t) => t.type === "private");
+  const jsBizKm = jsBizTrips.reduce((a, t) => a + t.km, 0);
+  const jsPrvKm = jsPrvTrips.reduce((a, t) => a + t.km, 0);
+  const jsBizKmPct = totalKm > 0 ? Math.round((jsBizKm / totalKm) * 100) : 0;
+  const jsPrvKmPct = totalKm > 0 ? 100 - jsBizKmPct : 0;
   const exportedAt = new Date().toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "long",
@@ -395,6 +434,54 @@ async function exportPDFWeb(
     doc.text(item.value, x, y + 12);
   });
   y += 22;
+
+  // ── Statistics block: Geschäftlich vs. Privat ────────────────────────────
+  const statH = 22;
+  const halfW = (contentW - 6) / 2;
+
+  // Business box
+  doc.setFillColor(240, 243, 250);
+  doc.roundedRect(margin, y, halfW, statH, 2, 2, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 106, 154);
+  doc.text("GESCHÄFTLICH", margin + 4, y + 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text(`${jsBizKm.toFixed(1)} km`, margin + 4, y + 12);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(102, 102, 102);
+  doc.text(`${jsBizTrips.length} Fahrten  |  ${jsBizKmPct}% der Strecke`, margin + 4, y + 18);
+
+  // Private box
+  const prvX = margin + halfW + 6;
+  doc.setFillColor(250, 251, 253);
+  doc.roundedRect(prvX, y, halfW, statH, 2, 2, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 106, 154);
+  doc.text("PRIVAT", prvX + 4, y + 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text(`${jsPrvKm.toFixed(1)} km`, prvX + 4, y + 12);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(102, 102, 102);
+  doc.text(`${jsPrvTrips.length} Fahrten  |  ${jsPrvKmPct}% der Strecke`, prvX + 4, y + 18);
+
+  // Ratio bar
+  y += statH + 3;
+  doc.setFillColor(232, 234, 240);
+  doc.roundedRect(margin, y, contentW, 3, 1, 1, "F");
+  if (jsBizKmPct > 0) {
+    doc.setFillColor(...navy);
+    doc.rect(margin, y, (contentW * jsBizKmPct) / 100, 3, "F");
+  }
+  y += 8;
+  // ────────────────────────────────────────────────────────────────────────
 
   const colWidths = [26, 20, 70, 70, 28, 28, 17];
   const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "GPS-Strecke", "Kurzeste Route", "Dauer"];

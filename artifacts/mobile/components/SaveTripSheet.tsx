@@ -76,7 +76,10 @@ export default function SaveTripSheet() {
       const route = routes.find((r) => r.id === selectedId);
       if (route) km = route.km;
     }
-    await finalizeTrip({ ...draftTrip, km });
+    // Always record the shortest available route as kmRoute so the PDF comparison column is filled
+    const shortestRoute = routes.find((r) => r.isShortest);
+    const kmRoute = shortestRoute?.km ?? draftTrip.kmRoute;
+    await finalizeTrip({ ...draftTrip, km, kmRoute });
   }, [draftTrip, selectedId, routes, finalizeTrip]);
 
   const handleEditSave = useCallback(
