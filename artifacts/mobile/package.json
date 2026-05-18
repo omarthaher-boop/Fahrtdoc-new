@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "expo-crypto": "~15.0.9",
+    "expo-file-system": "^55.0.20",
     "expo-print": "^15.0.8",
     "expo-secure-store": "~15.0.8",
     "expo-sharing": "^14.0.8",

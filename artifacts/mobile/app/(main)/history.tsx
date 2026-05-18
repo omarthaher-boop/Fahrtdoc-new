@@ -19,7 +19,7 @@ import TripCard from "@/components/TripCard";
 import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
-import { exportPDF } from "@/utils/exportPDF";
+import { exportPDF, exportCSV } from "@/utils/exportPDF";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 
@@ -260,6 +260,15 @@ export default function HistoryScreen() {
     await exportPDF(displayTrips, user, dateFrom, dateTo);
   };
 
+  const handleExportCSV = async () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (selectionMode && selectedIds.size === 0) {
+      Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
+      return;
+    }
+    await exportCSV(displayTrips);
+  };
+
   const handleEdit = (trip: Trip) => {
     setEditingTrip(trip);
   };
@@ -434,6 +443,20 @@ export default function HistoryScreen() {
             >
               <Feather name="file-text" size={13} color={colors.primary} />
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+            </TouchableOpacity>
+            {selectionMode && selectedIds.size > 0 && (
+              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.exportBtnWrap}>
+            <TouchableOpacity
+              onPress={handleExportCSV}
+              style={[styles.exportBtn, { borderColor: colors.primary }]}
+            >
+              <Feather name="grid" size={13} color={colors.primary} />
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>CSV</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
               <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>

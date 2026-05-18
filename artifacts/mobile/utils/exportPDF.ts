@@ -1,6 +1,93 @@
 import { Platform, Alert } from "react-native";
 import type { Trip, UserProfile } from "@/context/AppContext";
 
+// ─── CSV helpers ─────────────────────────────────────────────────────────────
+
+function csvCell(value: string | number): string {
+  const s = String(value);
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function buildCSV(trips: Trip[]): string {
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "Dauer", "Notiz"];
+  const rows: string[] = [headers.join(",")];
+
+  for (const t of trips) {
+    const date = new Date(t.date).toLocaleDateString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const type = t.type === "business" ? "Geschäftlich" : "Privat";
+    rows.push(
+      [date, type, t.startAddr, t.endAddr, t.km.toFixed(1), fmtDur(t.dur), ""]
+        .map(csvCell)
+        .join(",")
+    );
+
+    (t.waypoints ?? []).forEach((wp, i) => {
+      rows.push(
+        ["", `Zwischenstopp ${i + 1}`, wp.addr, "", "", "", wp.note ?? ""]
+          .map(csvCell)
+          .join(",")
+      );
+    });
+  }
+
+  return rows.join("\r\n");
+}
+
+async function exportCSVWeb(trips: Trip[], filename = "Fahrtenbuch.csv"): Promise<void> {
+  const csv = buildCSV(trips);
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportCSVNative(trips: Trip[], filename = "Fahrtenbuch.csv"): Promise<void> {
+  const { File, Paths } = await import("expo-file-system");
+  const Sharing = await import("expo-sharing");
+
+  const csv = buildCSV(trips);
+  const file = new File(Paths.cache, filename);
+  file.write("\uFEFF" + csv);
+  const fileUri = file.uri;
+
+  const isAvailable = await Sharing.isAvailableAsync();
+  if (isAvailable) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "text/csv",
+      dialogTitle: "CSV exportieren",
+      UTI: "public.comma-separated-values-text",
+    });
+  } else {
+    Alert.alert(
+      "CSV erstellt",
+      "Die Datei wurde gespeichert, aber das Teilen ist auf diesem Gerät nicht verfügbar.",
+      [{ text: "OK" }]
+    );
+  }
+}
+
+export async function exportCSV(trips: Trip[]): Promise<void> {
+  if (trips.length === 0) {
+    Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
+    return;
+  }
+  if (Platform.OS === "web") {
+    await exportCSVWeb(trips);
+  } else {
+    await exportCSVNative(trips);
+  }
+}
+
 const fmtDur = (s: number): string => {
   if (s < 60) return `${s}s`;
   const h = Math.floor(s / 3600);
