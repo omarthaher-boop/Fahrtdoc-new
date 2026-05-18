@@ -10,6 +10,12 @@ import {
   View,
   Pressable,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+} from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
 import { Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -52,7 +58,17 @@ export default function TripCard({
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [mapMounted, setMapMounted] = useState(false);
   const mountedRef = useRef(true);
+
+  const mapHeight = useSharedValue(0);
+  const mapOpacity = useSharedValue(0);
+
+  const mapAnimStyle = useAnimatedStyle(() => ({
+    maxHeight: mapHeight.value,
+    opacity: mapOpacity.value,
+    overflow: "hidden",
+  }));
 
   useEffect(() => {
     mountedRef.current = true;
@@ -87,7 +103,18 @@ export default function TripCard({
 
   const handleToggleExpand = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    setExpanded((v) => !v);
+    if (!expanded) {
+      setExpanded(true);
+      setMapMounted(true);
+      mapHeight.value = withTiming(300, { duration: 320 });
+      mapOpacity.value = withTiming(1, { duration: 320 });
+    } else {
+      setExpanded(false);
+      mapHeight.value = withTiming(0, { duration: 280 });
+      mapOpacity.value = withTiming(0, { duration: 220 }, (finished) => {
+        if (finished) runOnJS(setMapMounted)(false);
+      });
+    }
   };
 
   return (
@@ -280,11 +307,11 @@ export default function TripCard({
           </View>
         </View>
 
-        {/* Expandable map section */}
-        {expanded && !selectionMode && (
-          <View style={styles.mapSection}>
-            <TripRouteMap trip={trip} />
-          </View>
+        {/* Expandable map section — always rendered when mounted, height animates */}
+        {!selectionMode && (
+          <Animated.View style={[styles.mapSection, mapAnimStyle]}>
+            {mapMounted && <TripRouteMap trip={trip} />}
+          </Animated.View>
         )}
       </View>
     </Pressable>
