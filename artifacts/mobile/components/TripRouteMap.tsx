@@ -60,18 +60,29 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
-function projectPoints(
-  points: MapPoint[]
-): Array<MapPoint & { x: number; y: number }> {
-  if (points.length === 0) return [];
+interface Bounds {
+  minLat: number;
+  maxLat: number;
+  minLon: number;
+  maxLon: number;
+}
 
+function computeBounds(points: Coord[]): Bounds {
   const lats = points.map((p) => p.lat);
   const lons = points.map((p) => p.lon);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
+  return {
+    minLat: Math.min(...lats),
+    maxLat: Math.max(...lats),
+    minLon: Math.min(...lons),
+    maxLon: Math.max(...lons),
+  };
+}
 
+function projectWithBounds<T extends Coord>(
+  points: T[],
+  bounds: Bounds
+): Array<T & { x: number; y: number }> {
+  const { minLat, maxLat, minLon, maxLon } = bounds;
   const latRange = maxLat - minLat || 0.002;
   const lonRange = maxLon - minLon || 0.002;
 
@@ -94,6 +105,14 @@ function projectPoints(
   }));
 }
 
+function projectPoints(
+  points: MapPoint[]
+): Array<MapPoint & { x: number; y: number }> {
+  if (points.length === 0) return [];
+  const bounds = computeBounds(points);
+  return projectWithBounds(points, bounds);
+}
+
 interface DirectCoords {
   startLat: number;
   startLon: number;
@@ -104,14 +123,18 @@ interface DirectCoords {
 export default function TripRouteMap({
   trip,
   coords,
+  path,
 }: {
   trip: Trip;
   coords?: DirectCoords;
+  path?: { lat: number; lon: number }[];
 }) {
   const colors = useColors();
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const hasPath = path && path.length >= 2;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +148,11 @@ export default function TripRouteMap({
       let startCoord: Coord | null;
       let endCoord: Coord | null;
 
-      if (coords) {
+      if (hasPath) {
+        // Use first and last GPS breadcrumb points as anchors — no geocoding needed
+        startCoord = path[0];
+        endCoord = path[path.length - 1];
+      } else if (coords) {
         startCoord = { lat: coords.startLat, lon: coords.startLon };
         endCoord = { lat: coords.endLat, lon: coords.endLon };
       } else {
@@ -186,9 +213,8 @@ export default function TripRouteMap({
     return () => {
       cancelled = true;
     };
-    // Use a stable waypoint signature so edits to waypoints re-trigger the map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trip.id, trip.startAddr, trip.endAddr, trip.startLat, trip.startLon, trip.endLat, trip.endLon, JSON.stringify(trip.waypoints), coords?.startLat, coords?.startLon, coords?.endLat, coords?.endLon]);
+  }, [trip.id, trip.startAddr, trip.endAddr, trip.startLat, trip.startLon, trip.endLat, trip.endLon, JSON.stringify(trip.waypoints), coords?.startLat, coords?.startLon, coords?.endLat, coords?.endLon, hasPath]);
 
   const WAYPOINT_COLOR = "#F59E0B";
   const START_COLOR = colors.primary;
@@ -226,8 +252,23 @@ export default function TripRouteMap({
     );
   }
 
-  const projected = projectPoints(points);
-  const polylinePoints = projected.map((p) => `${p.x},${p.y}`).join(" ");
+  // When a GPS breadcrumb path is available, project everything using a
+  // shared bounding box that covers both the path and the marker points.
+  // This keeps the markers correctly positioned relative to the polyline.
+  let projected: Array<MapPoint & { x: number; y: number }>;
+  let pathPolylinePoints: string | null = null;
+
+  if (hasPath) {
+    const allCoords: Coord[] = [...path, ...points];
+    const bounds = computeBounds(allCoords);
+    projected = projectWithBounds(points, bounds);
+    const projectedPath = projectWithBounds(path, bounds);
+    pathPolylinePoints = projectedPath.map((p) => `${p.x},${p.y}`).join(" ");
+  } else {
+    projected = projectPoints(points);
+  }
+
+  const fallbackPolylinePoints = projected.map((p) => `${p.x},${p.y}`).join(" ");
   const waypointCount = (trip.waypoints ?? []).length;
 
   return (
@@ -267,17 +308,29 @@ export default function TripRouteMap({
           </React.Fragment>
         ))}
 
-        {/* Route line */}
-        {projected.length > 1 && (
+        {/* Route line — actual GPS path when available, straight-line fallback otherwise */}
+        {pathPolylinePoints ? (
           <Polyline
-            points={polylinePoints}
+            points={pathPolylinePoints}
             fill="none"
             stroke={colors.primary}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            opacity={0.75}
+            opacity={0.85}
           />
+        ) : (
+          projected.length > 1 && (
+            <Polyline
+              points={fallbackPolylinePoints}
+              fill="none"
+              stroke={colors.primary}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.75}
+            />
+          )
         )}
 
         {/* Markers */}
@@ -318,11 +371,9 @@ export default function TripRouteMap({
               "Z",
             ].join(" ");
 
-            // Place label to the right when pin is in left half, else left
             const labelOnRight = pt.x < SVG_W / 2;
             const GAP = 10;
             const labelX = labelOnRight ? pt.x + s + GAP : pt.x - s - GAP - LABEL_W;
-            // Vertically centre label on pin tip
             const labelY = pt.y - s * 2 - LABEL_H / 2;
             const clampedLabelY = Math.max(2, Math.min(SVG_H - LABEL_H - 2, labelY));
 
@@ -331,7 +382,6 @@ export default function TripRouteMap({
 
             return (
               <G key={`m-${idx}`}>
-                {/* Pin diamond */}
                 <Path d={pinPath} fill={WAYPOINT_COLOR} />
                 <SvgText
                   x={pt.x}
@@ -344,7 +394,6 @@ export default function TripRouteMap({
                   {wpNum}
                 </SvgText>
 
-                {/* Label callout bubble */}
                 <Rect
                   x={labelX}
                   y={clampedLabelY}
@@ -408,6 +457,14 @@ export default function TripRouteMap({
             </Text>
           </View>
         )}
+        {hasPath && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendLine, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.legendText, { color: colors.mutedForeground }]}>
+              GPS-Spur
+            </Text>
+          </View>
+        )}
         <View style={styles.legendItem}>
           <View
             style={[
@@ -465,6 +522,11 @@ const styles = StyleSheet.create({
   legendDotHollow: {
     backgroundColor: "white",
     borderWidth: 2,
+  },
+  legendLine: {
+    width: 16,
+    height: 2.5,
+    borderRadius: 2,
   },
   legendText: {
     fontSize: 11,

@@ -120,6 +120,7 @@ interface AppContextType {
   elapsed: number;
   pendingTrip: Trip | null;
   pendingTripCoords: { startLat: number; startLon: number; endLat: number; endLon: number } | null;
+  pendingTripPath: { lat: number; lon: number }[] | null;
   finalizeTrip: (trip: Trip) => Promise<void>;
   discardPendingTrip: () => void;
 }
@@ -404,6 +405,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [elapsed, setElapsed] = useState(0);
   const [pendingTrip, setPendingTrip] = useState<Trip | null>(null);
   const [pendingTripCoords, setPendingTripCoords] = useState<{ startLat: number; startLon: number; endLat: number; endLon: number } | null>(null);
+  const [pendingTripPath, setPendingTripPath] = useState<{ lat: number; lon: number }[] | null>(null);
   const watchRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTokenRef = useRef<string | null>(null);
@@ -836,6 +838,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const coords = pendingTripCoords;
     setPendingTrip(null);
     setPendingTripCoords(null);
+    setPendingTripPath(null);
     const tripWithCoords: Trip = coords
       ? {
           ...trip,
@@ -851,6 +854,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const discardPendingTrip = useCallback(() => {
     setPendingTrip(null);
     setPendingTripCoords(null);
+    setPendingTripPath(null);
   }, []);
 
   const deleteTrip = useCallback(async (id: string) => {
@@ -1114,6 +1118,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       endLat: last.lat,
       endLon: last.lon,
     } : null);
+    // Store the full breadcrumb trail so the map can render the actual driven path
+    setPendingTripPath(activeTrip.positions.length >= 2 ? activeTrip.positions : null);
 
     const newTrip: Trip = {
       id: activeTrip.id,
@@ -1205,6 +1211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         elapsed,
         pendingTrip,
         pendingTripCoords,
+        pendingTripPath,
         finalizeTrip,
         discardPendingTrip,
       }}

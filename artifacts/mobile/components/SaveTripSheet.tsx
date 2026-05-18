@@ -29,7 +29,7 @@ const fmtDur = (s: number) => {
 export default function SaveTripSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { pendingTrip, pendingTripCoords, finalizeTrip } = useApp();
+  const { pendingTrip, pendingTripCoords, pendingTripPath, finalizeTrip } = useApp();
   const { t } = useLanguage();
 
   const [routes, setRoutes] = useState<RouteOption[]>([]);
@@ -205,6 +205,7 @@ export default function SaveTripSheet() {
                     <TripRouteMap
                       trip={draftTrip}
                       coords={pendingTripCoords ?? undefined}
+                      path={pendingTripPath ?? undefined}
                     />
                   </View>
                 )}
