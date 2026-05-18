@@ -4,10 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -57,6 +59,8 @@ export default function ActiveTripBanner() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [showPauseDialog, setShowPauseDialog] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteText, setNoteText] = useState("");
   const [geocoding, setGeocoding] = useState(false);
 
   useEffect(() => {
@@ -91,8 +95,14 @@ export default function ActiveTripBanner() {
     }
   };
 
-  const handlePauseWithWaypoint = async () => {
+  const handlePauseWithWaypoint = () => {
     setShowPauseDialog(false);
+    setNoteText("");
+    setShowNoteInput(true);
+  };
+
+  const handleNoteConfirm = async (note: string) => {
+    setShowNoteInput(false);
     setGeocoding(true);
     // Capture trip ID before the async gap to detect if trip was stopped while geocoding
     const capturedTripId = activeTrip?.id;
@@ -120,6 +130,7 @@ export default function ActiveTripBanner() {
         lat: pos.lat,
         lon: pos.lon,
         timestamp: Date.now(),
+        ...(note.trim() ? { note: note.trim() } : {}),
       };
       togglePause(waypoint);
     } catch {
@@ -130,6 +141,7 @@ export default function ActiveTripBanner() {
           lat: pos.lat,
           lon: pos.lon,
           timestamp: Date.now(),
+          ...(note.trim() ? { note: note.trim() } : {}),
         };
         togglePause(waypoint);
       }
@@ -239,6 +251,56 @@ export default function ActiveTripBanner() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showNoteInput} transparent animationType="fade" onRequestClose={() => setShowNoteInput(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.dialogOverlay}>
+          <View style={[styles.dialogBox, { backgroundColor: colors.card }]}>
+            <View style={[styles.dialogIconWrap, { backgroundColor: colors.accent }]}>
+              <Feather name="edit-3" size={22} color={colors.primary} />
+            </View>
+            <Text style={[styles.dialogTitle, { color: colors.foreground }]}>
+              {t("waypoint.note.title")}
+            </Text>
+            <TextInput
+              style={[
+                styles.noteInput,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: colors.border,
+                  color: colors.foreground,
+                },
+              ]}
+              placeholder={t("waypoint.note.placeholder")}
+              placeholderTextColor={colors.mutedForeground}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              numberOfLines={3}
+              maxLength={200}
+              autoFocus
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={[styles.dialogBtnPrimary, { backgroundColor: colors.primary }]}
+              onPress={() => handleNoteConfirm(noteText)}
+            >
+              <Feather name="check" size={15} color="#FFF" />
+              <Text style={styles.dialogBtnPrimaryText}>{t("waypoint.note.confirm")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dialogBtnSecondary, { borderColor: colors.border, backgroundColor: colors.secondary }]}
+              onPress={() => handleNoteConfirm("")}
+            >
+              <Text style={[styles.dialogBtnSecondaryText, { color: colors.mutedForeground }]}>{t("waypoint.note.skip")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowNoteInput(false)}
+            >
+              <Text style={[styles.dialogCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
@@ -324,4 +386,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   dialogBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
+  noteInput: {
+    width: "100%",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    minHeight: 72,
+    textAlignVertical: "top",
+  },
+  dialogCancelText: { fontSize: 13, fontWeight: "500", paddingVertical: 4 },
 });

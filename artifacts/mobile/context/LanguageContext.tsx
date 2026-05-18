@@ -189,6 +189,10 @@ const de: Record<string, string> = {
   "waypoint.label": "Zwischenstopp",
   "waypoint.addressUnavailable": "Adresse nicht verfügbar",
   "waypoint.locating": "Standort wird ermittelt…",
+  "waypoint.note.title": "Notiz zum Stopp",
+  "waypoint.note.placeholder": "z. B. Kundenbesuch, Ladestation …",
+  "waypoint.note.confirm": "Stopp speichern",
+  "waypoint.note.skip": "Ohne Notiz speichern",
 };
 
 const en: Record<string, string> = {
@@ -376,6 +380,10 @@ const en: Record<string, string> = {
   "waypoint.label": "Waypoint",
   "waypoint.addressUnavailable": "Address unavailable",
   "waypoint.locating": "Locating…",
+  "waypoint.note.title": "Note for this stop",
+  "waypoint.note.placeholder": "e.g. Client visit, charging stop …",
+  "waypoint.note.confirm": "Save stop",
+  "waypoint.note.skip": "Save without note",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
