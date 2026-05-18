@@ -13,6 +13,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
+import TripRouteMap from "@/components/TripRouteMap";
 
 interface Props {
   trip: Trip;
@@ -50,6 +51,7 @@ export default function TripCard({
   const { t } = useLanguage();
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -83,8 +85,14 @@ export default function TripCard({
     onToggleSelect?.(trip.id);
   };
 
+  const handleToggleExpand = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setExpanded((v) => !v);
+  };
+
   return (
-    <View
+    <Pressable
+      onPress={selectionMode ? undefined : handleToggleExpand}
       style={[
         styles.card,
         {
@@ -206,7 +214,7 @@ export default function TripCard({
           </View>
         </View>
 
-        {/* Bottom row: km + duration + badges */}
+        {/* Bottom row: km + duration + badges + expand toggle */}
         <View style={styles.bottomRow}>
           <View style={styles.metaLeft}>
             <View style={styles.metaItem}>
@@ -271,8 +279,15 @@ export default function TripCard({
             )}
           </View>
         </View>
+
+        {/* Expandable map section */}
+        {expanded && !selectionMode && (
+          <View style={styles.mapSection}>
+            <TripRouteMap trip={trip} />
+          </View>
+        )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -441,5 +456,8 @@ const styles = StyleSheet.create({
   editedText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  mapSection: {
+    marginTop: 2,
   },
 });
