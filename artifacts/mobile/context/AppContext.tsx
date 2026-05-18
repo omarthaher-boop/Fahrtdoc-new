@@ -43,6 +43,7 @@ export interface Trip {
   type: "business" | "private";
   edited?: boolean;
   waypoints?: Waypoint[];
+  waypointSyncPending?: boolean;
 }
 
 export interface ActiveTrip {
@@ -102,6 +103,7 @@ interface AppContextType {
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
   editTrip: (id: string, changes: Partial<Trip>) => void;
+  retryWaypointSync: (id: string) => Promise<void>;
   activeTrip: ActiveTrip | null;
   paused: boolean;
   pauseStartedAt: number | null;
@@ -324,6 +326,7 @@ function tripToApiPayload(t: Trip): ApiTrip {
     type: t.type,
     edited: t.edited ?? undefined,
     waypoints: t.waypoints && t.waypoints.length > 0 ? t.waypoints : undefined,
+    // waypointSyncPending is client-only; never sent to the server
   };
 }
 
@@ -424,8 +427,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
               }
               if (waypointPatch.length > 0) {
+                const patchIds = new Set(waypointPatch.map((t) => t.id));
+                finalTrips = finalTrips.map((t) =>
+                  patchIds.has(t.id) && t.waypoints && t.waypoints.length > 0
+                    ? { ...t, waypointSyncPending: true }
+                    : t
+                );
                 for (const t of waypointPatch) {
-                  serverUpdateTrip(result.serverToken, t.id, { waypoints: t.waypoints });
+                  serverUpdateTrip(result.serverToken, t.id, { waypoints: t.waypoints }).then((ok) => {
+                    if (ok) {
+                      setTrips((prev) => {
+                        const next = prev.map((tr) =>
+                          tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
+                        );
+                        setUserState((u) => {
+                          if (u) persistTripsLocal(next, u.email);
+                          return u;
+                        });
+                        return next;
+                      });
+                    }
+                  });
                 }
               }
             }
@@ -478,15 +500,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const serverApiTrips = await fetchServerTrips(token);
     if (serverApiTrips !== null) {
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverApiTrips);
+      let result = merged;
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && localTrips.length > 0) {
         await serverBatchUpsertTrips(token, localTrips.map(tripToApiPayload));
       }
       if (waypointPatch.length > 0) {
-        await Promise.all(waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints })));
+        const patchIds = new Set(waypointPatch.map((t) => t.id));
+        result = result.map((t) =>
+          patchIds.has(t.id) && t.waypoints && t.waypoints.length > 0
+            ? { ...t, waypointSyncPending: true }
+            : t
+        );
+        const patchResults = await Promise.all(
+          waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok })))
+        );
+        for (const { id, ok } of patchResults) {
+          if (ok) {
+            result = result.map((t) => (t.id === id ? { ...t, waypointSyncPending: false } : t));
+          }
+        }
       }
-      return merged;
+      return result;
     }
     return localTrips;
   }, []);
@@ -590,10 +626,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       }
+      let patchedMerged = merged;
       if (waypointPatch.length > 0) {
-        await Promise.all(waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints })));
+        const patchIds = new Set(waypointPatch.map((t) => t.id));
+        patchedMerged = patchedMerged.map((t) =>
+          patchIds.has(t.id) && t.waypoints && t.waypoints.length > 0
+            ? { ...t, waypointSyncPending: true }
+            : t
+        );
+        const patchResults = await Promise.all(
+          waypointPatch.map((t) => serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok })))
+        );
+        for (const { id, ok } of patchResults) {
+          if (ok) {
+            patchedMerged = patchedMerged.map((t) => (t.id === id ? { ...t, waypointSyncPending: false } : t));
+          }
+        }
       }
-      finalTrips = merged;
+      finalTrips = patchedMerged;
     }
 
     setTrips(finalTrips);
@@ -697,21 +747,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const addTrip = useCallback(async (t: Trip) => {
+    const token = serverTokenRef.current;
+    const hasWaypoints = !!(t.waypoints && t.waypoints.length > 0);
+    // Mark waypoints as pending sync when the trip has waypoints and we're connected
+    const tripToStore: Trip = token && hasWaypoints ? { ...t, waypointSyncPending: true } : t;
     setTrips((prev) => {
-      const next = [t, ...prev];
+      const next = [tripToStore, ...prev];
       setUserState((u) => {
         if (u) persistTripsLocal(next, u.email);
         return u;
       });
       return next;
     });
-    const token = serverTokenRef.current;
     if (token) {
       serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
-        if (!ok) {
-          // Local state is updated; if create failed, the trip will be uploaded
-          // as a local-only trip during the next successful login/restore merge.
+        if (ok && hasWaypoints) {
+          // Server confirmed the full trip including waypoints — clear pending flag
+          setTrips((prev) => {
+            const next = prev.map((tr) =>
+              tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
+            );
+            setUserState((u) => {
+              if (u) persistTripsLocal(next, u.email);
+              return u;
+            });
+            return next;
+          });
         }
+        // If create failed, the trip remains local-only and will be uploaded
+        // on the next successful login/restore merge.
       });
     }
   }, [persistTripsLocal]);
@@ -767,6 +831,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [persistTripsLocal]);
+
+  const retryWaypointSync = useCallback(async (id: string) => {
+    const token = serverTokenRef.current;
+    if (!token) return;
+    const trip = trips.find((t) => t.id === id);
+    if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
+    const ok = await serverUpdateTrip(token, id, { waypoints: trip.waypoints });
+    if (ok) {
+      setTrips((prev) => {
+        const next = prev.map((t) =>
+          t.id === id ? { ...t, waypointSyncPending: false } : t
+        );
+        setUserState((u) => {
+          if (u) persistTripsLocal(next, u.email);
+          return u;
+        });
+        return next;
+      });
+    }
+  }, [trips, persistTripsLocal]);
 
   const startTrip = useCallback(
     async (type: "business" | "private") => {
@@ -1046,6 +1130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addTrip,
         deleteTrip,
         editTrip,
+        retryWaypointSync,
         activeTrip,
         paused,
         pauseStartedAt,

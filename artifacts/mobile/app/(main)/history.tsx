@@ -73,7 +73,7 @@ function groupByDate(
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { trips, deleteTrip, editTrip, user } = useApp();
+  const { trips, deleteTrip, editTrip, retryWaypointSync, user } = useApp();
   const { t, language } = useLanguage();
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
@@ -548,6 +548,7 @@ export default function HistoryScreen() {
                   selectionMode={selectionMode}
                   selected={selectedIds.has(tripItem.id)}
                   onToggleSelect={toggleTrip}
+                  onRetrySync={retryWaypointSync}
                 />
               ))}
             </View>

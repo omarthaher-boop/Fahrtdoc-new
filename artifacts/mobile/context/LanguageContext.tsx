@@ -193,6 +193,7 @@ const de: Record<string, string> = {
   "waypoint.note.placeholder": "z. B. Kundenbesuch, Ladestation …",
   "waypoint.note.confirm": "Stopp speichern",
   "waypoint.note.skip": "Ohne Notiz speichern",
+  "trip.syncPending": "Route sync",
 };
 
 const en: Record<string, string> = {
@@ -384,6 +385,7 @@ const en: Record<string, string> = {
   "waypoint.note.placeholder": "e.g. Client visit, charging stop …",
   "waypoint.note.confirm": "Save stop",
   "waypoint.note.skip": "Save without note",
+  "trip.syncPending": "Route sync",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

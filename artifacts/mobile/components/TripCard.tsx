@@ -20,6 +20,7 @@ interface Props {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  onRetrySync?: (id: string) => void;
 }
 
 const fmtTime = (iso: string) =>
@@ -41,6 +42,7 @@ export default function TripCard({
   selectionMode = false,
   selected = false,
   onToggleSelect,
+  onRetrySync,
 }: Props) {
   const colors = useColors();
   const { t } = useLanguage();
@@ -186,7 +188,7 @@ export default function TripCard({
           </View>
         </View>
 
-        {/* Bottom row: km + duration + edited badge */}
+        {/* Bottom row: km + duration + badges */}
         <View style={styles.bottomRow}>
           <View style={styles.metaLeft}>
             <View style={styles.metaItem}>
@@ -204,12 +206,27 @@ export default function TripCard({
               </View>
             )}
           </View>
-          {trip.edited && (
-            <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
-              <Feather name="edit" size={11} color="#C98A00" />
-              <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
-            </View>
-          )}
+          <View style={styles.badgeRow}>
+            {trip.waypointSyncPending && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
+                  onRetrySync?.(trip.id);
+                }}
+                style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}
+                activeOpacity={0.7}
+              >
+                <Feather name="upload-cloud" size={11} color="#E65100" />
+                <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncPending")}</Text>
+              </TouchableOpacity>
+            )}
+            {trip.edited && (
+              <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
+                <Feather name="edit" size={11} color="#C98A00" />
+                <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -344,6 +361,24 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
+    fontWeight: "600",
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  syncBadgeText: {
+    fontSize: 11,
     fontWeight: "600",
   },
   editedBadge: {
