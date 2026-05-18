@@ -94,7 +94,20 @@ function projectPoints(
   }));
 }
 
-export default function TripRouteMap({ trip }: { trip: Trip }) {
+interface DirectCoords {
+  startLat: number;
+  startLon: number;
+  endLat: number;
+  endLon: number;
+}
+
+export default function TripRouteMap({
+  trip,
+  coords,
+}: {
+  trip: Trip;
+  coords?: DirectCoords;
+}) {
   const colors = useColors();
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,19 +122,27 @@ export default function TripRouteMap({ trip }: { trip: Trip }) {
 
       const waypoints = trip.waypoints ?? [];
 
-      const storedStart =
-        trip.startLat != null && trip.startLon != null
-          ? { lat: trip.startLat, lon: trip.startLon }
-          : null;
-      const storedEnd =
-        trip.endLat != null && trip.endLon != null
-          ? { lat: trip.endLat, lon: trip.endLon }
-          : null;
+      let startCoord: Coord | null;
+      let endCoord: Coord | null;
 
-      const [startCoord, endCoord] = await Promise.all([
-        storedStart ? Promise.resolve(storedStart) : geocodeAddress(trip.startAddr),
-        storedEnd ? Promise.resolve(storedEnd) : geocodeAddress(trip.endAddr),
-      ]);
+      if (coords) {
+        startCoord = { lat: coords.startLat, lon: coords.startLon };
+        endCoord = { lat: coords.endLat, lon: coords.endLon };
+      } else {
+        const storedStart =
+          trip.startLat != null && trip.startLon != null
+            ? { lat: trip.startLat, lon: trip.startLon }
+            : null;
+        const storedEnd =
+          trip.endLat != null && trip.endLon != null
+            ? { lat: trip.endLat, lon: trip.endLon }
+            : null;
+
+        [startCoord, endCoord] = await Promise.all([
+          storedStart ? Promise.resolve(storedStart) : geocodeAddress(trip.startAddr),
+          storedEnd ? Promise.resolve(storedEnd) : geocodeAddress(trip.endAddr),
+        ]);
+      }
 
       if (cancelled) return;
 
@@ -167,7 +188,7 @@ export default function TripRouteMap({ trip }: { trip: Trip }) {
     };
     // Use a stable waypoint signature so edits to waypoints re-trigger the map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trip.id, trip.startAddr, trip.endAddr, trip.startLat, trip.startLon, trip.endLat, trip.endLon, JSON.stringify(trip.waypoints)]);
+  }, [trip.id, trip.startAddr, trip.endAddr, trip.startLat, trip.startLon, trip.endLat, trip.endLon, JSON.stringify(trip.waypoints), coords?.startLat, coords?.startLon, coords?.endLat, coords?.endLon]);
 
   const WAYPOINT_COLOR = "#F59E0B";
   const START_COLOR = colors.primary;

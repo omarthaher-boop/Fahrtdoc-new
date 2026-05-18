@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EditTripModal from "@/components/EditTripModal";
+import TripRouteMap from "@/components/TripRouteMap";
 import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
@@ -197,6 +198,16 @@ export default function SaveTripSheet() {
                     </View>
                   </View>
                 </View>
+
+                {/* Route map */}
+                {draftTrip && (
+                  <View style={styles.mapWrapper}>
+                    <TripRouteMap
+                      trip={draftTrip}
+                      coords={pendingTripCoords ?? undefined}
+                    />
+                  </View>
+                )}
 
                 {/* Section label */}
                 <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
@@ -459,6 +470,9 @@ const styles = StyleSheet.create({
   },
   infoChip: { flexDirection: "row", alignItems: "center", gap: 5 },
   infoChipText: { fontSize: 12 },
+  mapWrapper: {
+    marginBottom: 20,
+  },
   sectionLabel: {
     fontSize: 10,
     fontWeight: "700",
