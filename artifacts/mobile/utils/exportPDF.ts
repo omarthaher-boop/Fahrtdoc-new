@@ -132,7 +132,7 @@ function buildHTML(
       display: flex; justify-content: space-between;
       border-top: 1px solid #e0e4f0; padding-top: 12px;
     }
-    @media print { body { padding: 0; } @page { margin: 1.5cm; } }
+    @media print { body { padding: 0; } @page { size: A4 landscape; margin: 1.2cm 1.5cm; } }
   </style>
 </head>
 <body>
@@ -195,7 +195,7 @@ async function exportPDFWeb(
   typeLabel?: string
 ): Promise<void> {
   const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
@@ -206,7 +206,7 @@ async function exportPDFWeb(
     year: "numeric",
   });
 
-  const pageW = 210;
+  const pageW = 297;
   const margin = 16;
   const contentW = pageW - margin * 2;
   let y = 20;
@@ -296,10 +296,10 @@ async function exportPDFWeb(
   });
   y += 22;
 
-  const colWidths = [24, 20, 52, 52, 18, 22];
-  const headers = ["Datum", "Typ", "Start", "Ziel", "km", "Dauer"];
+  const colWidths = [28, 22, 88, 88, 22, 17];
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "km", "Dauer"];
   const rowH = 8;
-  const pageH = 297;
+  const pageH = 210;
   const bottomMargin = 20;
 
   const drawTableHeader = (atY: number): number => {
