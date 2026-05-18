@@ -34,6 +34,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   const [km, setKm] = useState("");
   const [durMin, setDurMin] = useState("");
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [mapTrip, setMapTrip] = useState<Trip | null>(trip);
 
   useEffect(() => {
     if (trip) {
@@ -43,8 +44,13 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       setKm(trip.km.toFixed(1));
       setDurMin(String(Math.round(trip.dur / 60)));
       setWaypoints(trip.waypoints ? [...trip.waypoints] : []);
+      setMapTrip(trip);
     }
   }, [trip]);
+
+  const syncMapTrip = (overrides: Partial<Trip>) => {
+    setMapTrip((prev) => (prev ? { ...prev, ...overrides } : prev));
+  };
 
   const handleWaypointChange = (idx: number, addr: string) => {
     setWaypoints((prev) => prev.map((wp, i) => (i === idx ? { ...wp, addr } : wp)));
@@ -58,6 +64,14 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
     if (!trip) return;
     const kmNum = parseFloat(km.replace(",", "."));
     const durNum = parseInt(durMin, 10);
+    syncMapTrip({
+      startAddr: startAddr.trim() || trip.startAddr,
+      endAddr: endAddr.trim() || trip.endAddr,
+      startLat: undefined,
+      startLon: undefined,
+      endLat: undefined,
+      endLon: undefined,
+    });
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onSave(trip.id, {
       type,
@@ -92,9 +106,9 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Route map */}
+            {/* Route map — built from current form state, refreshes on address blur */}
             <View style={styles.mapWrapper}>
-              <TripRouteMap trip={trip} />
+              {mapTrip && <TripRouteMap trip={mapTrip} />}
             </View>
 
             {/* Type toggle */}
@@ -131,6 +145,9 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                   style={[styles.input, { color: colors.foreground }]}
                   value={startAddr}
                   onChangeText={setStartAddr}
+                  onBlur={() =>
+                    syncMapTrip({ startAddr: startAddr.trim() || trip.startAddr, startLat: undefined, startLon: undefined })
+                  }
                   placeholder="Startadresse"
                   placeholderTextColor={colors.mutedForeground}
                 />
@@ -175,6 +192,9 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                   style={[styles.input, { color: colors.foreground }]}
                   value={endAddr}
                   onChangeText={setEndAddr}
+                  onBlur={() =>
+                    syncMapTrip({ endAddr: endAddr.trim() || trip.endAddr, endLat: undefined, endLon: undefined })
+                  }
                   placeholder="Zieladresse"
                   placeholderTextColor={colors.mutedForeground}
                 />
