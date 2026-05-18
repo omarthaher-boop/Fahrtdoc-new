@@ -33,7 +33,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { user, trips, activeTrip, startTrip, gpsStatus } = useApp();
+  const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync } = useApp();
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
@@ -232,7 +232,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : (
-            periodTrips.slice(0, 3).map((t) => <TripCard key={t.id} trip={t} />)
+            periodTrips.slice(0, 3).map((t) => <TripCard key={t.id} trip={t} onRetrySync={retryWaypointSync} />)
           )}
         </View>
       </ScrollView>
