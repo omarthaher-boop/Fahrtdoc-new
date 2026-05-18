@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import bcrypt from "bcryptjs";
+import { db, usersTable, userSessionsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendPasswordChangeCode } from "../lib/mailer";
 
 const router: IRouter = Router();
+
+const BCRYPT_ROUNDS = 12;
 
 interface OtpEntry {
   code: string;
@@ -17,6 +20,27 @@ const otpStore = new Map<string, OtpEntry>();
 const EXPIRY_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
+const IP_RATE_WINDOW_MS = 15 * 60 * 1000;
+const IP_RATE_MAX = 5;
+
+interface IpRateEntry {
+  count: number;
+  windowStart: number;
+}
+
+const ipRateStore = new Map<string, IpRateEntry>();
+
+function isIpRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = ipRateStore.get(ip);
+  if (!entry || now - entry.windowStart > IP_RATE_WINDOW_MS) {
+    ipRateStore.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > IP_RATE_MAX;
+}
+
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -26,15 +50,13 @@ function cleanExpired() {
   for (const [key, entry] of otpStore.entries()) {
     if (entry.expiresAt < now) otpStore.delete(key);
   }
+  for (const [ip, entry] of ipRateStore.entries()) {
+    if (now - entry.windowStart > IP_RATE_WINDOW_MS) ipRateStore.delete(ip);
+  }
 }
 
-async function sha256Hex(text: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 router.post("/auth/request-change-code", requireAuth, async (req, res): Promise<void> => {
@@ -42,6 +64,12 @@ router.post("/auth/request-change-code", requireAuth, async (req, res): Promise<
   const email = authReq.userEmail;
 
   cleanExpired();
+
+  const existing = otpStore.get(email);
+  if (existing && Date.now() < existing.expiresAt) {
+    res.json({ success: true, message: "Bestätigungscode wurde an deine E-Mail-Adresse gesendet." });
+    return;
+  }
 
   const code = generateCode();
   otpStore.set(email, {
@@ -66,6 +94,7 @@ router.post("/auth/request-change-code", requireAuth, async (req, res): Promise<
 router.post("/auth/confirm-change-password", requireAuth, async (req, res): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
   const email = authReq.userEmail;
+  const userId = authReq.userId;
   const { code, newPassword } = req.body as { code?: string; newPassword?: string };
 
   if (!code || !newPassword) {
@@ -106,10 +135,11 @@ router.post("/auth/confirm-change-password", requireAuth, async (req, res): Prom
 
   otpStore.delete(email);
 
-  const passwordHash = await sha256Hex(newPassword);
+  const passwordHash = await hashPassword(newPassword);
   await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.email, email));
+  await db.delete(userSessionsTable).where(eq(userSessionsTable.userId, userId));
 
-  req.log.info({ email }, "Password changed successfully");
+  req.log.info({ email }, "Password changed successfully; all sessions revoked");
   res.json({ success: true, message: "Passwort erfolgreich geändert." });
 });
 
@@ -121,9 +151,23 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
     return;
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
+
   cleanExpired();
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const clientIp = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "unknown";
+  if (isIpRateLimited(clientIp)) {
+    req.log.warn({ ip: clientIp }, "Forgot-password rate limit exceeded");
+    res.status(429).json({ error: "Zu viele Anfragen. Bitte versuche es später erneut." });
+    return;
+  }
+
+  const existing = otpStore.get(normalizedEmail);
+  if (existing && Date.now() < existing.expiresAt) {
+    res.json({ success: true, message: "Falls ein Konto existiert, wird ein Code gesendet." });
+    return;
+  }
+
   const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, normalizedEmail));
   if (!user) {
     res.json({ success: true, message: "Falls ein Konto existiert, wird ein Code gesendet." });
@@ -197,10 +241,17 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
 
   otpStore.delete(normalizedEmail);
 
-  const passwordHash = await sha256Hex(newPassword);
-  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.email, normalizedEmail));
+  const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, normalizedEmail));
+  if (!user) {
+    res.status(400).json({ error: "Kein Konto für diese E-Mail-Adresse gefunden." });
+    return;
+  }
 
-  req.log.info({ email: normalizedEmail }, "Password reset via forgot-password flow");
+  const passwordHash = await hashPassword(newPassword);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, user.id));
+  await db.delete(userSessionsTable).where(eq(userSessionsTable.userId, user.id));
+
+  req.log.info({ email: normalizedEmail }, "Password reset via forgot-password flow; all sessions revoked");
   res.json({ success: true, message: "Passwort erfolgreich zurückgesetzt." });
 });
 

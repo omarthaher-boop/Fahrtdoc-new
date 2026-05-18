@@ -20,6 +20,7 @@ import type {
   AuthResult,
   ErrorResponse,
   HealthStatus,
+  RegisterResult,
   Trip,
   TripBatch,
   TripInput,
@@ -114,6 +115,8 @@ export function useHealthCheck<
 }
 
 /**
+ * Always returns 200 with the same generic response regardless of whether the email was already registered, to prevent account enumeration. Callers must proceed to /auth/login to obtain a session token.
+
  * @summary Register a new user
  */
 export const getRegisterUserUrl = () => {
@@ -123,8 +126,8 @@ export const getRegisterUserUrl = () => {
 export const registerUser = async (
   userRegistration: UserRegistration,
   options?: RequestInit,
-): Promise<AuthResult> => {
-  return customFetch<AuthResult>(getRegisterUserUrl(), {
+): Promise<RegisterResult> => {
+  return customFetch<RegisterResult>(getRegisterUserUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -133,7 +136,7 @@ export const registerUser = async (
 };
 
 export const getRegisterUserMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -174,13 +177,13 @@ export type RegisterUserMutationResult = NonNullable<
   Awaited<ReturnType<typeof registerUser>>
 >;
 export type RegisterUserMutationBody = BodyType<UserRegistration>;
-export type RegisterUserMutationError = ErrorType<ErrorResponse>;
+export type RegisterUserMutationError = ErrorType<unknown>;
 
 /**
  * @summary Register a new user
  */
 export const useRegisterUser = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

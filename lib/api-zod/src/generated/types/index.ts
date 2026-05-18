@@ -9,6 +9,7 @@
 export * from "./authResult";
 export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./registerResult";
 export * from "./trip";
 export * from "./tripBatch";
 export * from "./tripInput";

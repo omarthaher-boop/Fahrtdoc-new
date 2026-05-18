@@ -34,6 +34,10 @@ paths:
       operationId: registerUser
       tags: [auth]
       summary: Register a new user
+      description: >
+        Always returns 200 with the same generic response regardless of whether
+        the email was already registered, to prevent account enumeration.
+        Callers must proceed to /auth/login to obtain a session token.
       requestBody:
         required: true
         content:
@@ -41,18 +45,12 @@ paths:
             schema:
               $ref: "#/components/schemas/UserRegistration"
       responses:
-        "201":
-          description: Registered successfully
+        "200":
+          description: Registration processed
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResult"
-        "409":
-          description: Email already registered
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/RegisterResult"
 
   /auth/login:
     post:
@@ -244,6 +242,15 @@ components:
           type: string
       required:
         - error
+
+    RegisterResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
 
     UserRegistration:
       type: object

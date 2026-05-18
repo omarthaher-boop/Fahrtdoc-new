@@ -16,6 +16,8 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
+ * Always returns 200 with the same generic response regardless of whether the email was already registered, to prevent account enumeration. Callers must proceed to /auth/login to obtain a session token.
+
  * @summary Register a new user
  */
 export const RegisterUserBody = zod.object({
@@ -23,6 +25,11 @@ export const RegisterUserBody = zod.object({
   name: zod.string(),
   plate: zod.string(),
   password: zod.string(),
+});
+
+export const RegisterUserResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
 });
 
 /**

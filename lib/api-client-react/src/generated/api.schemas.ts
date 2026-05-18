@@ -13,6 +13,11 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface RegisterResult {
+  success: boolean;
+  message: string;
+}
+
 export interface UserRegistration {
   email: string;
   name: string;

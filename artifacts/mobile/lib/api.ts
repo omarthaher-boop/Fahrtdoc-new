@@ -82,17 +82,16 @@ export async function serverRegister(
   name: string,
   plate: string,
   password: string
-): Promise<AuthResult | null> {
+): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name, plate, password }),
     });
-    if (!res.ok) return null;
-    return res.json();
+    return res.ok;
   } catch {
-    return null;
+    return false;
   }
 }
 

@@ -615,9 +615,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (loginResult) {
       token = loginResult.token;
     } else {
-      const registerResult = await serverRegister(key, account.name, account.plate, password);
-      if (registerResult) {
-        token = registerResult.token;
+      const registered = await serverRegister(key, account.name, account.plate, password);
+      if (registered) {
+        const loginAfterRegister = await serverLogin(key, password);
+        if (loginAfterRegister) {
+          token = loginAfterRegister.token;
+        }
       }
     }
 
@@ -673,13 +676,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await secureSetItem(key, tripsKey(key), JSON.stringify(SEED_TRIPS));
     setTrips(SEED_TRIPS);
 
-    // Register on server and upload seed trips
-    const result = await serverRegister(key, name, plate, password);
-    if (result) {
-      await secureSetItem(key, serverTokenKey(key), result.token);
-      setServerToken(result.token);
-      serverTokenRef.current = result.token;
-      await serverBatchUpsertTrips(result.token, SEED_TRIPS.map(tripToApiPayload));
+    // Register on server, then login to obtain a session token and upload seed trips
+    const registered = await serverRegister(key, name, plate, password);
+    if (registered) {
+      const loginResult = await serverLogin(key, password);
+      if (loginResult) {
+        await secureSetItem(key, serverTokenKey(key), loginResult.token);
+        setServerToken(loginResult.token);
+        serverTokenRef.current = loginResult.token;
+        await serverBatchUpsertTrips(loginResult.token, SEED_TRIPS.map(tripToApiPayload));
+      }
     }
 
     return "ok";
