@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TripUpdateType } from "./tripUpdateType";
+import type { Waypoint } from "./waypoint";
 
 export interface TripUpdate {
   date?: string;
@@ -16,4 +17,5 @@ export interface TripUpdate {
   type?: TripUpdateType;
   /** @nullable */
   edited?: boolean | null;
+  waypoints?: Waypoint[];
 }

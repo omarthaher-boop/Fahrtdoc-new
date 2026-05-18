@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TripType } from "./tripType";
+import type { Waypoint } from "./waypoint";
 
 export interface Trip {
   id: string;
@@ -18,4 +19,5 @@ export interface Trip {
   /** @nullable */
   edited?: boolean | null;
   deleted: boolean;
+  waypoints?: Waypoint[];
 }

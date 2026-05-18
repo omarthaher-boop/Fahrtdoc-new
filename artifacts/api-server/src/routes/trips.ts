@@ -24,6 +24,7 @@ function toApiTrip(row: typeof tripsTable.$inferSelect) {
     type: row.type,
     edited: row.edited ?? null,
     deleted: row.deletedAt != null,
+    waypoints: row.waypoints ?? undefined,
   });
 }
 
@@ -40,13 +41,13 @@ router.post("/trips", requireAuth, async (req: Request, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { id, date, startAddr, endAddr, km, dur, type, edited } = parsed.data;
+  const { id, date, startAddr, endAddr, km, dur, type, edited, waypoints } = parsed.data;
   const [row] = await db
     .insert(tripsTable)
-    .values({ id, userId, date, startAddr, endAddr, km, dur, type, edited: edited ?? false })
+    .values({ id, userId, date, startAddr, endAddr, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null })
     .onConflictDoUpdate({
       target: [tripsTable.userId, tripsTable.id],
-      set: { date, startAddr, endAddr, km, dur, type, edited: edited ?? false },
+      set: { date, startAddr, endAddr, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null },
     })
     .returning();
   res.status(201).json(toApiTrip(row));
@@ -67,7 +68,7 @@ router.post("/trips/batch", requireAuth, async (req: Request, res): Promise<void
   for (const trip of parsed.data.trips) {
     deduped.set(trip.id, trip);
   }
-  const values = [...deduped.values()].map(({ id, date, startAddr, endAddr, km, dur, type, edited }) => ({
+  const values = [...deduped.values()].map(({ id, date, startAddr, endAddr, km, dur, type, edited, waypoints }) => ({
     id,
     userId,
     date,
@@ -77,6 +78,7 @@ router.post("/trips/batch", requireAuth, async (req: Request, res): Promise<void
     dur,
     type,
     edited: edited ?? false,
+    waypoints: waypoints ?? null,
   }));
   const rows = await db
     .insert(tripsTable)
@@ -91,6 +93,7 @@ router.post("/trips/batch", requireAuth, async (req: Request, res): Promise<void
         dur: sql`excluded.dur`,
         type: sql`excluded.type`,
         edited: sql`excluded.edited`,
+        waypoints: sql`excluded.waypoints`,
       },
     })
     .returning();
@@ -105,8 +108,12 @@ router.patch("/trips/:id", requireAuth, async (req: Request, res): Promise<void>
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { edited, ...rest } = parsed.data;
-  const updateData = { ...rest, ...(edited != null ? { edited } : {}) };
+  const { edited, waypoints, ...rest } = parsed.data;
+  const updateData = {
+    ...rest,
+    ...(edited != null ? { edited } : {}),
+    ...(waypoints !== undefined ? { waypoints: waypoints.length > 0 ? waypoints : null } : {}),
+  };
   const [row] = await db
     .update(tripsTable)
     .set(updateData)

@@ -18,3 +18,4 @@ export * from "./tripUpdate";
 export * from "./tripUpdateType";
 export * from "./userCredentials";
 export * from "./userRegistration";
+export * from "./waypoint";

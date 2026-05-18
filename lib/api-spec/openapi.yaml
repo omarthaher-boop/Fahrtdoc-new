@@ -280,6 +280,21 @@ components:
         plate:
           type: string
 
+    Waypoint:
+      type: object
+      required: [addr, lat, lon, timestamp]
+      properties:
+        addr:
+          type: string
+        lat:
+          type: number
+        lon:
+          type: number
+        timestamp:
+          type: number
+        note:
+          type: string
+
     Trip:
       type: object
       required: [id, date, startAddr, endAddr, km, dur, type, deleted]
@@ -303,6 +318,10 @@ components:
           type: ["boolean", "null"]
         deleted:
           type: boolean
+        waypoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Waypoint"
 
     TripInput:
       type: object
@@ -325,6 +344,10 @@ components:
           enum: [business, private]
         edited:
           type: ["boolean", "null"]
+        waypoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Waypoint"
 
     TripUpdate:
       type: object
@@ -344,6 +367,10 @@ components:
           enum: [business, private]
         edited:
           type: ["boolean", "null"]
+        waypoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Waypoint"
 
     TripBatch:
       type: object

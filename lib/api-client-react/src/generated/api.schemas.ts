@@ -32,6 +32,14 @@ export interface AuthResult {
   plate: string;
 }
 
+export interface Waypoint {
+  addr: string;
+  lat: number;
+  lon: number;
+  timestamp: number;
+  note?: string;
+}
+
 export type TripType = (typeof TripType)[keyof typeof TripType];
 
 export const TripType = {
@@ -50,6 +58,7 @@ export interface Trip {
   /** @nullable */
   edited?: boolean | null;
   deleted: boolean;
+  waypoints?: Waypoint[];
 }
 
 export type TripInputType = (typeof TripInputType)[keyof typeof TripInputType];
@@ -69,6 +78,7 @@ export interface TripInput {
   type: TripInputType;
   /** @nullable */
   edited?: boolean | null;
+  waypoints?: Waypoint[];
 }
 
 export type TripUpdateType =
@@ -88,6 +98,7 @@ export interface TripUpdate {
   type?: TripUpdateType;
   /** @nullable */
   edited?: boolean | null;
+  waypoints?: Waypoint[];
 }
 
 export interface TripBatch {

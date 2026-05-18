@@ -283,14 +283,22 @@ function apiTripToLocal(t: ApiTrip): Trip {
     dur: t.dur,
     type: t.type,
     edited: t.edited ?? undefined,
+    waypoints: t.waypoints && t.waypoints.length > 0 ? t.waypoints : undefined,
   };
 }
 
-/** Strip local-only fields (waypoints) that the server schema does not accept. */
 function tripToApiPayload(t: Trip): ApiTrip {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { waypoints: _wp, ...rest } = t;
-  return rest;
+  return {
+    id: t.id,
+    date: t.date,
+    startAddr: t.startAddr,
+    endAddr: t.endAddr,
+    km: t.km,
+    dur: t.dur,
+    type: t.type,
+    edited: t.edited ?? undefined,
+    waypoints: t.waypoints && t.waypoints.length > 0 ? t.waypoints : undefined,
+  };
 }
 
 // Maximum acceptable GPS accuracy (meters). Points less accurate than this are discarded.
@@ -305,9 +313,8 @@ const MIN_MOVE_KM = 0.005;
  * - Server soft-deletions propagate: any local trip whose ID is marked
  *   deleted on the server is removed from the local state.
  * - Server wins on same-ID conflicts: when both sides have a non-deleted
- *   trip with the same ID, the server version is used — except for
- *   local-only fields that the server does not store (e.g. waypoints),
- *   which are preserved from the local copy.
+ *   trip with the same ID, the server version is used (including waypoints,
+ *   which are now persisted on the server).
  * - Local-only trips (ID not present on server at all) are kept locally
  *   and returned in `localOnly` so the caller can upload them.
  */
@@ -320,18 +327,9 @@ function mergeTrips(
     serverApiTrips.filter((t) => !t.deleted).map((t) => [t.id, apiTripToLocal(t)])
   );
 
-  // Build local lookup to recover fields the server does not persist (waypoints)
-  const localById = new Map(localTrips.map((t) => [t.id, t]));
-
   const merged: Trip[] = [];
-  for (const [id, serverTrip] of serverActiveById) {
-    const localTrip = localById.get(id);
-    // Preserve local waypoints since the server schema does not carry them
-    if (localTrip?.waypoints && localTrip.waypoints.length > 0) {
-      merged.push({ ...serverTrip, waypoints: localTrip.waypoints });
-    } else {
-      merged.push(serverTrip);
-    }
+  for (const serverTrip of serverActiveById.values()) {
+    merged.push(serverTrip);
   }
 
   const localOnly: Trip[] = [];
@@ -712,9 +710,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token) {
-      // Strip local-only fields before sending to server
-      const { waypoints: _wp, ...serverChanges } = changes as Partial<Trip> & { waypoints?: unknown };
-      serverUpdateTrip(token, id, serverChanges).then((ok) => {
+      serverUpdateTrip(token, id, changes).then((ok) => {
         if (!ok) {
           // Local state is updated; if the server update failed, the server
           // retains the old version which will win on the next merge/re-login.

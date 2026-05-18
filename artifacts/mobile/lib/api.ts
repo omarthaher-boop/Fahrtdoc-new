@@ -27,6 +27,14 @@ interface ResetPasswordResponse {
   error?: string;
 }
 
+export interface ApiWaypoint {
+  addr: string;
+  lat: number;
+  lon: number;
+  timestamp: number;
+  note?: string;
+}
+
 export interface ApiTrip {
   id: string;
   date: string;
@@ -37,6 +45,7 @@ export interface ApiTrip {
   type: "business" | "private";
   edited?: boolean | null;
   deleted?: boolean;
+  waypoints?: ApiWaypoint[];
 }
 
 export interface AuthResult {

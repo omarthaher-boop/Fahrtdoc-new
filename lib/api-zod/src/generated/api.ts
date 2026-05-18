@@ -53,6 +53,17 @@ export const ListTripsResponseItem = zod.object({
   type: zod.enum(["business", "private"]),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
+  waypoints: zod
+    .array(
+      zod.object({
+        addr: zod.string(),
+        lat: zod.number(),
+        lon: zod.number(),
+        timestamp: zod.number(),
+        note: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 export const ListTripsResponse = zod.array(ListTripsResponseItem);
 
@@ -68,6 +79,17 @@ export const CreateTripBody = zod.object({
   dur: zod.number(),
   type: zod.enum(["business", "private"]),
   edited: zod.boolean().nullish(),
+  waypoints: zod
+    .array(
+      zod.object({
+        addr: zod.string(),
+        lat: zod.number(),
+        lon: zod.number(),
+        timestamp: zod.number(),
+        note: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -84,6 +106,17 @@ export const BatchUpsertTripsBody = zod.object({
       dur: zod.number(),
       type: zod.enum(["business", "private"]),
       edited: zod.boolean().nullish(),
+      waypoints: zod
+        .array(
+          zod.object({
+            addr: zod.string(),
+            lat: zod.number(),
+            lon: zod.number(),
+            timestamp: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
 });
@@ -98,6 +131,17 @@ export const BatchUpsertTripsResponseItem = zod.object({
   type: zod.enum(["business", "private"]),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
+  waypoints: zod
+    .array(
+      zod.object({
+        addr: zod.string(),
+        lat: zod.number(),
+        lon: zod.number(),
+        timestamp: zod.number(),
+        note: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 export const BatchUpsertTripsResponse = zod.array(BatchUpsertTripsResponseItem);
 
@@ -116,6 +160,17 @@ export const UpdateTripBody = zod.object({
   dur: zod.number().optional(),
   type: zod.enum(["business", "private"]).optional(),
   edited: zod.boolean().nullish(),
+  waypoints: zod
+    .array(
+      zod.object({
+        addr: zod.string(),
+        lat: zod.number(),
+        lon: zod.number(),
+        timestamp: zod.number(),
+        note: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const UpdateTripResponse = zod.object({
@@ -128,6 +183,17 @@ export const UpdateTripResponse = zod.object({
   type: zod.enum(["business", "private"]),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
+  waypoints: zod
+    .array(
+      zod.object({
+        addr: zod.string(),
+        lat: zod.number(),
+        lon: zod.number(),
+        timestamp: zod.number(),
+        note: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**

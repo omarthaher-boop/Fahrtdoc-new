@@ -1,7 +1,16 @@
-import { pgTable, text, uuid, real, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, real, integer, boolean, timestamp, unique, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+
+export const waypointSchema = z.object({
+  addr: z.string(),
+  lat: z.number(),
+  lon: z.number(),
+  timestamp: z.number(),
+  note: z.string().optional(),
+});
+export type WaypointRow = z.infer<typeof waypointSchema>;
 
 export const tripsTable = pgTable("trips", {
   rowId: uuid("row_id").primaryKey().defaultRandom(),
@@ -14,6 +23,7 @@ export const tripsTable = pgTable("trips", {
   dur: integer("dur").notNull(),
   type: text("type", { enum: ["business", "private"] }).notNull(),
   edited: boolean("edited").notNull().default(false),
+  waypoints: jsonb("waypoints").$type<WaypointRow[]>(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
