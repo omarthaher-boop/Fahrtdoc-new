@@ -1,0 +1,67 @@
+Bitte erweitere meine App um folgende Funktion für laufende Fahrten:
+
+Wenn der Fahrer während einer laufenden Fahrt auf „Pause“ drückt, soll zuerst ein Dialog/Modal erscheinen mit der Frage:
+
+„Möchtest du den aktuellen Standort als Zwischenstopp dokumentieren?“
+
+Der Fahrer soll zwei Optionen haben:
+
+1. „Ja, als Zwischenstopp speichern“
+2. „Nein, nur pausieren“
+
+Wenn „Nein“ gewählt wird:
+- Die Fahrt wird wie bisher pausiert.
+- Es wird kein Zwischenstopp gespeichert.
+
+Wenn „Ja“ gewählt wird:
+- Der aktuelle GPS-Standort soll erfasst werden.
+- Aus dem Standort soll, falls möglich, eine Adresse erzeugt werden.
+- Dieser Standort soll als Zwischenstopp zur aktuellen Fahrt gespeichert werden.
+- Danach wird die Fahrt pausiert.
+
+Der Zwischenstopp soll dauerhaft Teil der Fahrt sein und überall dort angezeigt werden, wo Fahrtdetails sichtbar sind, insbesondere:
+- in der Detailansicht einer Fahrt
+- in der Fahrtenliste, falls dort Start/Ziel/Zwischenstopps angezeigt werden
+- in allen relevanten Übersichten innerhalb der App
+- im PDF-Export der Fahrtenliste
+
+Im PDF soll der Zwischenstopp klar erkennbar sein, z. B.:
+
+Startadresse: …
+Zwischenstopp 1: …
+Zwischenstopp 2: …
+Zieladresse: …
+
+Falls mehrere Pausen mit gespeicherten Standorten während einer Fahrt gemacht werden, sollen mehrere Zwischenstopps unterstützt und in der richtigen Reihenfolge gespeichert und angezeigt werden.
+
+Bitte füge außerdem die Möglichkeit hinzu, die Adresse eines Zwischenstopps nachträglich zu bearbeiten, genauso wie andere Adressen in der App bearbeitet werden können. Die Bearbeitung soll:
+- in der Fahrtdetailansicht möglich sein
+- denselben Stil und dieselbe Logik verwenden wie bei bestehenden Adressfeldern
+- die geänderte Adresse dauerhaft speichern
+- sich auch im PDF-Export widerspiegeln
+
+Technische Anforderungen:
+- Prüfe zuerst die bestehende Datenstruktur für Fahrten und Adressen.
+- Erweitere das Fahrtmodell um ein Feld für Zwischenstopps, falls noch nicht vorhanden.
+- Jeder Zwischenstopp sollte mindestens folgende Daten enthalten:
+  - Adresse
+  - Latitude
+  - Longitude
+  - Zeitstempel
+  - optionale Notiz oder Typ, falls die App so etwas bereits nutzt
+- Achte darauf, bestehende Fahrten ohne Zwischenstopps nicht zu beschädigen.
+- Füge sinnvolle Fallbacks hinzu, falls GPS oder Reverse Geocoding fehlschlägt.
+- In diesem Fall soll trotzdem ein Zwischenstopp mit Koordinaten oder dem Text „Adresse nicht verfügbar“ gespeichert werden können.
+- Aktualisiere alle betroffenen UI-Komponenten, Speicherlogik und PDF-Exportlogik.
+- Bitte keine bestehende Funktion entfernen oder verschlechtern.
+- Halte das Design konsistent mit der bestehenden App.
+
+Akzeptanzkriterien:
+- Beim Drücken auf „Pause“ während einer aktiven Fahrt erscheint die Nachfrage.
+- Der Fahrer kann entscheiden, ob der aktuelle Standort als Zwischenstopp gespeichert wird.
+- Gespeicherte Zwischenstopps erscheinen in der Fahrt.
+- Mehrere Zwischenstopps pro Fahrt sind möglich.
+- Zwischenstopp-Adressen können nachträglich bearbeitet werden.
+- Bearbeitete Zwischenstopps erscheinen korrekt in der App und im PDF.
+- Der PDF-Export der Fahrtenliste enthält Startadresse, alle Zwischenstopps und Zieladresse.
+- Bestehende Fahrten ohne Zwischenstopps funktionieren weiterhin normal.
