@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Pressable,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { Trip } from "@/context/AppContext";
@@ -73,9 +74,7 @@ export default function TripCard({
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={selectionMode ? 0.75 : 1}
-      onPress={handleCardPress}
+    <View
       style={[
         styles.card,
         {
@@ -85,6 +84,15 @@ export default function TripCard({
         },
       ]}
     >
+      {/* Transparent tap-overlay — only active in selection mode so it
+          never blocks the edit/delete/view buttons when browsing */}
+      {selectionMode && (
+        <Pressable
+          onPress={handleCardPress}
+          style={[StyleSheet.absoluteFillObject, styles.selectionOverlay]}
+        />
+      )}
+
       {/* Selection checkbox */}
       {selectionMode && (
         <View style={styles.checkboxWrap}>
@@ -229,7 +237,7 @@ export default function TripCard({
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -239,6 +247,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 10,
     overflow: "hidden",
+    position: "relative",
+  },
+  selectionOverlay: {
+    zIndex: 1,
+    borderRadius: 14,
   },
   checkboxWrap: {
     width: 44,
