@@ -16,6 +16,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { Trip, Waypoint } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
+import TripRouteMap from "@/components/TripRouteMap";
 
 interface Props {
   trip: Trip | null;
@@ -91,6 +92,11 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Route map */}
+            <View style={styles.mapWrapper}>
+              <TripRouteMap trip={trip} />
+            </View>
+
             {/* Type toggle */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Fahrtzweck</Text>
@@ -321,6 +327,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 6,
   },
+  mapWrapper: { marginBottom: 16 },
   twoColRow: { flexDirection: "row", gap: 12 },
   saveBtn: {
     flexDirection: "row",
