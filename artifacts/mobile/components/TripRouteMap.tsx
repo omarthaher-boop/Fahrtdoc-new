@@ -109,9 +109,18 @@ export default function TripRouteMap({ trip }: { trip: Trip }) {
 
       const waypoints = trip.waypoints ?? [];
 
+      const storedStart =
+        trip.startLat != null && trip.startLon != null
+          ? { lat: trip.startLat, lon: trip.startLon }
+          : null;
+      const storedEnd =
+        trip.endLat != null && trip.endLon != null
+          ? { lat: trip.endLat, lon: trip.endLon }
+          : null;
+
       const [startCoord, endCoord] = await Promise.all([
-        geocodeAddress(trip.startAddr),
-        geocodeAddress(trip.endAddr),
+        storedStart ? Promise.resolve(storedStart) : geocodeAddress(trip.startAddr),
+        storedEnd ? Promise.resolve(storedEnd) : geocodeAddress(trip.endAddr),
       ]);
 
       if (cancelled) return;
@@ -158,7 +167,7 @@ export default function TripRouteMap({ trip }: { trip: Trip }) {
     };
     // Use a stable waypoint signature so edits to waypoints re-trigger the map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trip.id, trip.startAddr, trip.endAddr, JSON.stringify(trip.waypoints)]);
+  }, [trip.id, trip.startAddr, trip.endAddr, trip.startLat, trip.startLon, trip.endLat, trip.endLon, JSON.stringify(trip.waypoints)]);
 
   const WAYPOINT_COLOR = "#F59E0B";
   const START_COLOR = colors.primary;

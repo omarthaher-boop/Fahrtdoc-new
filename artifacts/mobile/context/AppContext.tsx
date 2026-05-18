@@ -37,6 +37,10 @@ export interface Trip {
   date: string;
   startAddr: string;
   endAddr: string;
+  startLat?: number;
+  startLon?: number;
+  endLat?: number;
+  endLon?: number;
   km: number;
   kmRoute?: number;
   dur: number;
@@ -781,10 +785,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [persistTripsLocal]);
 
   const finalizeTrip = useCallback(async (trip: Trip) => {
+    const coords = pendingTripCoords;
     setPendingTrip(null);
     setPendingTripCoords(null);
-    await addTrip(trip);
-  }, [addTrip]);
+    const tripWithCoords: Trip = coords
+      ? {
+          ...trip,
+          startLat: trip.startLat ?? coords.startLat,
+          startLon: trip.startLon ?? coords.startLon,
+          endLat: trip.endLat ?? coords.endLat,
+          endLon: trip.endLon ?? coords.endLon,
+        }
+      : trip;
+    await addTrip(tripWithCoords);
+  }, [addTrip, pendingTripCoords]);
 
   const discardPendingTrip = useCallback(() => {
     setPendingTrip(null);
