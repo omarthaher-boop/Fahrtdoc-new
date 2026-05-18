@@ -424,24 +424,28 @@ export default function HistoryScreen() {
 
       {/* Stats summary card */}
       <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
-        <View style={styles.statItem}>
-          <Feather name="list" size={18} color={colors.primary} />
-          <View>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{displayTrips.length}</Text>
-            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-              {selectionMode && selectedIds.size > 0 ? t("history.selected") : t("home.trips")}
-            </Text>
+        {/* Row 1: stat items */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Feather name="list" size={18} color={colors.primary} />
+            <View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{displayTrips.length}</Text>
+              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
+                {selectionMode && selectedIds.size > 0 ? t("history.selected") : t("home.trips")}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Feather name="navigation" size={18} color={colors.primary} />
+            <View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{statsKm.toFixed(1)} km</Text>
+              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>{t("history.totalDistance")}</Text>
+            </View>
           </View>
         </View>
-        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.statItem}>
-          <Feather name="navigation" size={18} color={colors.primary} />
-          <View>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{statsKm.toFixed(1)} km</Text>
-            <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>{t("history.totalDistance")}</Text>
-          </View>
-        </View>
-        <View style={styles.exportBtns}>
+        {/* Row 2: export buttons */}
+        <View style={[styles.exportRow, { borderTopColor: colors.border }]}>
           <View style={styles.exportBtnWrap}>
             <TouchableOpacity
               onPress={handleExportPDF}
@@ -475,7 +479,8 @@ export default function HistoryScreen() {
               onPress={handleEmailExport}
               style={[styles.exportBtn, { borderColor: colors.primary }]}
             >
-              <Feather name="mail" size={15} color={colors.primary} />
+              <Feather name="mail" size={13} color={colors.primary} />
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>E-Mail</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
               <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
@@ -699,10 +704,24 @@ const styles = StyleSheet.create({
   statsCard: {
     borderRadius: 14,
     borderWidth: 1,
-    padding: 14,
+    overflow: "hidden",
+    flexDirection: "column",
+  },
+  statsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  exportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
   },
   statItem: {
     flexDirection: "row",
@@ -712,22 +731,21 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: "800" },
   statUnit: { fontSize: 11, fontWeight: "500" },
   statDivider: { width: 1, height: 32, marginHorizontal: 2 },
-  exportBtns: {
-    flexDirection: "row",
-    gap: 8,
-    marginLeft: "auto",
-  },
   exportBtnWrap: {
     position: "relative",
+    flex: 1,
+    alignItems: "center",
   },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 5,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
     borderWidth: 1.5,
+    width: "100%",
   },
   exportBtnText: { fontSize: 13, fontWeight: "700" },
   exportBadge: {
