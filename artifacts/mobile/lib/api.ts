@@ -184,6 +184,18 @@ export async function serverRequestChangeCode(token: string): Promise<{ success:
   }
 }
 
+export async function serverDeleteAccount(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/account`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function serverConfirmChangePassword(
   token: string,
   code: string,

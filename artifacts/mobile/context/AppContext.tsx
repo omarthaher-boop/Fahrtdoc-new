@@ -10,6 +10,7 @@ import React, {
 import { Platform } from "react-native";
 import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
+import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import {
   type ApiTrip,
@@ -103,6 +104,7 @@ interface AppContextType {
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
   confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   trips: Trip[];
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
@@ -482,6 +484,55 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (tickRef.current) clearInterval(tickRef.current);
     };
   }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
+
+  const deleteAccount = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    const token = serverTokenRef.current;
+    if (token) {
+      const ok = await serverDeleteAccount(token);
+      if (!ok) {
+        return { success: false, error: "Konto konnte nicht gelöscht werden. Bitte versuche es erneut." };
+      }
+    }
+    // Wipe all local data identically to logout
+    const email = user?.email ?? null;
+    if (watchRef.current !== null) {
+      if (Platform.OS !== "web") {
+        (watchRef.current as unknown as { remove: () => void })?.remove?.();
+      } else {
+        navigator.geolocation?.clearWatch(watchRef.current);
+      }
+      watchRef.current = null;
+    }
+    if (Platform.OS !== "web") {
+      try {
+        const Location = await import("expo-location");
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+        if (isRunning) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      } catch { /* non-fatal */ }
+    }
+    setUserState(null);
+    setActiveTrip(null);
+    setTrips([]);
+    setServerToken(null);
+    serverTokenRef.current = null;
+    const removals: Promise<void>[] = [
+      AsyncStorage.removeItem("session"),
+      AsyncStorage.removeItem(BG_POSITIONS_KEY),
+    ];
+    if (email) {
+      removals.push(AsyncStorage.removeItem(tripsKey(email)));
+      removals.push(AsyncStorage.removeItem(serverTokenKey(email)));
+      removals.push(secureRemoveDataKey(email));
+      removals.push(
+        loadAccounts().then((accounts) => {
+          delete accounts[email];
+          return saveAccounts(accounts);
+        })
+      );
+    }
+    await Promise.all(removals);
+    return { success: true };
+  }, [user]);
 
   const logout = useCallback(async () => {
     const email = user?.email ?? null;
@@ -1186,6 +1237,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         loading,
         isSynced: serverToken !== null,
         logout,
+        deleteAccount,
         login,
         register,
         updateProfile,

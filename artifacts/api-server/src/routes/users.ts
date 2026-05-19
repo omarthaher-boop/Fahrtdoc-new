@@ -1,13 +1,16 @@
 /**
- * Auth routes: POST /api/auth/register, POST /api/auth/login
- * Owns user account creation and session token issuance.
+ * Auth routes: POST /api/auth/register, POST /api/auth/login,
+ *              DELETE /api/auth/account
+ * Owns user account creation, session token issuance, and account deletion.
  * See routes/trips.ts for trip CRUD; middleware/auth.ts for token validation.
  */
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, usersTable, userSessionsTable } from "@workspace/db";
+import { db, usersTable, userSessionsTable, tripsTable } from "@workspace/db";
 import { RegisterUserBody, LoginUserBody, LoginUserResponse } from "@workspace/api-zod";
+import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
+import type { Request } from "express";
 
 const router: IRouter = Router();
 
@@ -105,6 +108,17 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   req.log.info({ userId: user.id }, "User logged in");
   res.json(LoginUserResponse.parse({ token: session.token, email: user.email, name: user.name, plate: user.plate }));
+});
+
+router.delete("/auth/account", requireAuth, async (req: Request, res): Promise<void> => {
+  const { userId } = req as AuthenticatedRequest;
+
+  await db.delete(tripsTable).where(eq(tripsTable.userId, userId));
+  await db.delete(userSessionsTable).where(eq(userSessionsTable.userId, userId));
+  await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+  req.log.info({ userId }, "Account and all associated data deleted");
+  res.status(200).json({ success: true });
 });
 
 export default router;

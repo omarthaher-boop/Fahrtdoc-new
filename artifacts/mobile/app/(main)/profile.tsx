@@ -64,7 +64,7 @@ const FAQ_DATA: { q: string; a: string }[] = [
     { q: "Kann ich das Design der App anpassen?", a: "Ja. Unter Profil -> Einstellungen -> Design kannst du zwischen Hell, Dunkel und Systemeinstellung waehlen. Im Systemeinstellung-Modus passt sich die App an das Systemdesign an." },
     { q: "Welche Daten speichert die App?", a: "FahrtDoc speichert Fahrten (Start/Ziel, Datum, Uhrzeit, Strecke, Fahrtart, Notizen), GPS-Koordinaten sowie Profildaten (Name, E-Mail, Kennzeichen). Alle Daten werden verschluesselt gespeichert." },
     { q: "Werden meine Daten an Dritte weitergegeben?", a: "Nein. Deine Fahrt- und Profildaten werden nicht an Dritte verkauft. Fuer die Adressaufloesung wird OpenStreetMap Nominatim genutzt, dabei werden nur GPS-Koordinaten uebertragen." },
-    { q: "Wie loesche ich mein Konto?", a: "Wende dich an unseren Support unter support@fahrtdoc.de. Wir loeschen alle deine Daten innerhalb von 30 Tagen gemaess DSGVO." },
+    { q: "Wie loesche ich mein Konto?", a: "Gehe zu Profil -> unten auf 'Konto loeschen'. Alle deine Daten (Fahrten, Profil, Kontodaten) werden sofort und dauerhaft geloescht. Diese Aktion kann nicht rueckgaengig gemacht werden." },
     { q: "Wie lange werden meine Daten gespeichert?", a: "Fahrtdaten werden bis zu 10 Jahre aufbewahrt, da das Finanzamt die Aufbewahrung steuerrelevanter Unterlagen ueber diesen Zeitraum verlangen kann." },
     { q: "Warum braucht die App Hintergrund-Zugriff?", a: "Fuer das automatische Tracking muss die App auch im Hintergrund auf den Standort zugreifen koennen. Ohne diese Berechtigung koennen Fahrten nur erkannt werden, wenn die App im Vordergrund ist." },
     { q: "Welche Version der App habe ich?", a: `Du nutzt FahrtDoc Version ${APP_VERSION}. Die aktuelle Versionsnummer findest du auch unter Profil -> Support -> App-Version.` },
@@ -122,7 +122,7 @@ Du kannst die Standortberechtigung jederzeit in den Geräteinstellungen widerruf
 
 Fahrtdaten werden bis zu 10 Jahre aufbewahrt, da das Steuerrecht (§ 147 AO) eine entsprechende Aufbewahrungspflicht für steuerrelevante Unterlagen vorsieht. Profildaten werden nach Kontolöschung innerhalb von 30 Tagen gelöscht.
 
-Du kannst einzelne Fahrten jederzeit selbst löschen. Für die vollständige Kontolöschung wende dich an datenschutz@fahrtdoc.de.
+Du kannst einzelne Fahrten jederzeit selbst löschen. Dein komplettes Konto kannst du unter Profil → „Konto löschen" sofort und dauerhaft löschen. Dabei werden alle deine Fahrten, Profildaten und Kontoinformationen unwiderruflich gelöscht.
 
 6. DATENSICHERHEIT
 
@@ -292,7 +292,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
 
@@ -492,6 +492,28 @@ export default function ProfileScreen() {
     }
   }, [logout, router, t]);
 
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      t("deleteAccount.title"),
+      t("deleteAccount.message"),
+      [
+        { text: t("deleteAccount.cancel"), style: "cancel" },
+        {
+          text: t("deleteAccount.confirm"),
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteAccount();
+            if (result.success) {
+              router.replace("/");
+            } else {
+              Alert.alert("Fehler", t("deleteAccount.error"));
+            }
+          },
+        },
+      ]
+    );
+  }, [deleteAccount, router, t]);
+
   const initials = (user?.name ?? "?")
     .split(" ")
     .map((n) => n[0] ?? "")
@@ -631,6 +653,15 @@ export default function ProfileScreen() {
           >
             <Feather name="log-out" size={17} color={colors.destructive} />
             <Text style={[styles.logoutText, { color: colors.destructive }]}>{t("row.logout")}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.deleteAccountBtn, { borderColor: colors.destructive }]}
+            onPress={handleDeleteAccount}
+            testID="delete-account-btn"
+          >
+            <Feather name="trash-2" size={15} color={colors.destructive} />
+            <Text style={[styles.deleteAccountText, { color: colors.destructive }]}>{t("row.deleteAccount")}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -978,6 +1009,8 @@ const styles = StyleSheet.create({
   segBtnText: { fontSize: 13, fontWeight: "500" },
   logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 24, marginBottom: 8, borderRadius: 14, paddingVertical: 15, borderWidth: 1.5 },
   logoutText: { fontSize: 15, fontWeight: "600" },
+  deleteAccountBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 32, borderRadius: 14, paddingVertical: 12, borderWidth: 1, borderStyle: "dashed", opacity: 0.7 },
+  deleteAccountText: { fontSize: 13, fontWeight: "500" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 24 },
   themePickerCard: { width: "100%", maxWidth: 360, borderRadius: 20, padding: 20, borderWidth: 1, gap: 10 },
   themePickerTitle: { fontSize: 17, fontWeight: "700", marginBottom: 4, textAlign: "center" },
