@@ -110,7 +110,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               FAHRTROUTE
             </Text>
-            <TripRouteMap trip={trip} />
+            <TripRouteMap trip={trip} path={trip.path} />
 
             {/* Route summary */}
             <Text

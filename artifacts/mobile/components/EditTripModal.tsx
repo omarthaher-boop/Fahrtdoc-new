@@ -108,7 +108,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Route map — built from current form state, refreshes on address blur */}
             <View style={styles.mapWrapper}>
-              {mapTrip && <TripRouteMap trip={mapTrip} />}
+              {mapTrip && <TripRouteMap trip={mapTrip} path={mapTrip.path} />}
             </View>
 
             {/* Type toggle */}

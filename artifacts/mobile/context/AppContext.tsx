@@ -49,6 +49,7 @@ export interface Trip {
   type: "business" | "private";
   edited?: boolean;
   waypoints?: Waypoint[];
+  path?: { lat: number; lon: number }[];
   waypointSyncPending?: boolean;
 }
 
@@ -334,7 +335,7 @@ function tripToApiPayload(t: Trip): ApiTrip {
     type: t.type,
     edited: t.edited ?? undefined,
     waypoints: t.waypoints && t.waypoints.length > 0 ? t.waypoints : undefined,
-    // waypointSyncPending is client-only; never sent to the server
+    // path and waypointSyncPending are client-only; never sent to the server
   };
 }
 
@@ -378,13 +379,25 @@ function mergeTrips(
     if (!serverActiveById.has(lt.id)) {
       merged.push(lt);
       localOnly.push(lt);
-    } else if (lt.waypoints && lt.waypoints.length > 0) {
+    } else {
       const serverTrip = serverActiveById.get(lt.id)!;
-      if (!serverTrip.waypoints || serverTrip.waypoints.length === 0) {
-        waypointPatch.push(lt);
-        const idx = merged.findIndex((m) => m.id === lt.id);
-        if (idx !== -1) {
-          merged[idx] = { ...merged[idx], waypoints: lt.waypoints };
+      const idx = merged.findIndex((m) => m.id === lt.id);
+
+      // path is client-only and never sent to/stored on the server.
+      // Always restore the local path onto the merged server entry so the
+      // breadcrumb polyline survives session restore and server-merge cycles.
+      if (lt.path && lt.path.length >= 2 && idx !== -1 && !merged[idx].path) {
+        merged[idx] = { ...merged[idx], path: lt.path };
+      }
+
+      // Restore local waypoints when the server copy has none, and schedule
+      // a server patch so the server eventually catches up.
+      if (lt.waypoints && lt.waypoints.length > 0) {
+        if (!serverTrip.waypoints || serverTrip.waypoints.length === 0) {
+          waypointPatch.push(lt);
+          if (idx !== -1) {
+            merged[idx] = { ...merged[idx], waypoints: lt.waypoints };
+          }
         }
       }
     }
@@ -1244,6 +1257,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dur: durSec,
       type: activeTrip.type,
       waypoints: activeTrip.waypoints && activeTrip.waypoints.length > 0 ? activeTrip.waypoints : undefined,
+      path: activeTrip.positions.length >= 2 ? activeTrip.positions : undefined,
     };
 
     // Async: geocode end address and update pending trip display
