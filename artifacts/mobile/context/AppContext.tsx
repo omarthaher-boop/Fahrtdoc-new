@@ -108,6 +108,7 @@ interface AppContextType {
   confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   trips: Trip[];
+  syncRetryingIds: ReadonlySet<string>;
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
   editTrip: (id: string, changes: Partial<Trip>) => void;
@@ -434,6 +435,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTokenRef = useRef<string | null>(null);
   const tripsRef = useRef<Trip[]>([]);
+  const [syncRetryingIds, setSyncRetryingIds] = useState<ReadonlySet<string>>(new Set());
   const lastRetryMsRef = useRef<number>(0);
   const retryBackoffMsRef = useRef<number>(30_000);
 
@@ -640,11 +642,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       lastRetryMsRef.current = now;
 
+      setSyncRetryingIds(new Set(pending.map((t) => t.id)));
+
       Promise.all(
         pending.map((t) =>
           serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok }))
         )
       ).then((results) => {
+        setSyncRetryingIds(new Set());
+
         const allOk = results.every((r) => r.ok);
         retryBackoffMsRef.current = allOk
           ? 30_000
@@ -1333,6 +1339,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         requestPasswordChangeCode,
         confirmPasswordChange,
         trips,
+        syncRetryingIds,
         addTrip,
         deleteTrip,
         editTrip,

@@ -17,7 +17,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
-import { Trip } from "@/context/AppContext";
+import { Trip, useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import TripRouteMap from "@/components/TripRouteMap";
 
@@ -55,10 +55,12 @@ export default function TripCard({
 }: Props) {
   const colors = useColors();
   const { t } = useLanguage();
+  const { syncRetryingIds } = useApp();
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const syncErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isBackgroundSyncing = syncRetryingIds.has(trip.id);
   const [expanded, setExpanded] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
   const mountedRef = useRef(true);
@@ -267,7 +269,7 @@ export default function TripCard({
               onRetrySync ? (
                 <TouchableOpacity
                   onPress={async () => {
-                    if (isSyncing) return;
+                    if (isSyncing || isBackgroundSyncing) return;
                     if (Platform.OS !== "web") Haptics.selectionAsync();
                     setIsSyncing(true);
                     setSyncError(false);
@@ -286,22 +288,27 @@ export default function TripCard({
                   }}
                   style={[
                     styles.syncBadge,
-                    isSyncing
+                    (isSyncing || isBackgroundSyncing)
                       ? { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }
                       : { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" },
                   ]}
-                  activeOpacity={isSyncing ? 1 : 0.7}
-                  disabled={isSyncing}
+                  activeOpacity={(isSyncing || isBackgroundSyncing) ? 1 : 0.7}
+                  disabled={isSyncing || isBackgroundSyncing}
                 >
-                  {isSyncing ? (
+                  {(isSyncing || isBackgroundSyncing) ? (
                     <ActivityIndicator size={11} color="#E65100" />
                   ) : (
                     <Feather name="upload-cloud" size={11} color="#E65100" />
                   )}
                   <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>
-                    {isSyncing ? t("trip.syncRetrying") : t("trip.syncPending")}
+                    {(isSyncing || isBackgroundSyncing) ? t("trip.syncRetrying") : t("trip.syncPending")}
                   </Text>
                 </TouchableOpacity>
+              ) : isBackgroundSyncing ? (
+                <View style={[styles.syncBadge, { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }]}>
+                  <ActivityIndicator size={11} color="#E65100" />
+                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncRetrying")}</Text>
+                </View>
               ) : (
                 <View style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}>
                   <Feather name="upload-cloud" size={11} color="#E65100" />
