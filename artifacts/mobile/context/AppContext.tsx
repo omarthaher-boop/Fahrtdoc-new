@@ -14,6 +14,11 @@ import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY } from "@/utils/driveDetect";
 import {
+  showTripNotification,
+  hideTripNotification,
+  setupTripNotificationChannel,
+} from "@/utils/tripNotification";
+import {
   type ApiTrip,
   serverLogin,
   serverRegister,
@@ -435,6 +440,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const serverTokenRef = useRef<string | null>(null);
   const tripsRef = useRef<Trip[]>([]);
+  const activeTripRef = useRef<ActiveTrip | null>(null);
   const [syncRetryingIds, setSyncRetryingIds] = useState<ReadonlySet<string>>(new Set());
   const lastRetryMsRef = useRef<number>(0);
   const retryBackoffMsRef = useRef<number>(30_000);
@@ -499,6 +505,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    activeTripRef.current = activeTrip;
+  }, [activeTrip]);
+
+  useEffect(() => {
     if (activeTrip) {
       tickRef.current = setInterval(() => {
         if (!paused) {
@@ -515,6 +525,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (tickRef.current) clearInterval(tickRef.current);
     };
   }, [activeTrip, paused, pauseStartedAt, totalPausedMs]);
+
+  // Lock-screen notification: show when trip active, update every 60s, hide when done
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!activeTrip) {
+      hideTripNotification().catch(() => {});
+      return;
+    }
+    setupTripNotificationChannel().catch(() => {});
+    const showNow = () => {
+      const t = activeTripRef.current;
+      if (!t) return;
+      const sec = Math.max(0, Math.floor((Date.now() - t.startTime) / 1000));
+      const km = (t.distance || 0) / 1000;
+      showTripNotification(t.type, sec, km).catch(() => {});
+    };
+    showNow();
+    const id = setInterval(showNow, 60_000);
+    return () => {
+      clearInterval(id);
+      hideTripNotification().catch(() => {});
+    };
+  }, [activeTrip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteAccount = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     const token = serverTokenRef.current;
