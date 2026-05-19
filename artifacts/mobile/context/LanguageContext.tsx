@@ -203,6 +203,7 @@ const de: Record<string, string> = {
   "waypoint.note.skip": "Ohne Notiz speichern",
   "trip.syncPending": "Route sync",
   "trip.syncRetrying": "Wird sync…",
+  "trip.syncFailed": "Sync fehlgeschlagen – bitte erneut versuchen",
 };
 
 const en: Record<string, string> = {
@@ -404,6 +405,7 @@ const en: Record<string, string> = {
   "waypoint.note.skip": "Save without note",
   "trip.syncPending": "Route sync",
   "trip.syncRetrying": "Syncing…",
+  "trip.syncFailed": "Sync failed – please try again",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

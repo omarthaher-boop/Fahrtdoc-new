@@ -110,7 +110,7 @@ interface AppContextType {
   addTrip: (t: Trip) => void;
   deleteTrip: (id: string) => void;
   editTrip: (id: string, changes: Partial<Trip>) => void;
-  retryWaypointSync: (id: string) => Promise<void>;
+  retryWaypointSync: (id: string) => Promise<boolean>;
   activeTrip: ActiveTrip | null;
   paused: boolean;
   pauseStartedAt: number | null;
@@ -1010,11 +1010,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [persistTripsLocal]);
 
-  const retryWaypointSync = useCallback(async (id: string) => {
+  const retryWaypointSync = useCallback(async (id: string): Promise<boolean> => {
     const token = serverTokenRef.current;
-    if (!token) return;
+    if (!token) return false;
     const trip = trips.find((t) => t.id === id);
-    if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
+    if (!trip || !trip.waypoints || trip.waypoints.length === 0) return false;
     const ok = await serverUpdateTrip(token, id, { waypoints: trip.waypoints });
     if (ok) {
       setTrips((prev) => {
@@ -1028,6 +1028,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
     }
+    return ok;
   }, [trips, persistTripsLocal]);
 
   const startTrip = useCallback(

@@ -29,7 +29,7 @@ interface Props {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
-  onRetrySync?: (id: string) => void | Promise<void>;
+  onRetrySync?: (id: string) => Promise<boolean>;
 }
 
 const fmtTime = (iso: string) =>
@@ -57,6 +57,8 @@ export default function TripCard({
   const { t } = useLanguage();
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState(false);
+  const syncErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
   const mountedRef = useRef(true);
@@ -74,6 +76,7 @@ export default function TripCard({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (syncErrorTimerRef.current) clearTimeout(syncErrorTimerRef.current);
     };
   }, []);
   const accentColor = isBusiness ? colors.primary : colors.success;
@@ -267,8 +270,16 @@ export default function TripCard({
                     if (isSyncing) return;
                     if (Platform.OS !== "web") Haptics.selectionAsync();
                     setIsSyncing(true);
+                    setSyncError(false);
+                    if (syncErrorTimerRef.current) clearTimeout(syncErrorTimerRef.current);
                     try {
-                      await onRetrySync(trip.id);
+                      const succeeded = await onRetrySync(trip.id);
+                      if (!succeeded && mountedRef.current) {
+                        setSyncError(true);
+                        syncErrorTimerRef.current = setTimeout(() => {
+                          if (mountedRef.current) setSyncError(false);
+                        }, 4000);
+                      }
                     } finally {
                       if (mountedRef.current) setIsSyncing(false);
                     }
@@ -306,6 +317,14 @@ export default function TripCard({
             )}
           </View>
         </View>
+
+        {/* Sync error message */}
+        {syncError && (
+          <View style={styles.syncErrorRow}>
+            <Feather name="alert-circle" size={12} color="#C62828" />
+            <Text style={styles.syncErrorText}>{t("trip.syncFailed")}</Text>
+          </View>
+        )}
 
         {/* Expandable map section — always rendered when mounted, height animates */}
         {!selectionMode && (
@@ -486,5 +505,17 @@ const styles = StyleSheet.create({
   },
   mapSection: {
     marginTop: 2,
+  },
+  syncErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: -4,
+  },
+  syncErrorText: {
+    fontSize: 11,
+    color: "#C62828",
+    fontWeight: "500",
+    flexShrink: 1,
   },
 });
