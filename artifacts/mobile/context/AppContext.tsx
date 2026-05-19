@@ -12,6 +12,7 @@ import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
 import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
+import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY } from "@/utils/driveDetect";
 import {
   type ApiTrip,
   serverLogin,
@@ -547,13 +548,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       watchRef.current = null;
     }
 
-    // Stop background location task (native only)
+    // Stop background location tasks (native only)
     if (Platform.OS !== "web") {
       try {
         const Location = await import("expo-location");
         const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
         if (isRunning) {
           await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        }
+        const isDetecting = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+        if (isDetecting) {
+          await Location.stopLocationUpdatesAsync(DRIVE_DETECT_TASK);
         }
       } catch {
         // Non-fatal
@@ -569,6 +574,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const removals: Promise<void>[] = [
       AsyncStorage.removeItem("session"),
       AsyncStorage.removeItem(BG_POSITIONS_KEY),
+      AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "false"),
     ];
     if (email) {
       removals.push(AsyncStorage.removeItem(tripsKey(email)));
@@ -985,6 +991,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           distance: 0,
           positions: [{ lat, lon }],
         });
+        AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
         reverseGeocode(lat, lon).then((addr) => {
           setActiveTrip((prev) =>
             prev ? { ...prev, startAddr: addr } : prev
@@ -1200,6 +1207,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setActiveTrip(null);
+    AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "false").catch(() => {});
     setPaused(false);
     setPauseStartedAt(null);
     setTotalPausedMs(0);

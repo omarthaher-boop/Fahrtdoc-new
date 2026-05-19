@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY } from "@/utils/driveDetect";
 
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -40,6 +41,7 @@ const PREF = {
   notifSync: "pref_notif_sync",
   notifLogin: "pref_notif_login",
   notifPrivacy: "pref_notif_datenschutz",
+  notifDriveRemind: "pref_notif_drive_remind",
 } as const;
 
 
@@ -322,6 +324,7 @@ export default function ProfileScreen() {
   const [notifSync, setNotifSync] = useState(true);
   const [notifLogin, setNotifLogin] = useState(true);
   const [notifDatenschutz, setNotifDatenschutz] = useState(true);
+  const [notifDriveRemind, setNotifDriveRemind] = useState(false);
 
   const [autoTracking, setAutoTracking] = useState(true);
   const [gpsTracking, setGpsTracking] = useState(true);
@@ -346,6 +349,7 @@ export default function ProfileScreen() {
         PREF.trackingPaused, PREF.defaultTripType,
         PREF.notifGeneral, PREF.notifTrips, PREF.notifTracking, PREF.notifGps,
         PREF.notifOffline, PREF.notifSync, PREF.notifLogin, PREF.notifPrivacy,
+        PREF.notifDriveRemind,
       ]);
       const m = Object.fromEntries(vals);
       if (m[PREF.autoTracking] !== null) setAutoTracking(m[PREF.autoTracking] === "true");
@@ -362,6 +366,7 @@ export default function ProfileScreen() {
       if (m[PREF.notifSync] !== null) setNotifSync(m[PREF.notifSync] === "true");
       if (m[PREF.notifLogin] !== null) setNotifLogin(m[PREF.notifLogin] === "true");
       if (m[PREF.notifPrivacy] !== null) setNotifDatenschutz(m[PREF.notifPrivacy] === "true");
+      if (m[PREF.notifDriveRemind] !== null) setNotifDriveRemind(m[PREF.notifDriveRemind] === "true");
     };
     load();
   }, []);
@@ -396,6 +401,71 @@ export default function ProfileScreen() {
   const handleNotifSync = useCallback((v: boolean) => { setNotifSync(v); savePref(PREF.notifSync, v); }, [savePref]);
   const handleNotifLogin = useCallback((v: boolean) => { setNotifLogin(v); savePref(PREF.notifLogin, v); }, [savePref]);
   const handleNotifDatenschutz = useCallback((v: boolean) => { setNotifDatenschutz(v); savePref(PREF.notifPrivacy, v); }, [savePref]);
+
+  const handleNotifDriveRemind = useCallback(async (v: boolean) => {
+    if (Platform.OS === "web") return;
+    if (v) {
+      const Notifications = await import("expo-notifications");
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          language === "de" ? "Berechtigung erforderlich" : "Permission required",
+          language === "de"
+            ? "Bitte erlaube Benachrichtigungen in den Einstellungen."
+            : "Please allow notifications in your device settings."
+        );
+        return;
+      }
+      try {
+        const Location = await import("expo-location");
+        const bgPerm = await Location.getBackgroundPermissionsAsync();
+        if (bgPerm.status !== "granted") {
+          const req = await Location.requestBackgroundPermissionsAsync();
+          if (req.status !== "granted") {
+            Alert.alert(
+              language === "de" ? "Standort-Berechtigung" : "Location Permission",
+              language === "de"
+                ? "Fuer Fahrt-Erinnerungen wird Standortzugriff im Hintergrund benoetigt."
+                : "Drive reminders require background location access."
+            );
+            return;
+          }
+        }
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+        if (!isRunning) {
+          await Location.startLocationUpdatesAsync(DRIVE_DETECT_TASK, {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 200,
+            timeInterval: 60000,
+            activityType: Location.ActivityType.OtherNavigation,
+            showsBackgroundLocationIndicator: false,
+            ...(Platform.OS === "android" && {
+              foregroundService: {
+                notificationTitle: "FahrtDoc",
+                notificationBody: language === "de" ? "Fahrt-Erkennung aktiv" : "Drive detection active",
+                notificationColor: "#2563EB",
+              },
+            }),
+          });
+        }
+      } catch {
+        // Non-fatal
+      }
+    } else {
+      try {
+        const Location = await import("expo-location");
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+        if (isRunning) {
+          await Location.stopLocationUpdatesAsync(DRIVE_DETECT_TASK);
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+    setNotifDriveRemind(v);
+    await AsyncStorage.setItem(DRIVE_REMIND_KEY, String(v));
+    savePref(PREF.notifDriveRemind, v);
+  }, [savePref, language]);
 
   const handleOpenEdit = useCallback(() => {
     setEditName(user?.name ?? "");
@@ -827,7 +897,8 @@ export default function ProfileScreen() {
               <ModalNotifRow icon="wifi-off" label={t("notif.offline")} desc={t("notif.offline.desc")} value={notifOffline} onValueChange={handleNotifOffline} showDivider colors={colors} />
               <ModalNotifRow icon="refresh-cw" label={t("notif.sync")} desc={t("notif.sync.desc")} value={notifSync} onValueChange={handleNotifSync} showDivider colors={colors} />
               <ModalNotifRow icon="log-in" label={t("notif.login")} desc={t("notif.login.desc")} value={notifLogin} onValueChange={handleNotifLogin} showDivider colors={colors} />
-              <ModalNotifRow icon="shield" label={t("notif.datenschutz")} desc={t("notif.datenschutz.desc")} value={notifDatenschutz} onValueChange={handleNotifDatenschutz} colors={colors} />
+              <ModalNotifRow icon="shield" label={t("notif.datenschutz")} desc={t("notif.datenschutz.desc")} value={notifDatenschutz} onValueChange={handleNotifDatenschutz} showDivider colors={colors} />
+              <ModalNotifRow icon="navigation" label={t("notif.driveRemind")} desc={t("notif.driveRemind.desc")} value={notifDriveRemind} onValueChange={handleNotifDriveRemind} colors={colors} />
             </View>
             <Text style={[styles.notifHint, { color: colors.mutedForeground }]}>
               {language === "de"
