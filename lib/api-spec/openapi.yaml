@@ -314,6 +314,14 @@ components:
           type: string
         endAddr:
           type: string
+        startLat:
+          type: number
+        startLon:
+          type: number
+        endLat:
+          type: number
+        endLon:
+          type: number
         km:
           type: number
         dur:
@@ -342,6 +350,14 @@ components:
           type: string
         endAddr:
           type: string
+        startLat:
+          type: number
+        startLon:
+          type: number
+        endLat:
+          type: number
+        endLon:
+          type: number
         km:
           type: number
         dur:
@@ -365,6 +381,14 @@ components:
           type: string
         endAddr:
           type: string
+        startLat:
+          type: number
+        startLon:
+          type: number
+        endLat:
+          type: number
+        endLon:
+          type: number
         km:
           type: number
         dur:

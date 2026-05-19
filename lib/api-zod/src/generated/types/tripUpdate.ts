@@ -12,6 +12,10 @@ export interface TripUpdate {
   date?: string;
   startAddr?: string;
   endAddr?: string;
+  startLat?: number;
+  startLon?: number;
+  endLat?: number;
+  endLon?: number;
   km?: number;
   dur?: number;
   type?: TripUpdateType;

@@ -19,6 +19,10 @@ function toApiTrip(row: typeof tripsTable.$inferSelect) {
     date: row.date,
     startAddr: row.startAddr,
     endAddr: row.endAddr,
+    startLat: row.startLat ?? undefined,
+    startLon: row.startLon ?? undefined,
+    endLat: row.endLat ?? undefined,
+    endLon: row.endLon ?? undefined,
     km: row.km,
     dur: row.dur,
     type: row.type,
@@ -41,13 +45,13 @@ router.post("/trips", requireAuth, async (req: Request, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { id, date, startAddr, endAddr, km, dur, type, edited, waypoints } = parsed.data;
+  const { id, date, startAddr, endAddr, startLat, startLon, endLat, endLon, km, dur, type, edited, waypoints } = parsed.data;
   const [row] = await db
     .insert(tripsTable)
-    .values({ id, userId, date, startAddr, endAddr, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null })
+    .values({ id, userId, date, startAddr, endAddr, startLat: startLat ?? null, startLon: startLon ?? null, endLat: endLat ?? null, endLon: endLon ?? null, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null })
     .onConflictDoUpdate({
       target: [tripsTable.userId, tripsTable.id],
-      set: { date, startAddr, endAddr, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null },
+      set: { date, startAddr, endAddr, startLat: startLat ?? null, startLon: startLon ?? null, endLat: endLat ?? null, endLon: endLon ?? null, km, dur, type, edited: edited ?? false, waypoints: waypoints ?? null },
     })
     .returning();
   res.status(201).json(toApiTrip(row));
@@ -68,12 +72,16 @@ router.post("/trips/batch", requireAuth, async (req: Request, res): Promise<void
   for (const trip of parsed.data.trips) {
     deduped.set(trip.id, trip);
   }
-  const values = [...deduped.values()].map(({ id, date, startAddr, endAddr, km, dur, type, edited, waypoints }) => ({
+  const values = [...deduped.values()].map(({ id, date, startAddr, endAddr, startLat, startLon, endLat, endLon, km, dur, type, edited, waypoints }) => ({
     id,
     userId,
     date,
     startAddr,
     endAddr,
+    startLat: startLat ?? null,
+    startLon: startLon ?? null,
+    endLat: endLat ?? null,
+    endLon: endLon ?? null,
     km,
     dur,
     type,
@@ -89,6 +97,10 @@ router.post("/trips/batch", requireAuth, async (req: Request, res): Promise<void
         date: sql`excluded.date`,
         startAddr: sql`excluded.start_addr`,
         endAddr: sql`excluded.end_addr`,
+        startLat: sql`excluded.start_lat`,
+        startLon: sql`excluded.start_lon`,
+        endLat: sql`excluded.end_lat`,
+        endLon: sql`excluded.end_lon`,
         km: sql`excluded.km`,
         dur: sql`excluded.dur`,
         type: sql`excluded.type`,
@@ -108,11 +120,15 @@ router.patch("/trips/:id", requireAuth, async (req: Request, res): Promise<void>
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { edited, waypoints, ...rest } = parsed.data;
+  const { edited, waypoints, startLat, startLon, endLat, endLon, ...rest } = parsed.data;
   const updateData = {
     ...rest,
     ...(edited != null ? { edited } : {}),
     ...(waypoints !== undefined ? { waypoints: waypoints.length > 0 ? waypoints : null } : {}),
+    ...(startLat !== undefined ? { startLat: startLat } : {}),
+    ...(startLon !== undefined ? { startLon: startLon } : {}),
+    ...(endLat !== undefined ? { endLat: endLat } : {}),
+    ...(endLon !== undefined ? { endLon: endLon } : {}),
   };
   const [row] = await db
     .update(tripsTable)
