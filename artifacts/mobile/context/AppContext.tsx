@@ -910,9 +910,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = useCallback(async (name: string, plate: string) => {
     if (!user) return;
     const accounts = await loadAccounts();
-    if (!accounts[user.email]) return;
-    accounts[user.email].name = name;
-    accounts[user.email].plate = plate;
+    if (!accounts[user.email]) {
+      accounts[user.email] = { name, plate, passwordHash: "" };
+    } else {
+      accounts[user.email].name = name;
+      accounts[user.email].plate = plate;
+    }
     await saveAccounts(accounts);
     setUserState((u) => u ? { ...u, name, plate } : u);
   }, [user]);
@@ -920,9 +923,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateCompanyInfo = useCallback(async (companyName: string, logoUri: string) => {
     if (!user) return;
     const accounts = await loadAccounts();
-    if (!accounts[user.email]) return;
-    accounts[user.email].companyName = companyName;
-    accounts[user.email].logoUri = logoUri;
+    if (!accounts[user.email]) {
+      accounts[user.email] = { name: user.name ?? "", plate: user.plate ?? "", passwordHash: "", companyName, logoUri };
+    } else {
+      accounts[user.email].companyName = companyName;
+      accounts[user.email].logoUri = logoUri;
+    }
     await saveAccounts(accounts);
     setUserState((u) => u ? { ...u, companyName, logoUri } : u);
   }, [user]);
@@ -930,11 +936,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateVehicleData = useCallback(async (brand: string, model: string, year: string, color: string) => {
     if (!user) return;
     const accounts = await loadAccounts();
-    if (!accounts[user.email]) return;
-    accounts[user.email].vehicleBrand = brand;
-    accounts[user.email].vehicleModel = model;
-    accounts[user.email].vehicleYear = year;
-    accounts[user.email].vehicleColor = color;
+    if (!accounts[user.email]) {
+      accounts[user.email] = { name: user.name ?? "", plate: user.plate ?? "", passwordHash: "", vehicleBrand: brand, vehicleModel: model, vehicleYear: year, vehicleColor: color };
+    } else {
+      accounts[user.email].vehicleBrand = brand;
+      accounts[user.email].vehicleModel = model;
+      accounts[user.email].vehicleYear = year;
+      accounts[user.email].vehicleColor = color;
+    }
     await saveAccounts(accounts);
     setUserState((u) => u ? { ...u, vehicleBrand: brand, vehicleModel: model, vehicleYear: year, vehicleColor: color } : u);
   }, [user]);
