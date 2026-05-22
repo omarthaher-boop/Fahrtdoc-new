@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -707,7 +708,7 @@ export default function ProfileScreen() {
             <ListRow
               icon="mail"
               label={t("row.contact")}
-              onPress={() => Alert.alert(t("contact.title"), `${t("contact.text")}\n\n${t("contact.email")}`)}
+              onPress={() => Linking.openURL(`mailto:${t("contact.email")}`)}
               colors={colors}
               showDivider
             />
