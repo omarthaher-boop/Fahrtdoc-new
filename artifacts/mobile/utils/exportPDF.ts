@@ -16,9 +16,37 @@ function csvCell(value: string | number): string {
   return s;
 }
 
-function buildCSV(trips: Trip[]): string {
-  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "Dauer", "Notiz"];
-  const rows: string[] = [headers.join(",")];
+function buildCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string): string {
+  const exportedAt = new Date().toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const dateRange = dateFrom || dateTo
+    ? [dateFrom, dateTo].filter(Boolean).join(" - ")
+    : trips.length > 0
+      ? (() => {
+          const ts = trips.map((t) => new Date(t.date).getTime());
+          const min = new Date(Math.min(...ts)).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+          const max = new Date(Math.max(...ts)).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+          return `${min} - ${max}`;
+        })()
+      : "";
+
+  const totalKm = trips.reduce((a, t) => a + t.km, 0);
+
+  const header: string[] = [
+    "FahrtDoc - Fahrtenbuch",
+    user?.name ? `Fahrer: ${user.name}` : "",
+    user?.plate ? `Kennzeichen: ${user.plate}` : "",
+    dateRange ? `Zeitraum: ${dateRange}` : "",
+    `Fahrten gesamt: ${trips.length}  |  Strecke gesamt: ${totalKm.toFixed(1)} km`,
+    `Exportiert am: ${exportedAt}`,
+    "",
+  ].filter((line, i) => i === 0 || line !== "");
+
+  const dataHeaders = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "Dauer", "Notiz"];
+  const rows: string[] = [...header.map((h) => csvCell(h)), dataHeaders.join(",")];
 
   for (const t of trips) {
     const date = new Date(t.date).toLocaleDateString("de-DE", {
@@ -45,8 +73,8 @@ function buildCSV(trips: Trip[]): string {
   return rows.join("\r\n");
 }
 
-async function exportCSVWeb(trips: Trip[], filename = "Fahrtenbuch.csv"): Promise<void> {
-  const csv = buildCSV(trips);
+async function exportCSVWeb(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, filename = "Fahrtenbuch.csv"): Promise<void> {
+  const csv = buildCSV(trips, user, dateFrom, dateTo);
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -56,11 +84,11 @@ async function exportCSVWeb(trips: Trip[], filename = "Fahrtenbuch.csv"): Promis
   URL.revokeObjectURL(url);
 }
 
-async function exportCSVNative(trips: Trip[], filename = "Fahrtenbuch.csv"): Promise<void> {
+async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, filename = "Fahrtenbuch.csv"): Promise<void> {
   const { File, Paths } = await import("expo-file-system");
   const Sharing = await import("expo-sharing");
 
-  const csv = buildCSV(trips);
+  const csv = buildCSV(trips, user, dateFrom, dateTo);
   const file = new File(Paths.cache, filename);
   file.write("\uFEFF" + csv);
   const fileUri = file.uri;
@@ -81,15 +109,15 @@ async function exportCSVNative(trips: Trip[], filename = "Fahrtenbuch.csv"): Pro
   }
 }
 
-export async function exportCSV(trips: Trip[]): Promise<void> {
+export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string): Promise<void> {
   if (trips.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
     return;
   }
   if (Platform.OS === "web") {
-    await exportCSVWeb(trips);
+    await exportCSVWeb(trips, user, dateFrom, dateTo);
   } else {
-    await exportCSVNative(trips);
+    await exportCSVNative(trips, user, dateFrom, dateTo);
   }
 }
 

@@ -237,17 +237,32 @@ export default function HistoryScreen() {
       (trip) =>
         `${new Date(trip.date).toLocaleDateString(locale)}  |  ${trip.type === "business" ? t("tripType.business") : t("tripType.private")}  |  ${trip.startAddr} → ${trip.endAddr}  |  ${trip.km.toFixed(1)} km  |  ${fmtDur(trip.dur)}`
     );
+    const exportedAt = new Date().toLocaleDateString(locale);
+    const dateRange = dateFrom || dateTo
+      ? [dateFrom, dateTo].filter(Boolean).join(" - ")
+      : toExport.length > 0
+        ? (() => {
+            const ts = toExport.map((t) => new Date(t.date).getTime());
+            const min = new Date(Math.min(...ts)).toLocaleDateString(locale);
+            const max = new Date(Math.max(...ts)).toLocaleDateString(locale);
+            return `${min} - ${max}`;
+          })()
+        : "";
     const subject = `FahrtDoc – ${toExport.length} ${t("home.trips")} (${statsKm.toFixed(1)} km)`;
     const body = [
-      "FahrtDoc",
-      "=".repeat(40),
-      `${toExport.length} ${t("home.trips")} · ${statsKm.toFixed(1)} km`,
+      "FahrtDoc - Fahrtenbuch",
+      "=".repeat(50),
+      ...(user?.name ? [`Fahrer: ${user.name}`] : []),
+      ...(user?.plate ? [`Kennzeichen: ${user.plate}`] : []),
+      ...(dateRange ? [`Zeitraum: ${dateRange}`] : []),
+      `Fahrten: ${toExport.length}  |  Gesamt: ${statsKm.toFixed(1)} km  |  Fahrzeit: ${fmtDur(statsDur)}`,
       "",
+      "-".repeat(50),
       ...lines,
-      "-".repeat(90),
-      `${statsKm.toFixed(1)} km · ${fmtDur(statsDur)}`,
+      "-".repeat(50),
       "",
-      `${new Date().toLocaleDateString(locale)}`,
+      `FahrtDoc | www.centofai.com`,
+      `Exportiert am: ${exportedAt}`,
     ].join("\n");
     const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     await Linking.openURL(mailto);
@@ -268,7 +283,7 @@ export default function HistoryScreen() {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    await exportCSV(displayTrips);
+    await exportCSV(displayTrips, user, dateFrom, dateTo);
   };
 
   const handleView = (trip: Trip) => {
