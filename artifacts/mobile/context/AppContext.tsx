@@ -137,23 +137,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-function seedDate(offsetDays: number, hour = 12, min = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() - offsetDays);
-  d.setHours(hour, min, 0, 0);
-  return d.toISOString();
-}
-
-const SEED_TRIPS: Trip[] = [
-  { id: "a1", date: seedDate(0, 8, 14), startAddr: "Giessereistrasse 8, Arbon", endAddr: "Zielpunkt unbekannt", km: 0.0, dur: 66, type: "business", edited: true },
-  { id: "a2", date: seedDate(1, 18, 12), startAddr: "Spitalstrasse, Herisau", endAddr: "Stickereistrasse, Arbon", km: 17.6, dur: 5160, type: "business", edited: true },
-  { id: "a3", date: seedDate(1, 18, 11), startAddr: "Spitalstrasse 6, Herisau", endAddr: "Spitalstrasse 6, Herisau", km: 17.6, dur: 5100, type: "business", edited: true },
-  { id: "a4", date: seedDate(3, 7, 55), startAddr: "Büro Mitte, Berlin", endAddr: "Musterstraße 12, Berlin", km: 11.2, dur: 1620, type: "business" },
-  { id: "a5", date: seedDate(5, 14, 20), startAddr: "Musterstraße 12, Berlin", endAddr: "Klinikum Steglitz", km: 15.8, dur: 2280, type: "business" },
-  { id: "a6", date: seedDate(10, 9, 0), startAddr: "Musterstraße 12, Berlin", endAddr: "Potsdam HBF", km: 31.4, dur: 2880, type: "private" },
-  { id: "a7", date: seedDate(22, 16, 45), startAddr: "Ku'damm 100, Berlin", endAddr: "Tegel Gewerbepark", km: 19.3, dur: 2460, type: "business" },
-  { id: "a8", date: seedDate(40, 8, 30), startAddr: "Musterstraße 12, Berlin", endAddr: "Cottbus HBF", km: 110.2, dur: 4920, type: "business" },
-];
 
 const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371;
@@ -303,13 +286,13 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
   }
   const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor };
   const raw2 = await secureGetItem(session.email, tripsKey(session.email));
-  let trips: Trip[] = SEED_TRIPS;
+  let trips: Trip[] = [];
   if (raw2) {
     try {
       const parsed: Trip[] = JSON.parse(raw2);
       if (parsed.length > 0) trips = parsed;
     } catch {
-      // fall back to seed
+      // fall back to empty
     }
   }
   const serverToken = await secureGetItem(session.email, serverTokenKey(session.email));
@@ -783,8 +766,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const { merged } = mergeTrips([], serverApiTrips);
           finalTrips = merged;
         } else {
-          finalTrips = SEED_TRIPS;
-          await serverBatchUpsertTrips(serverResult.token, SEED_TRIPS.map(tripToApiPayload));
+          finalTrips = [];
         }
 
         const profile: UserProfile = { name: serverResult.name, email: key, plate: serverResult.plate };
@@ -802,13 +784,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(profile);
 
     const raw = await secureGetItem(key, tripsKey(key));
-    let localTrips: Trip[] = SEED_TRIPS;
+    let localTrips: Trip[] = [];
     if (raw) {
       try {
         const parsed: Trip[] = JSON.parse(raw);
         if (parsed.length > 0) localTrips = parsed;
       } catch {
-        // keep seed
+        // fall back to empty
       }
     } else {
       const oldTrips = await AsyncStorage.getItem("trips");
@@ -820,7 +802,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             await secureSetItem(key, tripsKey(key), JSON.stringify(parsed));
           }
         } catch {
-          // keep seed
+          // fall back to empty
         }
       }
     }
@@ -889,10 +871,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await storeSession(key, passwordHash);
     const profile: UserProfile = { name, email: key, plate };
     setUserState(profile);
-    await secureSetItem(key, tripsKey(key), JSON.stringify(SEED_TRIPS));
-    setTrips(SEED_TRIPS);
+    await secureSetItem(key, tripsKey(key), JSON.stringify([]));
+    setTrips([]);
 
-    // Register on server, then login to obtain a session token and upload seed trips
+    // Register on server, then login to obtain a session token
     const registered = await serverRegister(key, name, plate, password);
     if (registered) {
       const loginResult = await serverLogin(key, password);
@@ -900,7 +882,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await secureSetItem(key, serverTokenKey(key), loginResult.token);
         setServerToken(loginResult.token);
         serverTokenRef.current = loginResult.token;
-        await serverBatchUpsertTrips(loginResult.token, SEED_TRIPS.map(tripToApiPayload));
       }
     }
 
