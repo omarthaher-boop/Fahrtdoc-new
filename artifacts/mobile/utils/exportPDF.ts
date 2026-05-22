@@ -138,12 +138,12 @@ async function getAppLogoBase64(): Promise<string | null> {
         reader.readAsDataURL(blob);
       });
     } else {
-      const { Asset } = await import("expo-asset");
+      const { Image } = await import("react-native");
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const [asset] = await Asset.loadAsync(require("../assets/images/logo.png"));
-      if (!asset.localUri) return null;
+      const source = Image.resolveAssetSource(require("../assets/images/logo.png"));
+      if (!source?.uri) return null;
       const { readAsStringAsync } = await import("expo-file-system");
-      const base64 = await readAsStringAsync(asset.localUri, { encoding: "base64" });
+      const base64 = await readAsStringAsync(source.uri, { encoding: "base64" });
       return `data:image/png;base64,${base64}`;
     }
   } catch {
