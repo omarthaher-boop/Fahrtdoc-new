@@ -216,3 +216,36 @@ export async function serverConfirmChangePassword(
     return { success: false, error: "Netzwerkfehler. Bitte versuche es erneut." };
   }
 }
+
+export async function serverRequestEmailChangeCode(
+  token: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/request-email-change`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ newEmail }),
+    });
+    return res.json();
+  } catch {
+    return { success: false, error: "Netzwerkfehler. Bitte versuche es erneut." };
+  }
+}
+
+export async function serverConfirmEmailChange(
+  token: string,
+  code: string,
+  newEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/confirm-email-change`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code, newEmail }),
+    });
+    return res.json();
+  } catch {
+    return { success: false, error: "Netzwerkfehler. Bitte versuche es erneut." };
+  }
+}

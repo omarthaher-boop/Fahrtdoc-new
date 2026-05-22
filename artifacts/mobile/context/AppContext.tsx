@@ -29,6 +29,8 @@ import {
   serverBatchUpsertTrips,
   serverRequestChangeCode,
   serverConfirmChangePassword,
+  serverRequestEmailChangeCode,
+  serverConfirmEmailChange,
 } from "@/lib/api";
 
 export interface Waypoint {
@@ -111,6 +113,8 @@ interface AppContextType {
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
   confirmPasswordChange: (code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  requestEmailChangeCode: (newEmail: string) => Promise<{ success: boolean; error?: string }>;
+  confirmEmailChange: (code: string, newEmail: string) => Promise<{ success: boolean; error?: string }>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   trips: Trip[];
   syncRetryingIds: ReadonlySet<string>;
@@ -945,6 +949,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return serverRequestChangeCode(token);
   }, []);
 
+  const requestEmailChangeCode = useCallback(async (newEmail: string): Promise<{ success: boolean; error?: string }> => {
+    const token = serverTokenRef.current;
+    if (!token) return { success: false, error: "Nicht mit Server verbunden. Bitte zuerst anmelden." };
+    return serverRequestEmailChangeCode(token, newEmail);
+  }, []);
+
+  const confirmEmailChange = useCallback(async (code: string, newEmail: string): Promise<{ success: boolean; error?: string }> => {
+    const token = serverTokenRef.current;
+    if (!token) return { success: false, error: "Nicht mit Server verbunden." };
+    return serverConfirmEmailChange(token, code, newEmail);
+  }, []);
+
   const confirmPasswordChange = useCallback(async (code: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
     const token = serverTokenRef.current;
     if (!token) return { success: false, error: "Nicht mit Server verbunden." };
@@ -1361,6 +1377,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updatePassword,
         requestPasswordChangeCode,
         confirmPasswordChange,
+        requestEmailChangeCode,
+        confirmEmailChange,
         trips,
         syncRetryingIds,
         addTrip,

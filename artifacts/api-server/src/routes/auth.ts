@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, usersTable, userSessionsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { sendPasswordChangeCode } from "../lib/mailer";
+import { sendPasswordChangeCode, sendEmailChangeCode } from "../lib/mailer";
 
 const router: IRouter = Router();
 
@@ -141,6 +141,122 @@ router.post("/auth/confirm-change-password", requireAuth, async (req, res): Prom
 
   req.log.info({ email }, "Password changed successfully; all sessions revoked");
   res.json({ success: true, message: "Passwort erfolgreich geändert." });
+});
+
+const EMAIL_OTP_PREFIX = "email_change:";
+
+router.post("/auth/request-email-change", requireAuth, async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const currentEmail = authReq.userEmail;
+  const { newEmail } = req.body as { newEmail?: string };
+
+  if (!newEmail || typeof newEmail !== "string" || !newEmail.includes("@")) {
+    res.status(400).json({ error: "Ungültige neue E-Mail-Adresse." });
+    return;
+  }
+
+  const normalizedNew = newEmail.trim().toLowerCase();
+
+  if (normalizedNew === currentEmail.toLowerCase()) {
+    res.status(400).json({ error: "Die neue E-Mail-Adresse muss sich von der aktuellen unterscheiden." });
+    return;
+  }
+
+  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, normalizedNew));
+  if (existing) {
+    res.status(409).json({ error: "Diese E-Mail-Adresse ist bereits registriert." });
+    return;
+  }
+
+  cleanExpired();
+
+  const storeKey = `${EMAIL_OTP_PREFIX}${currentEmail}`;
+  const existingOtp = otpStore.get(storeKey);
+  if (existingOtp && Date.now() < existingOtp.expiresAt) {
+    res.json({ success: true, message: "Bestätigungscode wurde an deine aktuelle E-Mail-Adresse gesendet." });
+    return;
+  }
+
+  const code = generateCode();
+  otpStore.set(storeKey, { code, expiresAt: Date.now() + EXPIRY_MS, attempts: 0 });
+
+  req.log.info({ currentEmail, newEmail: normalizedNew }, "Email change OTP generated");
+
+  try {
+    await sendEmailChangeCode(currentEmail, code, normalizedNew);
+  } catch (err) {
+    req.log.error({ err, currentEmail }, "Failed to send email change code");
+    otpStore.delete(storeKey);
+    res.status(500).json({ error: "E-Mail konnte nicht gesendet werden. Bitte versuche es später erneut." });
+    return;
+  }
+
+  res.json({ success: true, message: "Bestätigungscode wurde an deine aktuelle E-Mail-Adresse gesendet." });
+});
+
+router.post("/auth/confirm-email-change", requireAuth, async (req, res): Promise<void> => {
+  const authReq = req as AuthenticatedRequest;
+  const currentEmail = authReq.userEmail;
+  const userId = authReq.userId;
+  const { code, newEmail } = req.body as { code?: string; newEmail?: string };
+
+  if (!code || !newEmail) {
+    res.status(400).json({ error: "Code und neue E-Mail-Adresse sind erforderlich." });
+    return;
+  }
+
+  if (typeof newEmail !== "string" || !newEmail.includes("@")) {
+    res.status(400).json({ error: "Ungültige E-Mail-Adresse." });
+    return;
+  }
+
+  const normalizedNew = newEmail.trim().toLowerCase();
+
+  if (normalizedNew === currentEmail.toLowerCase()) {
+    res.status(400).json({ error: "Die neue E-Mail-Adresse muss sich von der aktuellen unterscheiden." });
+    return;
+  }
+
+  const [taken] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, normalizedNew));
+  if (taken) {
+    res.status(409).json({ error: "Diese E-Mail-Adresse ist bereits registriert." });
+    return;
+  }
+
+  const storeKey = `${EMAIL_OTP_PREFIX}${currentEmail}`;
+  const entry = otpStore.get(storeKey);
+
+  if (!entry) {
+    res.status(400).json({ error: "Kein aktiver Code gefunden. Bitte fordere einen neuen an." });
+    return;
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    otpStore.delete(storeKey);
+    res.status(400).json({ error: "Der Code ist abgelaufen. Bitte fordere einen neuen an." });
+    return;
+  }
+
+  entry.attempts += 1;
+  if (entry.attempts > MAX_ATTEMPTS) {
+    otpStore.delete(storeKey);
+    res.status(429).json({ error: "Zu viele Versuche. Bitte fordere einen neuen Code an." });
+    return;
+  }
+
+  if (entry.code !== code.trim()) {
+    const remaining = MAX_ATTEMPTS - entry.attempts;
+    res.status(400).json({ error: `Ungültiger Code. Noch ${remaining} Versuch${remaining === 1 ? "" : "e"}.` });
+    return;
+  }
+
+  otpStore.delete(storeKey);
+
+  await db.update(usersTable).set({ email: normalizedNew }).where(eq(usersTable.id, userId));
+  await db.delete(userSessionsTable).where(eq(userSessionsTable.userId, userId));
+
+  req.log.info({ oldEmail: currentEmail, newEmail: normalizedNew }, "Email changed; all sessions revoked");
+  res.json({ success: true, message: "E-Mail-Adresse erfolgreich geändert. Bitte melde dich erneut an." });
 });
 
 router.post("/auth/forgot-password", async (req, res): Promise<void> => {

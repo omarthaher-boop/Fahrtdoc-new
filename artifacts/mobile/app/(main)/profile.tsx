@@ -309,19 +309,26 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, isSynced } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced } = useApp();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
 
   const [themeModalVisible, setThemeModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [pwModalVisible, setPwModalVisible] = useState(false);
+
+  const [emStep, setEmStep] = useState<"input" | "verify">("input");
+  const [emNewEmail, setEmNewEmail] = useState("");
+  const [emCode, setEmCode] = useState("");
+  const [emError, setEmError] = useState("");
+  const [emLoading, setEmLoading] = useState(false);
   const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [faqModalVisible, setFaqModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [emModalVisible, setEmModalVisible] = useState(false);
 
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPlate, setEditPlate] = useState(user?.plate ?? "");
@@ -523,6 +530,49 @@ export default function ProfileScreen() {
     setLanguageModalVisible(false);
   }, [setLanguage]);
 
+  const openEmModal = useCallback(() => {
+    setEmStep("input");
+    setEmNewEmail("");
+    setEmCode("");
+    setEmError("");
+    setEmLoading(false);
+    setEmModalVisible(true);
+  }, []);
+
+  const closeEmModal = useCallback(() => {
+    setEmModalVisible(false);
+  }, []);
+
+  const handleEmRequestCode = useCallback(async () => {
+    if (!emNewEmail.trim()) { setEmError(t("em.error.noEmail")); return; }
+    if (!emNewEmail.includes("@") || !emNewEmail.includes(".")) { setEmError(t("em.error.invalidEmail")); return; }
+    setEmLoading(true);
+    setEmError("");
+    const result = await requestEmailChangeCode(emNewEmail.trim().toLowerCase());
+    setEmLoading(false);
+    if (result.success) {
+      setEmStep("verify");
+    } else {
+      setEmError(result.error ?? t("em.error.sendFailed"));
+    }
+  }, [emNewEmail, requestEmailChangeCode, t]);
+
+  const handleEmConfirm = useCallback(async () => {
+    if (!emCode.trim()) { setEmError(t("em.error.noCode")); return; }
+    setEmLoading(true);
+    setEmError("");
+    const result = await confirmEmailChange(emCode.trim(), emNewEmail.trim().toLowerCase());
+    setEmLoading(false);
+    if (result.success) {
+      closeEmModal();
+      Alert.alert(t("em.success.title"), t("em.success.text"), [
+        { text: "OK", onPress: async () => { await logout(); router.replace("/"); } },
+      ]);
+    } else {
+      setEmError(result.error ?? t("em.error.invalid"));
+    }
+  }, [emCode, emNewEmail, confirmEmailChange, closeEmModal, logout, router, t]);
+
   const openPwModal = useCallback(() => {
     setPwStep("request");
     setPwCode("");
@@ -715,6 +765,7 @@ export default function ProfileScreen() {
           <SectionHeader label={t("section.security")} colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="lock" label={t("row.changePassword")} onPress={openPwModal} colors={colors} showDivider />
+            <ListRow icon="mail" label={t("row.changeEmail")} onPress={openEmModal} colors={colors} showDivider />
             <ListRow icon="shield" label={t("row.privacy")} onPress={() => setPrivacyModalVisible(true)} colors={colors} />
           </View>
 
@@ -963,6 +1014,96 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
         </View>
+      </Modal>
+
+      {/* Change Email Modal */}
+      <Modal visible={emModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={closeEmModal} disabled={emLoading}>
+              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("row.changeEmail")}</Text>
+            <View style={{ width: 70 }} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.stepRow}>
+              <View style={styles.stepItem}>
+                <View style={[styles.stepDot, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.stepDotText}>{emStep === "input" ? "1" : "✓"}</Text>
+                </View>
+                <Text style={[styles.stepLabel, { color: emStep === "input" ? colors.foreground : colors.mutedForeground }]}>{t("em.step1")}</Text>
+              </View>
+              <View style={[styles.stepLine, { backgroundColor: emStep === "verify" ? colors.primary : colors.border }]} />
+              <View style={styles.stepItem}>
+                <View style={[styles.stepDot, { backgroundColor: emStep === "verify" ? colors.primary : colors.border }]}>
+                  <Text style={[styles.stepDotText, { color: emStep === "verify" ? "#fff" : colors.mutedForeground }]}>2</Text>
+                </View>
+                <Text style={[styles.stepLabel, { color: emStep === "verify" ? colors.foreground : colors.mutedForeground }]}>{t("em.step2")}</Text>
+              </View>
+            </View>
+
+            {emStep === "input" ? (
+              <>
+                <View style={[styles.infoNote, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                  <Feather name="info" size={14} color={colors.primary} />
+                  <Text style={[styles.infoNoteText, { color: colors.primary }]}>{t("em.info")}</Text>
+                </View>
+                <PwField
+                  label={t("em.newEmailLabel")}
+                  value={emNewEmail}
+                  onChangeText={setEmNewEmail}
+                  icon="mail"
+                  placeholder={t("em.newEmailPlaceholder")}
+                  autoCapitalize="none"
+                  keyboardType="default"
+                  colors={colors}
+                />
+                {emError !== "" && <Text style={[styles.errorText, { color: colors.destructive }]}>{emError}</Text>}
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: emLoading ? colors.mutedForeground : colors.primary }]}
+                  onPress={handleEmRequestCode}
+                  disabled={emLoading}
+                >
+                  <Text style={styles.primaryBtnText}>{emLoading ? t("em.sending") : t("em.sendCode")}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={[styles.infoNote, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                  <Feather name="mail" size={14} color={colors.primary} />
+                  <Text style={[styles.infoNoteText, { color: colors.primary }]}>
+                    {language === "de"
+                      ? `Code wurde an ${user?.email} gesendet. Neue Adresse: ${emNewEmail}`
+                      : `Code sent to ${user?.email}. New address: ${emNewEmail}`}
+                  </Text>
+                </View>
+                <PwField
+                  label={language === "de" ? "Bestätigungscode" : "Confirmation Code"}
+                  value={emCode}
+                  onChangeText={setEmCode}
+                  icon="key"
+                  placeholder="000000"
+                  autoCapitalize="none"
+                  keyboardType="numeric"
+                  colors={colors}
+                />
+                {emError !== "" && <Text style={[styles.errorText, { color: colors.destructive }]}>{emError}</Text>}
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: emLoading ? colors.mutedForeground : colors.primary }]}
+                  onPress={handleEmConfirm}
+                  disabled={emLoading}
+                >
+                  <Text style={styles.primaryBtnText}>{emLoading ? t("em.changing") : t("em.changeBtn")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setEmStep("input"); setEmError(""); }}>
+                  <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>{t("em.newCode")}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Change Password Modal */}
