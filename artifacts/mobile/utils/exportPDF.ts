@@ -124,12 +124,40 @@ function getDateRange(trips: Trip[], dateFrom: string, dateTo: string): string {
   return `${fmtDate(min.toISOString())} – ${fmtDate(max.toISOString())}`;
 }
 
+async function getAppLogoBase64(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const logoSrc = require("../assets/images/logo.png") as string;
+      const resp = await fetch(logoSrc);
+      const blob = await resp.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } else {
+      const { Asset } = await import("expo-asset");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const [asset] = await Asset.loadAsync(require("../assets/images/logo.png"));
+      if (!asset.localUri) return null;
+      const { readAsStringAsync } = await import("expo-file-system");
+      const base64 = await readAsStringAsync(asset.localUri, { encoding: "base64" });
+      return `data:image/png;base64,${base64}`;
+    }
+  } catch {
+    return null;
+  }
+}
+
 function buildHTML(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
   dateTo: string,
-  typeLabel?: string
+  typeLabel?: string,
+  appLogoBase64?: string | null
 ): string {
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
@@ -266,6 +294,7 @@ function buildHTML(
       <div class="brand-sub">${subLabel}</div>
     </div>
     <div class="meta">
+      ${appLogoBase64 ? `<img src="${appLogoBase64}" style="max-height:44px; max-width:100px; object-fit:contain; display:block; margin-left:auto; margin-bottom:6px;" alt="FahrtDoc" />` : ""}
       ${user ? `<strong>${user.name}</strong><br>` : ""}
       ${user?.plate ? `Kennzeichen: <strong>${user.plate}</strong><br>` : ""}
       Zeitraum: <strong>${dateRange}</strong>
@@ -366,6 +395,8 @@ async function exportPDFWeb(
   const brandLabel = user?.companyName || "FahrtDoc";
   const subLabel = typeLabel ?? "Fahrtenbuch";
 
+  const appLogo = await getAppLogoBase64();
+
   if (user?.logoUri) {
     try {
       const loadImg = (src: string): Promise<HTMLImageElement> =>
@@ -401,14 +432,40 @@ async function exportPDFWeb(
   doc.setTextColor(90, 106, 154);
   doc.text(subLabel, margin, y + 6);
 
+  // App logo top-right
+  if (appLogo) {
+    try {
+      const loadImg = (src: string): Promise<HTMLImageElement> =>
+        new Promise((res, rej) => {
+          const img = new window.Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = src;
+        });
+      const logoImg = await loadImg(appLogo);
+      const ratio = logoImg.naturalWidth / logoImg.naturalHeight;
+      const maxH = 14;
+      const maxW = 28;
+      let lh = maxH;
+      let lw = maxH * ratio;
+      if (lw > maxW) { lw = maxW; lh = maxW / ratio; }
+      const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
+      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
+      doc.addImage(appLogo, fmt, pageW - margin - lw, y - 4, lw, lh);
+    } catch {
+      // skip if loading fails
+    }
+  }
+
   doc.setFontSize(9);
   doc.setTextColor(68, 68, 68);
   const metaLines: string[] = [];
   if (user?.name) metaLines.push(user.name);
   if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
   metaLines.push(`Zeitraum: ${dateRange}`);
+  const metaStartY = appLogo ? y + 12 : y;
   metaLines.forEach((line, i) => {
-    doc.text(line, pageW - margin, y + i * 5, { align: "right" });
+    doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
   });
 
   y += 14;
@@ -640,7 +697,8 @@ async function exportPDFNative(
   dialogTitle = "Fahrtenbuch exportieren",
   typeLabel?: string
 ): Promise<void> {
-  const html = buildHTML(trips, user, dateFrom, dateTo, typeLabel);
+  const appLogo = await getAppLogoBase64();
+  const html = buildHTML(trips, user, dateFrom, dateTo, typeLabel, appLogo);
   const Print = await import("expo-print");
   const Sharing = await import("expo-sharing");
 
