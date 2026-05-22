@@ -13,10 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActiveTripBanner from "@/components/ActiveTripBanner";
+import EditTripModal from "@/components/EditTripModal";
 import SaveTripSheet from "@/components/SaveTripSheet";
 import StatCard from "@/components/StatCard";
 import TripCard from "@/components/TripCard";
-import { useApp } from "@/context/AppContext";
+import TripDetailModal from "@/components/TripDetailModal";
+import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -33,11 +35,13 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync } = useApp();
+  const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync, deleteTrip, editTrip } = useApp();
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
   const [starting, setStarting] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
 
   const PERIOD_LABELS: Record<Period, string> = {
     1: t("home.period.1"),
@@ -83,6 +87,10 @@ export default function HomeScreen() {
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
   const pendingLabel = pendingType === "business" ? t("home.businessTrip") : t("home.privateTrip");
+
+  const handleEdit = (trip: Trip) => setEditingTrip(trip);
+  const handleView = (trip: Trip) => setViewingTrip(trip);
+  const handleSaveEdit = (id: string, changes: Partial<Trip>) => editTrip(id, changes);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -232,13 +240,37 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : (
-            periodTrips.slice(0, 3).map((t) => <TripCard key={t.id} trip={t} onRetrySync={retryWaypointSync} />)
+            periodTrips.slice(0, 3).map((trip) => (
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                onDelete={deleteTrip}
+                onEdit={handleEdit}
+                onView={handleView}
+                onRetrySync={retryWaypointSync}
+              />
+            ))
           )}
         </View>
       </ScrollView>
 
       {/* Save Trip Sheet — shown after stopping a trip */}
       <SaveTripSheet />
+
+      {/* Edit modal */}
+      <EditTripModal
+        trip={editingTrip}
+        visible={editingTrip !== null}
+        onClose={() => setEditingTrip(null)}
+        onSave={handleSaveEdit}
+      />
+
+      {/* Trip detail / route map modal */}
+      <TripDetailModal
+        trip={viewingTrip}
+        visible={viewingTrip !== null}
+        onClose={() => setViewingTrip(null)}
+      />
 
       {/* Start Trip Confirm Modal */}
       <Modal visible={showStartModal} transparent animationType="fade">
