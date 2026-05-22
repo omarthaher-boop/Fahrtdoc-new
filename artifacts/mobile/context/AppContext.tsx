@@ -179,7 +179,7 @@ const fetchOsrmRoute = async (
     const url = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=false`;
     const r = await fetch(url, {
       signal: ctrl.signal,
-      headers: { "User-Agent": "FahrtDoc/2.4 (support@fahrtdoc.de)" },
+      headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" },
     });
     clearTimeout(tid);
     const d = await r.json();
@@ -198,7 +198,7 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     const tid = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de&zoom=18&addressdetails=1`,
-      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (support@fahrtdoc.de)" } }
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
     );
     clearTimeout(tid);
     const d = await r.json();

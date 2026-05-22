@@ -70,7 +70,7 @@ const FAQ_DATA: { q: string; a: string }[] = [
     { q: "Wie lange werden meine Daten gespeichert?", a: "Fahrtdaten werden bis zu 10 Jahre aufbewahrt, da das Finanzamt die Aufbewahrung steuerrelevanter Unterlagen ueber diesen Zeitraum verlangen kann." },
     { q: "Warum braucht die App Hintergrund-Zugriff?", a: "Fuer das automatische Tracking muss die App auch im Hintergrund auf den Standort zugreifen koennen. Ohne diese Berechtigung koennen Fahrten nur erkannt werden, wenn die App im Vordergrund ist." },
     { q: "Welche Version der App habe ich?", a: `Du nutzt FahrtDoc Version ${APP_VERSION}. Die aktuelle Versionsnummer findest du auch unter Profil -> Support -> App-Version.` },
-    { q: "Wie kontaktiere ich den Support?", a: "Du erreichst unseren Support unter support@fahrtdoc.de oder ueber das Kontaktformular in der App. Wir antworten in der Regel innerhalb von 1-2 Werktagen." },
+    { q: "Wie kontaktiere ich den Support?", a: "Du erreichst unseren Support unter info@centofai.com oder ueber das Kontaktformular in der App. Wir antworten in der Regel innerhalb von 1-2 Werktagen." },
     { q: "Wie klassifiziere ich Fahrten als geschaeftlich oder privat?", a: "Beim manuellen Start einer Fahrt kannst du die Fahrtart direkt auswaehlen. Bei automatisch erkannten Fahrten wird der Standardwert aus deinen Einstellungen uebernommen." },
     { q: "Kann ich Fahrten rueckwirkend aendern?", a: "Ja, du kannst bereits abgeschlossene Fahrten in der Fahrtenliste oeffnen und bearbeiten. Aenderungen werden sofort gespeichert und bei bestehender Verbindung synchronisiert." },
     { q: "Was ist der Unterschied zwischen automatischem und manuellem Tracking?", a: "Beim manuellen Tracking startest und beendest du Fahrten selbst. Das automatische Tracking erkennt Fahrten selbststaendig anhand von Bewegungsmustern, GPS und Fahrzeugsensoren." },
@@ -87,7 +87,7 @@ Verantwortlich für die Verarbeitung deiner personenbezogenen Daten im Sinne der
 FahrtDoc GmbH
 Musterstraße 1
 10115 Berlin
-E-Mail: datenschutz@fahrtdoc.de
+E-Mail: info@centofai.com
 
 2. WELCHE DATEN WIR ERHEBEN
 
@@ -142,7 +142,7 @@ Als betroffene Person hast du folgende Rechte:
 • Widerspruchsrecht (Art. 21 DSGVO)
 • Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3 DSGVO)
 
-Zur Ausübung deiner Rechte wende dich an: datenschutz@fahrtdoc.de
+Zur Ausübung deiner Rechte wende dich an: info@centofai.com
 
 8. BESCHWERDERECHT
 
