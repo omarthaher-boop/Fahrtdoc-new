@@ -41,26 +41,25 @@ function ClassicMainTabs() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarActiveTintColor: colors.success,
+        tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          backgroundColor: isIOS ? "transparent" : colors.primary,
+          borderTopWidth: 0,
           elevation: 0,
           height: isWeb ? 84 : undefined,
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
+              intensity={95}
+              tint="dark"
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
           ) : null,
       }}
     >
