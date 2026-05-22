@@ -87,16 +87,16 @@ export default function HomeScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.primary, borderBottomColor: "transparent" }]}>
+      <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View>
-          <Text style={[styles.greeting, { color: "rgba(255,255,255,0.65)" }]}>{t("home.greeting")}</Text>
-          <Text style={[styles.userName, { color: "#FFFFFF" }]}>
+          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{t("home.greeting")}</Text>
+          <Text style={[styles.userName, { color: colors.foreground }]}>
             {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
           </Text>
         </View>
-        <View style={[styles.plateBadge, { backgroundColor: "rgba(255,255,255,0.15)", borderColor: "rgba(255,255,255,0.25)" }]}>
-          <Feather name="truck" size={12} color="#FFFFFF" />
-          <Text style={[styles.plateText, { color: "#FFFFFF" }]}>{user?.plate ?? "—"}</Text>
+        <View style={[styles.plateBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Feather name="truck" size={12} color={colors.primary} />
+          <Text style={[styles.plateText, { color: colors.sub }]}>{user?.plate ?? "—"}</Text>
         </View>
       </View>
 

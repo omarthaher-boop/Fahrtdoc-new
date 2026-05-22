@@ -157,33 +157,33 @@ export default function ActiveTripBanner() {
 
   return (
     <>
-      <View style={[styles.banner, { backgroundColor: paused ? (colors.warningLight ?? "#FFF8E7") : colors.successDark, borderColor: paused ? (colors.warning ?? "#FFB703") : colors.successDark }]}>
+      <View style={[styles.banner, { backgroundColor: paused ? colors.warningLight ?? "#FFF8E7" : colors.successLight, borderColor: paused ? colors.warning ?? "#FFB703" : colors.success }]}>
         <View style={styles.left}>
           <View style={styles.dotRow}>
-            <Animated.View style={[styles.dot, { backgroundColor: paused ? (colors.warning ?? "#FFB703") : colors.success, opacity: pulseAnim }]} />
-            <Text style={[styles.label, { color: paused ? (colors.warning ?? "#FFB703") : "#FFFFFF" }]}>
+            <Animated.View style={[styles.dot, { backgroundColor: paused ? colors.warning ?? "#FFB703" : colors.success, opacity: pulseAnim }]} />
+            <Text style={[styles.label, { color: paused ? colors.warning ?? "#FFB703" : colors.successDark ?? "#059669" }]}>
               {paused ? "PAUSIERT" : geocoding ? t("waypoint.locating") : "FAHRT LÄUFT"}
             </Text>
           </View>
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Feather name="navigation" size={12} color={paused ? colors.success : "rgba(255,255,255,0.8)"} />
-              <Text style={[styles.statNum, { color: paused ? colors.foreground : "#FFFFFF" }]}>
+              <Feather name="navigation" size={12} color={colors.success} />
+              <Text style={[styles.statNum, { color: colors.foreground }]}>
                 {activeTrip.distance.toFixed(1)}
               </Text>
-              <Text style={[styles.statUnit, { color: paused ? colors.mutedForeground : "rgba(255,255,255,0.7)" }]}>km</Text>
+              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>km</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Feather name="clock" size={12} color={paused ? colors.success : "rgba(255,255,255,0.8)"} />
-              <Text style={[styles.statNum, { color: paused ? colors.foreground : "#FFFFFF" }]}>
+              <Feather name="clock" size={12} color={colors.success} />
+              <Text style={[styles.statNum, { color: colors.foreground }]}>
                 {fmtTime(elapsed)}
               </Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Feather name="briefcase" size={12} color={paused ? colors.primary : "rgba(255,255,255,0.8)"} />
-              <Text style={[styles.statUnit, { color: paused ? colors.mutedForeground : "rgba(255,255,255,0.7)" }]}>
+              <Feather name="briefcase" size={12} color={colors.primary} />
+              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
                 {activeTrip.type === "business" ? "Geschäftl." : "Privat"}
               </Text>
             </View>
@@ -191,8 +191,8 @@ export default function ActiveTripBanner() {
               <>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
-                  <Feather name="map-pin" size={12} color={paused ? colors.primary : "rgba(255,255,255,0.8)"} />
-                  <Text style={[styles.statUnit, { color: paused ? colors.mutedForeground : "rgba(255,255,255,0.7)" }]}>
+                  <Feather name="map-pin" size={12} color={colors.primary} />
+                  <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
                     {activeTrip.waypoints!.length}
                   </Text>
                 </View>
@@ -204,12 +204,12 @@ export default function ActiveTripBanner() {
           <TouchableOpacity
             onPress={handlePausePress}
             disabled={geocoding}
-            style={[styles.actionBtn, { backgroundColor: paused ? (colors.warning ?? "#FFB703") : colors.success, borderColor: paused ? (colors.warning ?? "#FFB703") : colors.success }]}
+            style={[styles.actionBtn, { backgroundColor: paused ? colors.warning ?? "#FFB703" : colors.successLight, borderColor: paused ? colors.warning ?? "#FFB703" : colors.success }]}
           >
             {geocoding ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={colors.successDark ?? "#059669"} />
             ) : (
-              <Feather name={paused ? "play" : "pause"} size={16} color="#FFFFFF" />
+              <Feather name={paused ? "play" : "pause"} size={16} color={paused ? "#FFFFFF" : colors.successDark ?? "#059669"} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
