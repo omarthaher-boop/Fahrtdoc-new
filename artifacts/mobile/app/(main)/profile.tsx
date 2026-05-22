@@ -94,7 +94,7 @@ FahrtDoc verarbeitet folgende Kategorien personenbezogener Daten:
 
 • Profildaten: Name, E-Mail-Adresse, Fahrzeugkennzeichen, Fahrzeugmarke und -modell
 • Fahrtdaten: Startort, Zielort, Datum, Uhrzeit, Dauer, Streckenlänge, Fahrtart (geschäftlich/privat), Notizen
-• Standortdaten: GPS-Koordinaten während einer Fahrt
+• Standortdaten: GPS-Koordinaten während einer Fahrt (nur während aktiver Aufzeichnung)
 • Technische Daten: App-Version, Geräteart, Betriebssystem (nur zur Fehlerdiagnose)
 
 3. ZWECK DER DATENVERARBEITUNG
@@ -109,13 +109,29 @@ Wir verarbeiten deine Daten ausschließlich zu folgenden Zwecken:
 
 Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) sowie Art. 6 Abs. 1 lit. a DSGVO (Einwilligung) für die Standortverarbeitung.
 
-4. STANDORTDATEN
+4. STANDORTDATEN UND DRITTANBIETER
 
 Für die Fahrtaufzeichnung greift die App auf deinen Gerätestandort zu. Standortdaten werden:
 
-• Ausschließlich lokal auf deinem Gerät und auf unseren gesicherten Servern gespeichert
+• Lokal auf deinem Gerät und auf unseren gesicherten Servern gespeichert
 • Nicht an Dritte verkauft oder zu Werbezwecken genutzt
-• Für die Adressauflösung (Start-/Zieladresse) temporär an OpenStreetMap Nominatim übertragen - ohne Benutzerkennzeichnung
+• Für technische Hilfsfunktionen temporär an folgende Drittanbieter übertragen:
+
+ADRESSAUFLÖSUNG – OpenStreetMap Nominatim
+Betreiber: OpenStreetMap Foundation, 132 Maney Hill Road, Sutton Coldfield, West Midlands B72 1JU, Vereinigtes Königreich
+Zweck: Umwandlung von GPS-Koordinaten in lesbare Adressen (Reverse Geocoding)
+Übertragene Daten: GPS-Koordinaten (Breiten- und Längengrad) des Fahrtbeginns und -endes – ohne Benutzerkennzeichnung oder Account-Bezug
+Datenschutz: https://osmfoundation.org/wiki/Privacy_Policy
+Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO
+
+ROUTENBERECHNUNG – OSRM (Open Source Routing Machine)
+Betreiber: OpenStreetMap Foundation (Projektserver router.project-osrm.org)
+Zweck: Berechnung alternativer Routenoptionen (kürzeste/schnellste Strecke) beim Speichern einer Fahrt
+Übertragene Daten: GPS-Koordinaten von Start- und Zielpunkt der Fahrt – ohne Benutzerkennzeichnung oder Account-Bezug
+Datenschutz: https://osmfoundation.org/wiki/Privacy_Policy
+Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO
+
+Wichtig: Beide Dienste erhalten ausschließlich anonyme Koordinaten. Es werden keine Namen, E-Mail-Adressen oder sonstigen personenbezogenen Daten übertragen. Die Koordinaten werden von den Diensten nicht dauerhaft gespeichert und nicht zur Profilbildung verwendet.
 
 Du kannst die Standortberechtigung jederzeit in den Geräteinstellungen widerrufen. Das automatische Tracking ist dann nicht verfügbar.
 
@@ -137,7 +153,7 @@ Als betroffene Person hast du folgende Rechte:
 • Recht auf Berichtigung (Art. 16 DSGVO): Unrichtige Daten können korrigiert werden.
 • Recht auf Löschung (Art. 17 DSGVO): Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzliche Aufbewahrungspflicht entgegensteht.
 • Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO)
-• Recht auf Datenübertragbarkeit (Art. 20 DSGVO)
+• Recht auf Datenübertragbarkeit (Art. 20 DSGVO): Export deiner Fahrten als CSV oder PDF jederzeit möglich.
 • Widerspruchsrecht (Art. 21 DSGVO)
 • Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3 DSGVO)
 
@@ -149,7 +165,7 @@ Du hast das Recht, eine Beschwerde bei der zuständigen Datenschutzaufsichtsbeh�
 
 9. ÄNDERUNGEN DIESER ERKLÄRUNG
 
-Wir behalten uns vor, diese Datenschutzerklärung bei wesentlichen Änderungen der App oder der Rechtslage anzupassen. Die jeweils aktuelle Version ist in der App unter Profil -> Datenschutz abrufbar.`;
+Wir behalten uns vor, diese Datenschutzerklärung bei wesentlichen Änderungen der App oder der Rechtslage anzupassen. Die jeweils aktuelle Version ist in der App unter Profil → Datenschutz abrufbar.`;
 
 type Colors = ReturnType<typeof useColors>;
 
