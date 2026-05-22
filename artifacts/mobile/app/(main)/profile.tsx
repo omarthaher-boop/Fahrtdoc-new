@@ -84,9 +84,7 @@ Stand: Mai 2026
 
 Verantwortlich für die Verarbeitung deiner personenbezogenen Daten im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:
 
-FahrtDoc GmbH
-Musterstraße 1
-10115 Berlin
+www.centofai.com
 E-Mail: info@centofai.com
 
 2. WELCHE DATEN WIR ERHEBEN
