@@ -85,22 +85,17 @@ async function exportCSVWeb(trips: Trip[], user?: UserProfile | null, dateFrom?:
 }
 
 async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, filename = "Fahrtenbuch.csv"): Promise<void> {
-  const { File, Paths } = await import("expo-file-system");
-  const Sharing = await import("expo-sharing");
-
+  const FileSystem = await import("expo-file-system");
   const csv = buildCSV(trips, user, dateFrom, dateTo);
-  const file = new File(Paths.cache, filename);
-  file.write("\uFEFF" + csv);
-  const fileUri = file.uri;
+  const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+  await FileSystem.writeAsStringAsync(fileUri, "\uFEFF" + csv, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
 
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (isAvailable) {
-    await Sharing.shareAsync(fileUri, {
-      mimeType: "text/csv",
-      dialogTitle: "CSV exportieren",
-      UTI: "public.comma-separated-values-text",
-    });
-  } else {
+  const { Share } = await import("react-native");
+  try {
+    await Share.share({ url: fileUri, title: "CSV exportieren" });
+  } catch {
     Alert.alert(
       "CSV erstellt",
       "Die Datei wurde gespeichert, aber das Teilen ist auf diesem Gerät nicht verfügbar.",
@@ -1018,15 +1013,10 @@ async function exportPDFNative(
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  const Sharing = await import("expo-sharing");
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (isAvailable) {
-    await Sharing.shareAsync(fileUri, {
-      mimeType: "application/pdf",
-      dialogTitle,
-      UTI: "com.adobe.pdf",
-    });
-  } else {
+  const { Share } = await import("react-native");
+  try {
+    await Share.share({ url: fileUri, title: dialogTitle });
+  } catch {
     Alert.alert(
       "PDF erstellt",
       "Die Datei wurde gespeichert, aber das Teilen ist auf diesem Gerät nicht verfügbar.",

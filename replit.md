@@ -38,6 +38,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
+- **`expo-print` und `expo-sharing` beide entfernt** — beide rufen `getPathPermissions` auf `EXFileSystemInterface` auf, das in `expo-file-system ~19.x` entfernt wurde → Xcode Build-Fehler. Ersatz: `jspdf` + `FileSystem.writeAsStringAsync` für Datei-Erzeugung, React Native `Share.share({ url })` für das Teilen.
 - **`expo-file-system` muss auf SDK-Version passen** — `expo-file-system ^55.x` ist für SDK 55; bei `expo ~54.x` muss `expo-file-system ~17.0.1` verwendet werden. Neuere Versionen entfernen `getPathPermissions`, das `expo-print` und `expo-sharing` noch benötigen → Xcode Build-Fehler.
 - **Keine custom Config-Plugins für EAS-Builds** — `artifacts/mobile/plugins/` darf keine Dateien enthalten, die `require('@expo/config-plugins')` verwenden. Im pnpm-Workspace läuft `npm install` nicht (wegen `catalog:`-Protokoll), und EAS findet die Abhängigkeit nicht. Stattdessen immer native Expo-Felder in `app.json` nutzen (z.B. `ios.privacyManifests`, `ios.infoPlist`) oder Plugins ohne externe Imports schreiben.
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen, um lokale Änderungen zu verwerfen und dann zu aktualisieren.
