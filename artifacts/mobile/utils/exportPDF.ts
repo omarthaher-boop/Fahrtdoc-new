@@ -725,16 +725,302 @@ async function exportPDFNative(
   dialogTitle = "Fahrtenbuch exportieren",
   typeLabel?: string
 ): Promise<void> {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  const totalKm = trips.reduce((a, t) => a + t.km, 0);
+  const totalDur = trips.reduce((a, t) => a + t.dur, 0);
+  const dateRange = getDateRange(trips, dateFrom, dateTo);
+  const bizTripsN = trips.filter((t) => t.type === "business");
+  const prvTripsN = trips.filter((t) => t.type === "private");
+  const bizKmN = bizTripsN.reduce((a, t) => a + t.km, 0);
+  const prvKmN = prvTripsN.reduce((a, t) => a + t.km, 0);
+  const bizKmPctN = totalKm > 0 ? Math.round((bizKmN / totalKm) * 100) : 0;
+  const prvKmPctN = totalKm > 0 ? 100 - bizKmPctN : 0;
+  const exportedAt = new Date().toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const pageW = 297;
+  const margin = 16;
+  const contentW = pageW - margin * 2;
+  let y = 20;
+
+  const navy = [26, 43, 107] as const;
+  const white = [255, 255, 255] as const;
+  const lightBlue = [240, 243, 250] as const;
+  const gray = [136, 136, 136] as const;
+
+  const brandLabel = user?.companyName || "FahrtDoc";
+  const subLabel = typeLabel ?? "Fahrtenbuch";
+
   const appLogo = await getAppLogoBase64();
-  const html = buildHTML(trips, user, dateFrom, dateTo, typeLabel, appLogo);
-  const Print = await import("expo-print");
+
+  // User company logo (native: fixed dimensions, no DOM needed)
+  if (user?.logoUri) {
+    try {
+      const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
+      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
+      doc.addImage(user.logoUri, fmt, margin, y, 36, 14);
+      y += 16;
+    } catch {
+      // skip logo if loading fails
+    }
+  }
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text(brandLabel, margin, y);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90, 106, 154);
+  doc.text(subLabel, margin, y + 6);
+
+  // App logo top-right (native: fixed dimensions)
+  if (appLogo) {
+    try {
+      const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
+      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
+      doc.addImage(appLogo, fmt, pageW - margin - 20, y - 4, 20, 14);
+    } catch {
+      // skip if loading fails
+    }
+  }
+
+  doc.setFontSize(9);
+  doc.setTextColor(68, 68, 68);
+  const metaLines: string[] = [];
+  if (user?.name) metaLines.push(user.name);
+  if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
+  metaLines.push(`Zeitraum: ${dateRange}`);
+  const metaStartY = appLogo ? y + 12 : y;
+  metaLines.forEach((line, i) => {
+    doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
+  });
+
+  y += 14;
+  doc.setDrawColor(...navy);
+  doc.setLineWidth(0.7);
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+
+  doc.setFillColor(...lightBlue);
+  doc.roundedRect(margin, y, contentW, 16, 3, 3, "F");
+  const summaryItemsN = [
+    { label: "FAHRTEN", value: `${trips.length}` },
+    { label: "GESAMTSTRECKE", value: `${totalKm.toFixed(1)} km` },
+    { label: "FAHRZEIT GESAMT", value: fmtDur(totalDur) },
+  ];
+  summaryItemsN.forEach((item, i) => {
+    const x = margin + 8 + i * (contentW / 3);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(102, 102, 102);
+    doc.text(item.label, x, y + 5);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...navy);
+    doc.text(item.value, x, y + 12);
+  });
+  y += 22;
+
+  const statH = 22;
+  const halfW = (contentW - 6) / 2;
+
+  doc.setFillColor(240, 243, 250);
+  doc.roundedRect(margin, y, halfW, statH, 2, 2, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 106, 154);
+  doc.text("GESCHÄFTLICH", margin + 4, y + 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text(`${bizKmN.toFixed(1)} km`, margin + 4, y + 12);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(102, 102, 102);
+  doc.text(`${bizTripsN.length} Fahrten  |  ${bizKmPctN}% der Strecke`, margin + 4, y + 18);
+
+  const prvX = margin + halfW + 6;
+  doc.setFillColor(250, 251, 253);
+  doc.roundedRect(prvX, y, halfW, statH, 2, 2, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 106, 154);
+  doc.text("PRIVAT", prvX + 4, y + 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text(`${prvKmN.toFixed(1)} km`, prvX + 4, y + 12);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(102, 102, 102);
+  doc.text(`${prvTripsN.length} Fahrten  |  ${prvKmPctN}% der Strecke`, prvX + 4, y + 18);
+
+  y += statH + 3;
+  doc.setFillColor(232, 234, 240);
+  doc.roundedRect(margin, y, contentW, 3, 1, 1, "F");
+  if (bizKmPctN > 0) {
+    doc.setFillColor(...navy);
+    doc.rect(margin, y, (contentW * bizKmPctN) / 100, 3, "F");
+  }
+  y += 8;
+
+  const colWidths = [26, 20, 70, 70, 28, 28, 17];
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "GPS-Strecke", "Kurzeste Route", "Dauer"];
+  const rowH = 8;
+  const pageH = 210;
+  const bottomMargin = 20;
+
+  const drawTableHeader = (atY: number): number => {
+    doc.setFillColor(...navy);
+    doc.rect(margin, atY, contentW, rowH, "F");
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...white);
+    let cx = margin + 2;
+    headers.forEach((h, i) => {
+      if (i >= 4) {
+        doc.text(h, cx + colWidths[i] - 4, atY + 5.5, { align: "right" });
+      } else {
+        doc.text(h, cx, atY + 5.5);
+      }
+      cx += colWidths[i];
+    });
+    return atY + rowH;
+  };
+
+  y = drawTableHeader(y);
+
+  let pageRowIdx = 0;
+  doc.setFontSize(8.5);
+  trips.forEach((t) => {
+    if (y + rowH > pageH - bottomMargin) {
+      doc.addPage();
+      y = 20;
+      y = drawTableHeader(y);
+      pageRowIdx = 0;
+    }
+    const even = pageRowIdx % 2 === 1;
+    pageRowIdx++;
+    if (even) {
+      doc.setFillColor(248, 249, 252);
+      doc.rect(margin, y, contentW, rowH, "F");
+    }
+    doc.setDrawColor(232, 234, 240);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + rowH, margin + contentW, y + rowH);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(17, 17, 17);
+    const cells = [
+      fmtDate(t.date),
+      fmtType(t.type),
+      t.startAddr,
+      t.endAddr,
+      t.km.toFixed(1),
+      t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
+      fmtDur(t.dur),
+    ];
+    let cellX = margin + 2;
+    cells.forEach((cell, i) => {
+      const isNum = i >= 4;
+      const maxChars = Math.floor(colWidths[i] * 1.8);
+      const truncated = cell.length > maxChars ? cell.slice(0, maxChars - 1) + "…" : cell;
+      if (isNum) {
+        doc.text(truncated, cellX + colWidths[i] - 4, y + 5.5, { align: "right" });
+      } else {
+        doc.text(truncated, cellX, y + 5.5);
+      }
+      cellX += colWidths[i];
+    });
+    y += rowH;
+
+    if (t.waypoints && t.waypoints.length > 0) {
+      t.waypoints.forEach((wp, wpIdx) => {
+        const hasNote = !!wp.note;
+        const wpRowH = hasNote ? rowH + 5 : rowH;
+        if (y + wpRowH > pageH - bottomMargin) {
+          doc.addPage();
+          y = 20;
+          y = drawTableHeader(y);
+        }
+        const wpX = margin + 2 + colWidths[0] + colWidths[1];
+        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(90, 106, 154);
+        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${wp.addr}`;
+        const truncated = waypointLabel.length > maxChars ? waypointLabel.slice(0, maxChars - 1) + "…" : waypointLabel;
+        doc.text(truncated, wpX, y + 5);
+        if (hasNote) {
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "italic");
+          doc.setTextColor(136, 136, 136);
+          const noteTruncated = wp.note!.length > maxChars ? wp.note!.slice(0, maxChars - 1) + "…" : wp.note!;
+          doc.text(`    ${noteTruncated}`, wpX, y + 10);
+        }
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(17, 17, 17);
+        doc.setDrawColor(232, 234, 240);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y + wpRowH, margin + contentW, y + wpRowH);
+        y += wpRowH;
+      });
+    }
+  });
+
+  const totalsH = rowH + 1;
+  if (y + totalsH + 12 > pageH - bottomMargin) {
+    doc.addPage();
+    y = 20;
+  }
+  doc.setFillColor(...navy);
+  doc.rect(margin, y, contentW, totalsH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...white);
+  doc.setFontSize(9);
+  doc.text("Gesamt", margin + 2, y + 6);
+  let totX = margin + 2;
+  colWidths.slice(0, 4).forEach((w) => { totX += w; });
+  doc.text(`${totalKm.toFixed(1)} km`, totX + colWidths[4] - 4, y + 6, { align: "right" });
+  totX += colWidths[4];
+  const totalKmRouteN = trips.some((t) => t.kmRoute !== undefined)
+    ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
+    : null;
+  doc.text(
+    totalKmRouteN !== null ? `${totalKmRouteN.toFixed(1)} km` : "-",
+    totX + colWidths[5] - 4,
+    y + 6,
+    { align: "right" }
+  );
+  totX += colWidths[5];
+  doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
+  y += totalsH + 10;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...gray);
+  doc.text(`${brandLabel} · ${subLabel}-Export`, margin, y);
+  doc.text(`Erstellt am ${exportedAt}`, pageW - margin, y, { align: "right" });
+
+  // Save to temp file and share
+  const pdfBase64 = doc.output("datauristring").split(",")[1];
+  const { File, Paths } = await import("expo-file-system");
+  const filename = `Fahrtenbuch_${Date.now()}.pdf`;
+  const file = new File(Paths.cache, filename);
+  await file.write(pdfBase64, "base64");
+  const fileUri = file.uri;
+
   const Sharing = await import("expo-sharing");
-
-  const { uri } = await Print.printToFileAsync({ html });
   const isAvailable = await Sharing.isAvailableAsync();
-
   if (isAvailable) {
-    await Sharing.shareAsync(uri, {
+    await Sharing.shareAsync(fileUri, {
       mimeType: "application/pdf",
       dialogTitle,
       UTI: "com.adobe.pdf",
