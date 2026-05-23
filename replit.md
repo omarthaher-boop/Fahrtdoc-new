@@ -19,29 +19,61 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
+- Mobile: Expo SDK ~54, React Native 0.81.5, Expo Router ~6
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mobile/` — Expo React Native App (Bundle ID: `com.fahrtdoc.app`)
+- `artifacts/api-server/` — Express 5 API
+- `artifacts/mobile/utils/exportPDF.ts` — PDF/CSV-Export-Logik
+- `artifacts/mobile/context/AppContext.tsx` — globaler App-State
+- `artifacts/mobile/context/LanguageContext.tsx` — DE/EN-Übersetzungen
+- `lib/db/src/schema/` — Datenbankschema (Drizzle)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- PDF/CSV-Export läuft vollständig in JavaScript (jspdf + FileSystem.writeAsStringAsync + RN Share) — keine nativen Expo-Module, die Xcode-Build-Konflikte verursachen.
+- Privacy Manifest ist direkt in `app.json` unter `ios.privacyManifests` definiert — kein custom Config-Plugin.
+- Passwort-Reset und E-Mail-Änderung über 2-Schritt-OTP-Flow (Backend: `/api/auth/request-*` + `/api/auth/confirm-*`).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Automatische Fahrterfassung per GPS im Hintergrund
+- Manuelle Fahrtbearbeitung mit Zwischenstopps
+- PDF und CSV Export des Fahrtenbuchs
+- Sync mit Backend (Trips, Profil)
+- DSGVO-konform, DE/EN Sprache wählbar
+- iOS App Store Build via EAS
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Alle Änderungen sofort auf GitHub pushen (`omarthaher-boop/Fahrtdoc-new`, main)
+- Probleme und Learnings immer in replit.md unter Gotchas festhalten
+- Keine unnötigen Rückfragen — Probleme direkt lösen
 
-## Gotchas
+## Gotchas — EAS iOS Build
 
-- **`expo-print` und `expo-sharing` beide entfernt** — beide rufen `getPathPermissions` auf `EXFileSystemInterface` auf, das in `expo-file-system ~19.x` entfernt wurde → Xcode Build-Fehler. Ersatz: `jspdf` + `FileSystem.writeAsStringAsync` für Datei-Erzeugung, React Native `Share.share({ url })` für das Teilen.
-- **`expo-file-system` muss auf SDK-Version passen** — `expo-file-system ^55.x` ist für SDK 55; bei `expo ~54.x` muss `expo-file-system ~17.0.1` verwendet werden. Neuere Versionen entfernen `getPathPermissions`, das `expo-print` und `expo-sharing` noch benötigen → Xcode Build-Fehler.
-- **Keine custom Config-Plugins für EAS-Builds** — `artifacts/mobile/plugins/` darf keine Dateien enthalten, die `require('@expo/config-plugins')` verwenden. Im pnpm-Workspace läuft `npm install` nicht (wegen `catalog:`-Protokoll), und EAS findet die Abhängigkeit nicht. Stattdessen immer native Expo-Felder in `app.json` nutzen (z.B. `ios.privacyManifests`, `ios.infoPlist`) oder Plugins ohne externe Imports schreiben.
-- **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen, um lokale Änderungen zu verwerfen und dann zu aktualisieren.
+- **`expo-print` und `expo-sharing` NICHT verwenden** — beide rufen `getPathPermissions` auf `EXFileSystemInterface` auf, das in `expo-file-system ~19.x` entfernt wurde → Xcode-Fehler `has no member 'getPathPermissions'`. Ersatz: `jspdf` + `FileSystem.writeAsStringAsync` + React Native `Share.share({ url })`.
+
+- **Keine nativen Expo-Module mit `EXFileSystemInterface`** — bei SDK 54 + `expo-file-system ~19.x` wurden mehrere Swift-Interface-Methoden entfernt. Vor jedem neuen nativen Paket prüfen ob es `getPathPermissions`, `read`, oder andere alte `EXFileSystemInterface`-Methoden nutzt.
+
+- **`expo-dev-client` Versionsschema** — ab SDK 52 nutzt Expo das alte Versionsschema: `expo-dev-client ~6.x` entspricht SDK 54, NICHT `^56.x`. Falsche Version → `cannot find 'ExpoAppDelegate' in scope`.
+
+- **Alle Paketversionen müssen zum SDK passen** — `expo start` zeigt beim Start Warnungen mit den erwarteten Versionen. Diese immer sofort korrigieren. Für SDK 54: `expo-file-system ~19.0.x`, `expo-dev-client ~6.0.x`.
+
+- **Keine custom Config-Plugins mit externen `require()`** — `artifacts/mobile/plugins/` darf keine Dateien enthalten, die `require('@expo/config-plugins')` verwenden. Im pnpm-Workspace schlägt `npm install` fehl (wegen `catalog:`-Protokoll). Stattdessen native `app.json`-Felder nutzen (`ios.privacyManifests`, `ios.infoPlist`).
+
+- **Lockfile nach jeder `package.json`-Änderung aktualisieren** — nach Versionsänderungen immer `pnpm install --filter @workspace/mobile` lokal ausführen und den aktualisierten `pnpm-lock.yaml` committen. EAS Build verwendet den Lockfile, nicht `package.json` direkt.
+
+## Gotchas — Git / GitHub Workflow
+
+- **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
+- **EAS braucht aktuellen GitHub-Stand**: Immer erst pushen, dann `git checkout -- . && git pull` auf dem Mac, dann `eas build` starten.
+
+## Gotchas — Lokale Entwicklung
+
+- **Metro-Cache nach Paketentfernungen leeren**: Workflow neu starten nach `expo-print`/`expo-sharing`-Entfernung, sonst `Requiring unknown module "1650"`.
+- **`expo-notifications ~0.32.17` existiert nicht** — bei `expo ~54.x` bleibt es bei `~0.29.14` (funktioniert, auch wenn Expo CLI warnt).
 
 ## Pointers
 
