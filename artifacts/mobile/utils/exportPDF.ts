@@ -1011,11 +1011,12 @@ async function exportPDFNative(
 
   // Save to temp file and share
   const pdfBase64 = doc.output("datauristring").split(",")[1];
-  const { File, Paths } = await import("expo-file-system");
+  const FileSystem = await import("expo-file-system");
   const filename = `Fahrtenbuch_${Date.now()}.pdf`;
-  const file = new File(Paths.cache, filename);
-  await file.write(pdfBase64, "base64");
-  const fileUri = file.uri;
+  const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+  await FileSystem.writeAsStringAsync(fileUri, pdfBase64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 
   const Sharing = await import("expo-sharing");
   const isAvailable = await Sharing.isAvailableAsync();
