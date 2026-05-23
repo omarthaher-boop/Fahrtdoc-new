@@ -12,9 +12,6 @@
       },
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_DOMAIN": ""
       }
     },
     "development-device": {
