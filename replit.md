@@ -1,6 +1,6 @@
-# [Project name]
+# FahrtDoc
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernachweis exportieren, DSGVO-konform.
 
 ## Run & Operate
 
@@ -38,7 +38,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- **Keine custom Config-Plugins für EAS-Builds** — `artifacts/mobile/plugins/` darf keine Dateien enthalten, die `require('@expo/config-plugins')` verwenden. Im pnpm-Workspace läuft `npm install` nicht (wegen `catalog:`-Protokoll), und EAS findet die Abhängigkeit nicht. Stattdessen immer native Expo-Felder in `app.json` nutzen (z.B. `ios.privacyManifests`, `ios.infoPlist`) oder Plugins ohne externe Imports schreiben.
+- **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen, um lokale Änderungen zu verwerfen und dann zu aktualisieren.
 
 ## Pointers
 
