@@ -102,7 +102,7 @@ export async function serverRegister(
   }
 }
 
-export async function serverLogin(email: string, password: string): Promise<AuthResult | null> {
+export async function serverLogin(email: string, password: string): Promise<AuthResult | null | "network_error"> {
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
@@ -112,7 +112,7 @@ export async function serverLogin(email: string, password: string): Promise<Auth
     if (!res.ok) return null;
     return res.json();
   } catch {
-    return null;
+    return "network_error";
   }
 }
 

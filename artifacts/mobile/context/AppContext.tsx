@@ -105,7 +105,7 @@ interface AppContextType {
   loading: boolean;
   isSynced: boolean;
   logout: () => Promise<void>;
-  login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password">;
+  login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
   updateProfile: (name: string, plate: string) => Promise<void>;
   updateCompanyInfo: (companyName: string, logoUri: string) => Promise<void>;
@@ -738,7 +738,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (
     email: string,
     password: string
-  ): Promise<"ok" | "not_found" | "wrong_password"> => {
+  ): Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable"> => {
     const key = email.toLowerCase().trim();
     const accounts = await loadAccounts();
     let account = accounts[key];
@@ -751,6 +751,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         // No local account — try server login to support cross-device sync
         const serverResult = await serverLogin(key, password);
+        if (serverResult === "network_error") return "server_unavailable";
         if (!serverResult) return "not_found";
 
         // Server auth succeeded: reconstruct local account from server profile
@@ -815,13 +816,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Sync with server: try login first, then register if not found
     let token: string | null = null;
     const loginResult = await serverLogin(key, password);
-    if (loginResult) {
+    if (loginResult && loginResult !== "network_error") {
       token = loginResult.token;
-    } else {
+    } else if (!loginResult) {
       const registered = await serverRegister(key, account.name, account.plate, password);
       if (registered) {
         const loginAfterRegister = await serverLogin(key, password);
-        if (loginAfterRegister) {
+        if (loginAfterRegister && loginAfterRegister !== "network_error") {
           token = loginAfterRegister.token;
         }
       }
@@ -905,7 +906,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const registered = await serverRegister(key, name, plate, password);
     if (registered) {
       const loginResult = await serverLogin(key, password);
-      if (loginResult) {
+      if (loginResult && loginResult !== "network_error") {
         await secureSetItem(key, serverTokenKey(key), loginResult.token);
         setServerToken(loginResult.token);
         serverTokenRef.current = loginResult.token;

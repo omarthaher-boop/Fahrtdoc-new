@@ -107,6 +107,10 @@ export default function AuthScreen() {
           setError(t("auth.error.wrongPassword"));
           return;
         }
+        if (result === "server_unavailable") {
+          setError(t("auth.error.serverUnavailable"));
+          return;
+        }
       }
       router.replace("/(main)/home");
       if (mode === "login") {
