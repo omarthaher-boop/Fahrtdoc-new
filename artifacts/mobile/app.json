@@ -108,7 +108,6 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      "expo-local-authentication",
       [
         "expo-notifications",
         {
