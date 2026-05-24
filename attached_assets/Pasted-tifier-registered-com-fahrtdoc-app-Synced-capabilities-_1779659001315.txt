@@ -1,0 +1,56 @@
+tifier registered com.fahrtdoc.app
+✔ Synced capabilities: No updates
+✔ Synced capability identifiers: No updates
+✔ Fetched Apple distribution certificates
+✔ Fetched Apple provisioning profiles
+
+Project Credentials Configuration
+
+Project                   @omarthaher85/fahrtdoc
+Bundle Identifier         com.fahrtdoc.app
+                          
+App Store Configuration   
+                          
+Distribution Certificate  
+Serial Number             1514DE6CF476DFA6AF65221F8B60C8BF
+Expiration Date           Sun, 23 May 2027 22:37:29 GMT+0200
+Apple Team                GF4W5GQPWN (Omar Thaher (Individual))
+Updated                   1 day ago
+                          
+Provisioning Profile      
+Developer Portal ID       AL8Z7V7VAU
+Status                    active
+Expiration                Sun, 23 May 2027 22:37:29 GMT+0200
+Apple Team                GF4W5GQPWN (Omar Thaher (Individual))
+Updated                   1 day ago
+                          
+All credentials are ready to build @omarthaher85/fahrtdoc (com.fahrtdoc.app)
+
+✔ Push Notifications are set up
+
+Bumping expo.ios.buildNumber from 5 to 6
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+✔ Compressed project files 1s (22.0 MB)
+✔ Uploaded to EAS 1s
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/omarthaher85/projects/fahrtdoc/builds/31e7acad-d277-48c5-a1ea-1a909c0352fd
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+✔ Build finished
+
+🍏 iOS app:
+https://expo.dev/artifacts/eas/7aqzGNpfmmmBjrY9YzyDvF.ipa
+omarthaher@Omars-MacBook-Pro mobile % eas submit --platform ios                    
+
+
+✔ What would you like to submit? › Select a build from EAS
+? Which build would you like to submit? › - Use arrow-keys. Return to submit.
+    - ID: 31e7acad-d277-48c5-a1ea-1a909c0352fd (1 minute ago)
+    - ID: d0ce0a80-c977-45c8-accb-a89b2bf2e087 (38 minutes ago)
+    - ID: 83d49653-ed62-4da2-b311-203e5d5ee4e9 (2 hours ago)
+    - ID: 5033078b-ba6e-497e-95bc-e36a6efed4d3 (42 minutes ago)
+❯   - None of the above (select another option)
+
+
