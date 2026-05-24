@@ -3,13 +3,16 @@ import { Platform } from "react-native";
 function getApiBase(): string {
   // Explicit API URL (baked in at EAS build time via eas.json env)
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (apiUrl) return apiUrl;
+  if (apiUrl) return apiUrl.replace(/\/+$/, "");
   // Dev: set by the Expo start script in the workflow
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}/api`;
   // Web: use the current origin
   if (Platform.OS === "web" && typeof window !== "undefined") {
     return `${window.location.origin}/api`;
+  }
+  if (!__DEV__) {
+    return "https://api.fahrtdoc.app/api";
   }
   return "http://localhost:8080/api";
 }
@@ -110,25 +113,37 @@ export async function serverLogin(email: string, password: string): Promise<Auth
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) return null;
-    return res.json();
+    const json = await res.json();
+    if (
+      typeof json?.token !== "string" ||
+      typeof json?.email !== "string" ||
+      typeof json?.name !== "string" ||
+      typeof json?.plate !== "string"
+    ) {
+      return "network_error";
+    }
+    return json;
   } catch {
     return "network_error";
   }
 }
 
 export async function fetchServerTrips(token: string): Promise<ApiTrip[] | null> {
+  if (!token) return null;
   try {
     const res = await fetch(`${API_BASE}/trips`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
-    return res.json();
+    const json = await res.json();
+    return Array.isArray(json) ? json : null;
   } catch {
     return null;
   }
 }
 
 export async function serverCreateTrip(token: string, trip: ApiTrip): Promise<boolean> {
+  if (!token || !trip?.id) return false;
   try {
     const res = await fetch(`${API_BASE}/trips`, {
       method: "POST",
@@ -142,6 +157,7 @@ export async function serverCreateTrip(token: string, trip: ApiTrip): Promise<bo
 }
 
 export async function serverUpdateTrip(token: string, id: string, changes: Partial<ApiTrip>): Promise<boolean> {
+  if (!token || !id) return false;
   try {
     const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -155,6 +171,7 @@ export async function serverUpdateTrip(token: string, id: string, changes: Parti
 }
 
 export async function serverDeleteTrip(token: string, id: string): Promise<boolean> {
+  if (!token || !id) return false;
   try {
     const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -167,11 +184,14 @@ export async function serverDeleteTrip(token: string, id: string): Promise<boole
 }
 
 export async function serverBatchUpsertTrips(token: string, trips: ApiTrip[]): Promise<boolean> {
+  if (!token) return false;
+  const validTrips = Array.isArray(trips) ? trips.filter((trip) => trip?.id) : [];
+  if (validTrips.length === 0) return true;
   try {
     const res = await fetch(`${API_BASE}/trips/batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ trips }),
+      body: JSON.stringify({ trips: validTrips }),
     });
     return res.ok;
   } catch {

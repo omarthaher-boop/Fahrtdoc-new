@@ -2,20 +2,21 @@
   "expo": {
     "name": "FahrtDoc",
     "slug": "fahrtdoc",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fahrtdoc",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#F8FAFB"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fahrtdoc.app",
+      "buildNumber": "2",
       "infoPlist": {
         "UIBackgroundModes": ["location"],
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
@@ -90,13 +91,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-dev-client",
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      "expo-router",
       "expo-font",
       "expo-web-browser",
       [

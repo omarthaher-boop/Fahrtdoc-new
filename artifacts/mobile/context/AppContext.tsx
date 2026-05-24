@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { AppState, Platform } from "react-native";
 import * as ExpoCrypto from "expo-crypto";
-import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
+import { secureGetItem, secureSetItem, secureRemoveDataKey, secureGetSession, secureSetSession, secureRemoveSession } from "@/utils/secureStorage";
 import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY } from "@/utils/driveDetect";
@@ -98,6 +98,22 @@ interface SessionRecord {
   email: string;
   nonce: string;
   sessionToken: string;
+}
+
+type DebugEvent =
+  | "LOGIN_START"
+  | "LOGIN_SERVER_SUCCESS"
+  | "SESSION_STORE_START"
+  | "SESSION_STORE_SUCCESS"
+  | "NAVIGATE_HOME"
+  | "FETCH_TRIPS_START"
+  | "FETCH_TRIPS_SUCCESS"
+  | "LOGIN_ERROR";
+
+export function logDebugEvent(event: DebugEvent, details?: Record<string, string | number | boolean>): void {
+  if (__DEV__) {
+    console.info(`[FahrtDoc] ${event}`, details ?? {});
+  }
 }
 
 interface AppContextType {
@@ -263,17 +279,20 @@ async function makeSessionToken(passwordHash: string, nonce: string): Promise<st
 }
 
 async function storeSession(email: string, passwordHash: string): Promise<void> {
+  logDebugEvent("SESSION_STORE_START");
   const nonceBytes = await ExpoCrypto.getRandomBytesAsync(16);
   const nonce = Array.from(nonceBytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
   const sessionToken = await makeSessionToken(passwordHash, nonce);
   const record: SessionRecord = { email, nonce, sessionToken };
-  await AsyncStorage.setItem("session", JSON.stringify(record));
+  await secureSetSession(JSON.stringify(record));
+  await AsyncStorage.removeItem("session");
+  logDebugEvent("SESSION_STORE_SUCCESS");
 }
 
 async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips: Trip[]; serverToken: string | null } | null> {
-  const raw = await AsyncStorage.getItem("session");
+  const raw = await secureGetSession();
   if (!raw) return null;
   let session: SessionRecord;
   try {
@@ -294,8 +313,8 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
   let trips: Trip[] = [];
   if (raw2) {
     try {
-      const parsed: Trip[] = JSON.parse(raw2);
-      if (parsed.length > 0) trips = parsed;
+      const parsed = JSON.parse(raw2);
+      if (Array.isArray(parsed) && parsed.length > 0) trips = parsed;
     } catch {
       // fall back to empty
     }
@@ -361,12 +380,14 @@ const MIN_MOVE_KM = 0.005;
  *   and returned in `localOnly` so the caller can upload them.
  */
 function mergeTrips(
-  localTrips: Trip[],
-  serverApiTrips: ApiTrip[]
+  localTrips: Trip[] | null | undefined,
+  serverApiTrips: ApiTrip[] | null | undefined
 ): { merged: Trip[]; localOnly: Trip[]; waypointPatch: Trip[] } {
-  const serverDeletedIds = new Set(serverApiTrips.filter((t) => t.deleted).map((t) => t.id));
+  const safeLocalTrips = Array.isArray(localTrips) ? localTrips.filter((t) => t?.id) : [];
+  const safeServerTrips = Array.isArray(serverApiTrips) ? serverApiTrips.filter((t) => t?.id) : [];
+  const serverDeletedIds = new Set(safeServerTrips.filter((t) => t.deleted).map((t) => t.id));
   const serverActiveById = new Map(
-    serverApiTrips.filter((t) => !t.deleted).map((t) => [t.id, apiTripToLocal(t)])
+    safeServerTrips.filter((t) => !t.deleted).map((t) => [t.id, apiTripToLocal(t)])
   );
 
   const merged: Trip[] = [];
@@ -376,7 +397,7 @@ function mergeTrips(
 
   const localOnly: Trip[] = [];
   const waypointPatch: Trip[] = [];
-  for (const lt of localTrips) {
+  for (const lt of safeLocalTrips) {
     if (serverDeletedIds.has(lt.id)) continue;
     if (!serverActiveById.has(lt.id)) {
       merged.push(lt);
@@ -450,14 +471,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (result.serverToken) {
             setServerToken(result.serverToken);
             serverTokenRef.current = result.serverToken;
+            logDebugEvent("FETCH_TRIPS_START", { source: "restore" });
             const serverApiTrips = await fetchServerTrips(result.serverToken);
             if (serverApiTrips !== null) {
+              logDebugEvent("FETCH_TRIPS_SUCCESS", { count: serverApiTrips.length, source: "restore" });
               const { merged, localOnly, waypointPatch } = mergeTrips(result.trips, serverApiTrips);
               finalTrips = merged;
               if (localOnly.length > 0) {
-                serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
+                void serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
               } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && result.trips.length > 0) {
-                serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
+                void serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
               }
               if (waypointPatch.length > 0) {
                 const patchIds = new Set(waypointPatch.map((t) => t.id));
@@ -467,28 +490,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                     : t
                 );
                 for (const t of waypointPatch) {
-                  serverUpdateTrip(result.serverToken, t.id, { waypoints: t.waypoints }).then((ok) => {
-                    if (ok) {
-                      setTrips((prev) => {
-                        const next = prev.map((tr) =>
-                          tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
-                        );
-                        setUserState((u) => {
-                          if (u) persistTripsLocal(next, u.email);
-                          return u;
+                  void serverUpdateTrip(result.serverToken, t.id, { waypoints: t.waypoints })
+                    .then((ok) => {
+                      if (ok) {
+                        setTrips((prev) => {
+                          const next = prev.map((tr) =>
+                            tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
+                          );
+                          setUserState((u) => {
+                            if (u) void persistTripsLocal(next, u.email);
+                            return u;
+                          });
+                          return next;
                         });
-                        return next;
-                      });
-                    }
-                  });
+                      }
+                    })
+                    .catch(() => {});
                 }
               }
             }
           }
           setTrips(finalTrips);
-          persistTripsLocal(finalTrips, result.profile.email);
+          void persistTripsLocal(finalTrips, result.profile.email);
         }
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -568,7 +594,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setServerToken(null);
     serverTokenRef.current = null;
     const removals: Promise<void>[] = [
-      AsyncStorage.removeItem("session"),
+      secureRemoveSession(),
       AsyncStorage.removeItem(BG_POSITIONS_KEY),
     ];
     if (email) {
@@ -623,7 +649,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     serverTokenRef.current = null;
 
     const removals: Promise<void>[] = [
-      AsyncStorage.removeItem("session"),
+      secureRemoveSession(),
       AsyncStorage.removeItem(BG_POSITIONS_KEY),
       AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "false"),
     ];
@@ -641,8 +667,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await Promise.all(removals);
   }, [user]);
 
-  const persistTripsLocal = useCallback((next: Trip[], email: string) => {
-    secureSetItem(email, tripsKey(email), JSON.stringify(next));
+  const persistTripsLocal = useCallback(async (next: Trip[], email: string): Promise<void> => {
+    await secureSetItem(email, tripsKey(email), JSON.stringify(Array.isArray(next) ? next : []));
   }, []);
 
   useEffect(() => {
@@ -684,12 +710,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               succeededIds.has(t.id) ? { ...t, waypointSyncPending: false } : t
             );
             setUserState((u) => {
-              if (u) persistTripsLocal(next, u.email);
+              if (u) void persistTripsLocal(next, u.email);
               return u;
             });
             return next;
           });
         }
+      }).catch(() => {
+        setSyncRetryingIds(new Set());
+        retryBackoffMsRef.current = Math.min(retryBackoffMsRef.current * 2, 300_000);
       });
     };
 
@@ -705,8 +734,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await secureSetItem(email, serverTokenKey(email), token);
     setServerToken(token);
     serverTokenRef.current = token;
+    logDebugEvent("FETCH_TRIPS_START", { source: "auth" });
     const serverApiTrips = await fetchServerTrips(token);
     if (serverApiTrips !== null) {
+      logDebugEvent("FETCH_TRIPS_SUCCESS", { count: serverApiTrips.length, source: "auth" });
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverApiTrips);
       let result = merged;
       if (localOnly.length > 0) {
@@ -740,6 +771,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     password: string
   ): Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable"> => {
     const key = email.toLowerCase().trim();
+    logDebugEvent("LOGIN_START");
+    try {
     const accounts = await loadAccounts();
     let account = accounts[key];
 
@@ -753,6 +786,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const serverResult = await serverLogin(key, password);
         if (serverResult === "network_error") return "server_unavailable";
         if (!serverResult) return "not_found";
+        logDebugEvent("LOGIN_SERVER_SUCCESS", { source: "remote" });
 
         // Server auth succeeded: reconstruct local account from server profile
         const passwordHash = await sha256Hex(password);
@@ -766,7 +800,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setServerToken(serverResult.token);
         serverTokenRef.current = serverResult.token;
 
+        logDebugEvent("FETCH_TRIPS_START", { source: "login" });
         const serverApiTrips = await fetchServerTrips(serverResult.token);
+        if (serverApiTrips !== null) {
+          logDebugEvent("FETCH_TRIPS_SUCCESS", { count: serverApiTrips.length, source: "login" });
+        }
         let finalTrips: Trip[];
         if (serverApiTrips !== null && serverApiTrips.filter((t) => !t.deleted).length > 0) {
           const { merged } = mergeTrips([], serverApiTrips);
@@ -778,7 +816,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const profile: UserProfile = { name: serverResult.name, email: key, plate: serverResult.plate };
         setUserState(profile);
         setTrips(finalTrips);
-        persistTripsLocal(finalTrips, key);
+        void persistTripsLocal(finalTrips, key);
         return "ok";
       }
     }
@@ -793,8 +831,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let localTrips: Trip[] = [];
     if (raw) {
       try {
-        const parsed: Trip[] = JSON.parse(raw);
-        if (parsed.length > 0) localTrips = parsed;
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) localTrips = parsed;
       } catch {
         // fall back to empty
       }
@@ -802,8 +840,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const oldTrips = await AsyncStorage.getItem("trips");
       if (oldTrips) {
         try {
-          const parsed: Trip[] = JSON.parse(oldTrips);
-          if (parsed.length > 0) {
+          const parsed = JSON.parse(oldTrips);
+          if (Array.isArray(parsed) && parsed.length > 0) {
             localTrips = parsed;
             await secureSetItem(key, tripsKey(key), JSON.stringify(parsed));
           }
@@ -817,6 +855,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let token: string | null = null;
     const loginResult = await serverLogin(key, password);
     if (loginResult && loginResult !== "network_error") {
+      logDebugEvent("LOGIN_SERVER_SUCCESS", { source: "local" });
       token = loginResult.token;
     } else if (!loginResult) {
       const registered = await serverRegister(key, account.name, account.plate, password);
@@ -833,7 +872,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await secureSetItem(key, serverTokenKey(key), token);
       setServerToken(token);
       serverTokenRef.current = token;
-      const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
+      logDebugEvent("FETCH_TRIPS_START", { source: "login" });
+      const serverTrips = await fetchServerTrips(token);
+      if (serverTrips !== null) {
+        logDebugEvent("FETCH_TRIPS_SUCCESS", { count: serverTrips.length, source: "login" });
+      }
+      const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverTrips ?? []);
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
       }
@@ -858,8 +902,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setTrips(finalTrips);
-    persistTripsLocal(finalTrips, key);
+    void persistTripsLocal(finalTrips, key);
     return "ok";
+    } catch {
+      logDebugEvent("LOGIN_ERROR");
+      return "server_unavailable";
+    }
   }, [persistTripsLocal]);
 
   const biometricLogin = useCallback(async (): Promise<"ok" | "no_session"> => {
@@ -875,12 +923,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
         finalTrips = merged;
         if (localOnly.length > 0) {
-          serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
+          void serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
         }
       }
     }
     setTrips(finalTrips);
-    persistTripsLocal(finalTrips, result.profile.email);
+    void persistTripsLocal(finalTrips, result.profile.email);
     return "ok";
   }, [persistTripsLocal]);
 
@@ -1010,29 +1058,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTrips((prev) => {
       const next = [tripToStore, ...prev];
       setUserState((u) => {
-        if (u) persistTripsLocal(next, u.email);
+        if (u) void persistTripsLocal(next, u.email);
         return u;
       });
       return next;
     });
     if (token) {
-      serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
-        if (ok && hasWaypoints) {
-          // Server confirmed the full trip including waypoints — clear pending flag
-          setTrips((prev) => {
-            const next = prev.map((tr) =>
-              tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
-            );
-            setUserState((u) => {
-              if (u) persistTripsLocal(next, u.email);
-              return u;
+      void serverCreateTrip(token, tripToApiPayload(t))
+        .then((ok) => {
+          if (ok && hasWaypoints) {
+            setTrips((prev) => {
+              const next = prev.map((tr) =>
+                tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
+              );
+              setUserState((u) => {
+                if (u) void persistTripsLocal(next, u.email);
+                return u;
+              });
+              return next;
             });
-            return next;
-          });
-        }
-        // If create failed, the trip remains local-only and will be uploaded
-        // on the next successful login/restore merge.
-      });
+          }
+        })
+        .catch(() => {});
     }
   }, [persistTripsLocal]);
 
@@ -1063,20 +1110,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
       setUserState((u) => {
-        if (u) persistTripsLocal(next, u.email);
+        if (u) void persistTripsLocal(next, u.email);
         return u;
       });
       return next;
     });
     const token = serverTokenRef.current;
     if (token) {
-      serverDeleteTrip(token, id).then((ok) => {
-        if (!ok) {
-          // Local state is updated; if the server soft-delete failed, the trip
-          // remains active on the server. Server state will win on the next
-          // merge, so the trip may reappear after re-login on another device.
-        }
-      });
+      void serverDeleteTrip(token, id).catch(() => {});
     }
   }, [persistTripsLocal]);
 
@@ -1084,19 +1125,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTrips((prev) => {
       const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
       setUserState((u) => {
-        if (u) persistTripsLocal(next, u.email);
+        if (u) void persistTripsLocal(next, u.email);
         return u;
       });
       return next;
     });
     const token = serverTokenRef.current;
     if (token) {
-      serverUpdateTrip(token, id, changes).then((ok) => {
-        if (!ok) {
-          // Local state is updated; if the server update failed, the server
-          // retains the old version which will win on the next merge/re-login.
-        }
-      });
+      void serverUpdateTrip(token, id, changes).catch(() => {});
     }
   }, [persistTripsLocal]);
 
@@ -1112,7 +1148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           t.id === id ? { ...t, waypointSyncPending: false } : t
         );
         setUserState((u) => {
-          if (u) persistTripsLocal(next, u.email);
+          if (u) void persistTripsLocal(next, u.email);
           return u;
         });
         return next;

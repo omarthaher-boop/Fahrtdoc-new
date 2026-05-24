@@ -33,13 +33,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api"
+        "EXPO_PUBLIC_API_URL": "https://api.fahrtdoc.app/api"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api"
+        "EXPO_PUBLIC_API_URL": "https://api.fahrtdoc.app/api"
       }
     }
   },

@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync, deleteTrip, editTrip } = useApp();
+  const safeTrips = useMemo(() => (Array.isArray(trips) ? trips : []), [trips]);
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
@@ -58,8 +59,8 @@ export default function HomeScreen() {
   }, [period]);
 
   const periodTrips = useMemo(
-    () => trips.filter((t) => new Date(t.date) >= cutoff),
-    [trips, cutoff]
+    () => safeTrips.filter((t) => t?.date && new Date(t.date) >= cutoff),
+    [safeTrips, cutoff]
   );
 
   const totalKm = useMemo(() => periodTrips.reduce((a, b) => a + b.km, 0), [periodTrips]);
@@ -69,7 +70,7 @@ export default function HomeScreen() {
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
   const openStartModal = (type: "business" | "private") => {
-    if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (Platform.OS !== "web") void Haptics.selectionAsync().catch(() => {});
     setPendingType(type);
     setShowStartModal(true);
   };
@@ -78,9 +79,12 @@ export default function HomeScreen() {
     if (!pendingType) return;
     setStarting(true);
     setShowStartModal(false);
-    await startTrip(pendingType);
-    setStarting(false);
-    setPendingType(null);
+    try {
+      await startTrip(pendingType);
+    } finally {
+      setStarting(false);
+      setPendingType(null);
+    }
   };
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);

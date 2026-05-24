@@ -82,6 +82,37 @@ export async function secureSetItem(email: string, key: string, value: string): 
   localStorage.setItem(key, encrypted);
 }
 
+const nativeSessionKey = "fahrtdoc_session";
+
+export async function secureSetSession(value: string): Promise<void> {
+  if (Platform.OS !== "web") {
+    await SecureStore.setItemAsync(nativeSessionKey, value);
+    return;
+  }
+  localStorage.setItem(nativeSessionKey, value);
+}
+
+export async function secureGetSession(): Promise<string | null> {
+  if (Platform.OS !== "web") {
+    const value = await SecureStore.getItemAsync(nativeSessionKey);
+    if (value !== null) return value;
+    return AsyncStorage.getItem("session");
+  }
+  return localStorage.getItem(nativeSessionKey) ?? AsyncStorage.getItem("session");
+}
+
+export async function secureRemoveSession(): Promise<void> {
+  if (Platform.OS !== "web") {
+    await Promise.all([
+      SecureStore.deleteItemAsync(nativeSessionKey).catch(() => {}),
+      AsyncStorage.removeItem("session").catch(() => {}),
+    ]);
+    return;
+  }
+  localStorage.removeItem(nativeSessionKey);
+  await AsyncStorage.removeItem("session");
+}
+
 export async function secureGetItem(email: string, key: string): Promise<string | null> {
   if (Platform.OS !== "web") {
     const storeKey = await nativeKey(email, key);

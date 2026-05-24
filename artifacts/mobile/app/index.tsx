@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "@/context/AppContext";
+import { logDebugEvent, useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -46,10 +46,10 @@ export default function AuthScreen() {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    (async () => {
+    void (async () => {
       const [enabled, available] = await Promise.all([getFaceIdEnabled(), isBiometricAvailable()]);
       if (enabled && available) setFaceIdVisible(true);
-    })();
+    })().catch(() => {});
   }, []);
 
   const handleFaceIdLogin = async () => {
@@ -59,12 +59,16 @@ export default function AuthScreen() {
       if (!success) return;
       const result = await biometricLogin();
       if (result === "ok") {
+        logDebugEvent("NAVIGATE_HOME", { method: "biometric" });
         router.replace("/(main)/home");
       } else {
         setFaceIdVisible(false);
         await setFaceIdEnabled(false);
         setError("Sitzung abgelaufen. Bitte melde dich mit deinem Passwort an.");
       }
+    } catch {
+      logDebugEvent("LOGIN_ERROR", { source: "biometric" });
+      setError("Face ID Anmeldung fehlgeschlagen. Bitte melde dich mit deinem Passwort an.");
     } finally {
       setFaceIdLoading(false);
     }
@@ -89,7 +93,7 @@ export default function AuthScreen() {
     }
 
     setLoading(true);
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       if (mode === "register") {
         const result = await register(name.trim(), email.trim(), plate.trim(), password);
@@ -112,6 +116,7 @@ export default function AuthScreen() {
           return;
         }
       }
+      logDebugEvent("NAVIGATE_HOME", { method: mode });
       router.replace("/(main)/home");
       if (mode === "login") {
         const [available, asked] = await Promise.all([isBiometricAvailable(), getFaceIdAsked()]);
@@ -132,7 +137,8 @@ export default function AuthScreen() {
           );
         }
       }
-    } catch (e) {
+    } catch {
+      logDebugEvent("LOGIN_ERROR", { source: mode });
       setError("Ein Fehler ist aufgetreten. Bitte versuche es erneut.");
     } finally {
       setLoading(false);
