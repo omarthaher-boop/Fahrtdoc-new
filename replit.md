@@ -81,6 +81,12 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - **Metro-Cache nach Paketentfernungen leeren**: Workflow neu starten nach `expo-print`/`expo-sharing`-Entfernung, sonst `Requiring unknown module "1650"`.
 - **`expo-notifications ~0.32.17` existiert nicht** — bei `expo ~54.x` bleibt es bei `~0.29.14` (funktioniert, auch wenn Expo CLI warnt).
 
+## Gotchas — SMTP / E-Mail
+
+- **Infomaniak SMTP**: Host `mail.infomaniak.com`, Port `587`. `SMTP_USER` = vollständige E-Mail-Adresse (`info@centofai.com`). `SMTP_PASS` = Passwort **des Postfachs** (nicht das Infomaniak-Konto-Passwort) — zu finden unter manager.infomaniak.com → E-Mail & Zusammenarbeit → Postfach → Passwort.
+- **`SMTP_FROM`** ist als Env-Var (nicht Secret) gesetzt: `FahrtDoc <info@centofai.com>`.
+- **Secrets niemals in Git** — SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT leben nur in Replit Secrets und müssen bei neuem Deployment manuell gesetzt werden.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
