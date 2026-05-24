@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -18,12 +19,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  isBiometricAvailable,
+  authenticateWithBiometrics,
+  getFaceIdEnabled,
+  setFaceIdEnabled,
+  getFaceIdAsked,
+  setFaceIdAsked,
+} from "@/utils/biometrics";
 
 export default function AuthScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { login, register } = useApp();
+  const { login, register, biometricLogin } = useApp();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,6 +41,34 @@ export default function AuthScreen() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [faceIdVisible, setFaceIdVisible] = useState(false);
+  const [faceIdLoading, setFaceIdLoading] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    (async () => {
+      const [enabled, available] = await Promise.all([getFaceIdEnabled(), isBiometricAvailable()]);
+      if (enabled && available) setFaceIdVisible(true);
+    })();
+  }, []);
+
+  const handleFaceIdLogin = async () => {
+    setFaceIdLoading(true);
+    try {
+      const success = await authenticateWithBiometrics("Mit Face ID bei FahrtDoc anmelden");
+      if (!success) return;
+      const result = await biometricLogin();
+      if (result === "ok") {
+        router.replace("/(main)/home");
+      } else {
+        setFaceIdVisible(false);
+        await setFaceIdEnabled(false);
+        setError("Sitzung abgelaufen. Bitte melde dich mit deinem Passwort an.");
+      }
+    } finally {
+      setFaceIdLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setError("");
@@ -72,6 +109,25 @@ export default function AuthScreen() {
         }
       }
       router.replace("/(main)/home");
+      if (mode === "login") {
+        const [available, asked] = await Promise.all([isBiometricAvailable(), getFaceIdAsked()]);
+        if (available && !asked) {
+          await setFaceIdAsked();
+          Alert.alert(
+            "Face ID aktivieren",
+            "Möchtest du dich zukünftig schnell und sicher mit Face ID anmelden?",
+            [
+              { text: "Nicht jetzt", style: "cancel" },
+              {
+                text: "Aktivieren",
+                onPress: async () => {
+                  await setFaceIdEnabled(true);
+                },
+              },
+            ]
+          );
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -210,6 +266,25 @@ export default function AuthScreen() {
         <Text style={[styles.hint, { color: colors.mutedForeground }]}>
           {mode === "login" ? t("auth.hint.login") : t("auth.hint.register")}
         </Text>
+
+        {faceIdVisible && mode === "login" && (
+          <TouchableOpacity
+            style={[styles.faceIdBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleFaceIdLogin}
+            disabled={faceIdLoading}
+          >
+            {faceIdLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Feather name="unlock" size={18} color={colors.primary} />
+                <Text style={[styles.faceIdText, { color: colors.primary }]}>
+                  Mit Face ID anmelden
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -357,5 +432,19 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 13,
     textAlign: "center",
+  },
+  faceIdBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 15,
+    marginTop: 4,
+  },
+  faceIdText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

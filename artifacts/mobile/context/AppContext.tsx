@@ -116,6 +116,7 @@ interface AppContextType {
   requestEmailChangeCode: (newEmail: string) => Promise<{ success: boolean; error?: string }>;
   confirmEmailChange: (code: string, newEmail: string) => Promise<{ success: boolean; error?: string }>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
+  biometricLogin: () => Promise<"ok" | "no_session">;
   trips: Trip[];
   syncRetryingIds: ReadonlySet<string>;
   addTrip: (t: Trip) => void;
@@ -860,6 +861,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return "ok";
   }, [persistTripsLocal]);
 
+  const biometricLogin = useCallback(async (): Promise<"ok" | "no_session"> => {
+    const result = await verifyAndRestoreSession();
+    if (!result) return "no_session";
+    setUserState(result.profile);
+    let finalTrips = result.trips;
+    if (result.serverToken) {
+      setServerToken(result.serverToken);
+      serverTokenRef.current = result.serverToken;
+      const serverApiTrips = await fetchServerTrips(result.serverToken);
+      if (serverApiTrips !== null) {
+        const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
+        finalTrips = merged;
+        if (localOnly.length > 0) {
+          serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
+        }
+      }
+    }
+    setTrips(finalTrips);
+    persistTripsLocal(finalTrips, result.profile.email);
+    return "ok";
+  }, [persistTripsLocal]);
+
   const register = useCallback(async (
     name: string,
     email: string,
@@ -1369,6 +1392,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isSynced: serverToken !== null,
         logout,
         deleteAccount,
+        biometricLogin,
         login,
         register,
         updateProfile,

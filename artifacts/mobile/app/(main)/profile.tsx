@@ -3,6 +3,13 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  isBiometricAvailable,
+  authenticateWithBiometrics,
+  getFaceIdEnabled,
+  setFaceIdEnabled,
+  FACE_ID_PREF_KEY,
+} from "@/utils/biometrics";
+import {
   Alert,
   KeyboardAvoidingView,
   Linking,
@@ -338,6 +345,9 @@ export default function ProfileScreen() {
   const [editVehicleYear, setEditVehicleYear] = useState(user?.vehicleYear ?? "");
   const [editVehicleColor, setEditVehicleColor] = useState(user?.vehicleColor ?? "");
 
+  const [faceIdEnabled, setFaceIdEnabledState] = useState(false);
+  const [faceIdAvailable, setFaceIdAvailable] = useState(false);
+
   const [notifGeneral, setNotifGeneral] = useState(true);
   const [notifTrips, setNotifTrips] = useState(true);
   const [notifTracking, setNotifTracking] = useState(true);
@@ -371,7 +381,7 @@ export default function ProfileScreen() {
         PREF.trackingPaused, PREF.defaultTripType,
         PREF.notifGeneral, PREF.notifTrips, PREF.notifTracking, PREF.notifGps,
         PREF.notifOffline, PREF.notifSync, PREF.notifLogin, PREF.notifPrivacy,
-        PREF.notifDriveRemind,
+        PREF.notifDriveRemind, FACE_ID_PREF_KEY,
       ]);
       const m = Object.fromEntries(vals);
       if (m[PREF.autoTracking] !== null) setAutoTracking(m[PREF.autoTracking] === "true");
@@ -389,6 +399,11 @@ export default function ProfileScreen() {
       if (m[PREF.notifLogin] !== null) setNotifLogin(m[PREF.notifLogin] === "true");
       if (m[PREF.notifPrivacy] !== null) setNotifDatenschutz(m[PREF.notifPrivacy] === "true");
       if (m[PREF.notifDriveRemind] !== null) setNotifDriveRemind(m[PREF.notifDriveRemind] === "true");
+      if (m[FACE_ID_PREF_KEY] !== null) setFaceIdEnabledState(m[FACE_ID_PREF_KEY] === "true");
+      if (Platform.OS !== "web") {
+        const available = await isBiometricAvailable();
+        setFaceIdAvailable(available);
+      }
     };
     load();
   }, []);
@@ -423,6 +438,27 @@ export default function ProfileScreen() {
   const handleNotifSync = useCallback((v: boolean) => { setNotifSync(v); savePref(PREF.notifSync, v); }, [savePref]);
   const handleNotifLogin = useCallback((v: boolean) => { setNotifLogin(v); savePref(PREF.notifLogin, v); }, [savePref]);
   const handleNotifDatenschutz = useCallback((v: boolean) => { setNotifDatenschutz(v); savePref(PREF.notifPrivacy, v); }, [savePref]);
+
+  const handleFaceIdToggle = useCallback(async (v: boolean) => {
+    if (v) {
+      const available = await isBiometricAvailable();
+      if (!available) {
+        Alert.alert(
+          language === "de" ? "Nicht verfügbar" : "Not available",
+          language === "de"
+            ? "Face ID ist auf diesem Gerät nicht eingerichtet. Bitte richte Face ID in den Geräteeinstellungen ein."
+            : "Face ID is not set up on this device. Please configure Face ID in your device settings."
+        );
+        return;
+      }
+      const success = await authenticateWithBiometrics(
+        language === "de" ? "Face ID für FahrtDoc aktivieren" : "Enable Face ID for FahrtDoc"
+      );
+      if (!success) return;
+    }
+    setFaceIdEnabledState(v);
+    await setFaceIdEnabled(v);
+  }, [language]);
 
   const handleNotifDriveRemind = useCallback(async (v: boolean) => {
     if (Platform.OS === "web") return;
@@ -766,6 +802,17 @@ export default function ProfileScreen() {
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="lock" label={t("row.changePassword")} onPress={openPwModal} colors={colors} showDivider />
             <ListRow icon="mail" label={t("row.changeEmail")} onPress={openEmModal} colors={colors} showDivider />
+            {faceIdAvailable && (
+              <ToggleRow
+                icon="unlock"
+                label={t("row.faceId")}
+                description={language === "de" ? "Schnell und sicher per Face ID anmelden" : "Sign in quickly and securely with Face ID"}
+                value={faceIdEnabled}
+                onValueChange={handleFaceIdToggle}
+                showDivider
+                colors={colors}
+              />
+            )}
             <ListRow icon="shield" label={t("row.privacy")} onPress={() => setPrivacyModalVisible(true)} colors={colors} />
           </View>
 
