@@ -802,12 +802,16 @@ export default function ProfileScreen() {
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="lock" label={t("row.changePassword")} onPress={openPwModal} colors={colors} showDivider />
             <ListRow icon="mail" label={t("row.changeEmail")} onPress={openEmModal} colors={colors} showDivider />
-            {faceIdAvailable && (
+            {Platform.OS !== "web" && (
               <ToggleRow
                 icon="unlock"
                 label={t("row.faceId")}
-                description={language === "de" ? "Schnell und sicher per Face ID anmelden" : "Sign in quickly and securely with Face ID"}
-                value={faceIdEnabled}
+                description={
+                  faceIdAvailable
+                    ? (language === "de" ? "Schnell und sicher per Face ID anmelden" : "Sign in quickly and securely with Face ID")
+                    : (language === "de" ? "Face ID ist auf diesem Gerät nicht eingerichtet" : "Face ID is not set up on this device")
+                }
+                value={faceIdEnabled && faceIdAvailable}
                 onValueChange={handleFaceIdToggle}
                 showDivider
                 colors={colors}

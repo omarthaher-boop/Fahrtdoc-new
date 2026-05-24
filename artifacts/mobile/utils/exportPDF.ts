@@ -1,4 +1,4 @@
-import { Platform, Alert } from "react-native";
+import { Platform, Alert, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import type { Trip, UserProfile } from "@/context/AppContext";
 
@@ -92,7 +92,6 @@ async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFro
     encoding: FileSystem.EncodingType.UTF8,
   });
 
-  const { Share } = await import("react-native");
   try {
     await Share.share({ url: fileUri, title: "CSV exportieren" });
   } catch {
@@ -1012,7 +1011,6 @@ async function exportPDFNative(
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  const { Share } = await import("react-native");
   try {
     await Share.share({ url: fileUri, title: dialogTitle });
   } catch {

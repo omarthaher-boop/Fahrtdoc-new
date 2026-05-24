@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import * as LocalAuthentication from "expo-local-authentication";
 
 export const FACE_ID_PREF_KEY = "pref_face_id_enabled";
 export const FACE_ID_ASKED_KEY = "pref_face_id_asked";
@@ -7,10 +8,9 @@ export const FACE_ID_ASKED_KEY = "pref_face_id_asked";
 export async function isBiometricAvailable(): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
-    const LA = await import("expo-local-authentication");
     const [hardware, enrolled] = await Promise.all([
-      LA.hasHardwareAsync(),
-      LA.isEnrolledAsync(),
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
     ]);
     return hardware && enrolled;
   } catch {
@@ -21,8 +21,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
 export async function authenticateWithBiometrics(promptMessage: string): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
-    const LA = await import("expo-local-authentication");
-    const result = await LA.authenticateAsync({
+    const result = await LocalAuthentication.authenticateAsync({
       promptMessage,
       fallbackLabel: "Passwort verwenden",
       cancelLabel: "Abbrechen",
