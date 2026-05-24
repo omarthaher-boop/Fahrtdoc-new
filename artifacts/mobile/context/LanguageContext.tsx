@@ -226,6 +226,11 @@ const de: Record<string, string> = {
   "trip.syncPending": "Route sync",
   "trip.syncRetrying": "Wird sync…",
   "trip.syncFailed": "Sync fehlgeschlagen – bitte erneut versuchen",
+  "export.error.title": "Exportfehler",
+  "export.error.storage": "Nicht genug Speicherplatz. Bitte gib Speicher frei und versuche es erneut.",
+  "export.error.permission": "Kein Zugriff auf den Speicher. Bitte prüfe die App-Berechtigungen.",
+  "export.error.unknown": "Export fehlgeschlagen. Bitte versuche es erneut.",
+  "export.error.retry": "Erneut versuchen",
 };
 
 const en: Record<string, string> = {
@@ -450,6 +455,11 @@ const en: Record<string, string> = {
   "trip.syncPending": "Route sync",
   "trip.syncRetrying": "Syncing…",
   "trip.syncFailed": "Sync failed – please try again",
+  "export.error.title": "Export Error",
+  "export.error.storage": "Not enough storage space. Please free up some space and try again.",
+  "export.error.permission": "Storage access denied. Please check app permissions.",
+  "export.error.unknown": "Export failed. Please try again.",
+  "export.error.retry": "Try Again",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

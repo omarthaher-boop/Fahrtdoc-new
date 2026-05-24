@@ -1,6 +1,48 @@
 import { Platform, Alert, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import type { Trip, UserProfile } from "@/context/AppContext";
+import type { Language } from "@/context/LanguageContext";
+
+// ─── Export error messages ────────────────────────────────────────────────────
+
+const exportErrors: Record<Language, Record<string, string>> = {
+  de: {
+    title: "Exportfehler",
+    storage: "Nicht genug Speicherplatz. Bitte gib Speicher frei und versuche es erneut.",
+    permission: "Kein Zugriff auf den Speicher. Bitte prüfe die App-Berechtigungen.",
+    unknown: "Export fehlgeschlagen. Bitte versuche es erneut.",
+    retry: "Erneut versuchen",
+  },
+  en: {
+    title: "Export Error",
+    storage: "Not enough storage space. Please free up some space and try again.",
+    permission: "Storage access denied. Please check app permissions.",
+    unknown: "Export failed. Please try again.",
+    retry: "Try Again",
+  },
+};
+
+function getExportErrorMessage(err: unknown, lang: Language): string {
+  const msgs = exportErrors[lang];
+  const raw = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  if (raw.includes("no space") || raw.includes("enospc") || raw.includes("not enough space") || raw.includes("quota")) {
+    return msgs.storage;
+  }
+  if (raw.includes("permission") || raw.includes("eperm") || raw.includes("eacces") || raw.includes("not permitted")) {
+    return msgs.permission;
+  }
+  return msgs.unknown;
+}
+
+function showExportError(err: unknown, lang: Language, retry: () => void): void {
+  const msgs = exportErrors[lang];
+  const message = getExportErrorMessage(err, lang);
+  console.error("[exportPDF] Export failed:", err instanceof Error ? err.message : String(err));
+  Alert.alert(msgs.title, message, [
+    { text: "OK", style: "cancel" },
+    { text: msgs.retry, onPress: retry },
+  ]);
+}
 
 // ─── CSV helpers ─────────────────────────────────────────────────────────────
 
@@ -95,15 +137,11 @@ async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFro
   try {
     await Share.share({ url: fileUri, title: "CSV exportieren" });
   } catch {
-    Alert.alert(
-      "CSV erstellt",
-      "Die Datei wurde gespeichert, aber das Teilen ist auf diesem Gerät nicht verfügbar.",
-      [{ text: "OK" }]
-    );
+    // Share dismissed or unavailable — not an error worth surfacing
   }
 }
 
-export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string): Promise<void> {
+export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, lang: Language = "de"): Promise<void> {
   if (trips.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
     return;
@@ -111,7 +149,11 @@ export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFr
   if (Platform.OS === "web") {
     await exportCSVWeb(trips, user, dateFrom, dateTo);
   } else {
-    await exportCSVNative(trips, user, dateFrom, dateTo);
+    try {
+      await exportCSVNative(trips, user, dateFrom, dateTo);
+    } catch (err) {
+      showExportError(err, lang, () => exportCSV(trips, user, dateFrom, dateTo, lang));
+    }
   }
 }
 
@@ -1014,11 +1056,7 @@ async function exportPDFNative(
   try {
     await Share.share({ url: fileUri, title: dialogTitle });
   } catch {
-    Alert.alert(
-      "PDF erstellt",
-      "Die Datei wurde gespeichert, aber das Teilen ist auf diesem Gerät nicht verfügbar.",
-      [{ text: "OK" }]
-    );
+    // Share dismissed or unavailable — not an error worth surfacing
   }
 }
 
@@ -1026,7 +1064,8 @@ export async function exportPDF(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom = "",
-  dateTo = ""
+  dateTo = "",
+  lang: Language = "de"
 ): Promise<void> {
   if (trips.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
@@ -1035,7 +1074,11 @@ export async function exportPDF(
   if (Platform.OS === "web") {
     await exportPDFWeb(trips, user, dateFrom, dateTo);
   } else {
-    await exportPDFNative(trips, user, dateFrom, dateTo);
+    try {
+      await exportPDFNative(trips, user, dateFrom, dateTo);
+    } catch (err) {
+      showExportError(err, lang, () => exportPDF(trips, user, dateFrom, dateTo, lang));
+    }
   }
 }
 
@@ -1043,7 +1086,8 @@ export async function exportSplitPDF(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom = "",
-  dateTo = ""
+  dateTo = "",
+  lang: Language = "de"
 ): Promise<void> {
   if (trips.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
@@ -1080,25 +1124,29 @@ export async function exportSplitPDF(
       );
     }
   } else {
-    if (businessTrips.length > 0) {
-      await exportPDFNative(
-        businessTrips,
-        user,
-        dateFrom,
-        dateTo,
-        "Geschäftliche Fahrten exportieren",
-        "Geschäftliche Fahrten"
-      );
-    }
-    if (privateTrips.length > 0) {
-      await exportPDFNative(
-        privateTrips,
-        user,
-        dateFrom,
-        dateTo,
-        "Private Fahrten exportieren",
-        "Private Fahrten"
-      );
+    try {
+      if (businessTrips.length > 0) {
+        await exportPDFNative(
+          businessTrips,
+          user,
+          dateFrom,
+          dateTo,
+          "Geschäftliche Fahrten exportieren",
+          "Geschäftliche Fahrten"
+        );
+      }
+      if (privateTrips.length > 0) {
+        await exportPDFNative(
+          privateTrips,
+          user,
+          dateFrom,
+          dateTo,
+          "Private Fahrten exportieren",
+          "Private Fahrten"
+        );
+      }
+    } catch (err) {
+      showExportError(err, lang, () => exportSplitPDF(trips, user, dateFrom, dateTo, lang));
     }
   }
 }

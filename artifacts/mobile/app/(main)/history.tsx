@@ -274,7 +274,7 @@ export default function HistoryScreen() {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    await exportPDF(displayTrips, user, dateFrom, dateTo);
+    await exportPDF(displayTrips, user, dateFrom, dateTo, language);
   };
 
   const handleExportCSV = async () => {
@@ -283,7 +283,7 @@ export default function HistoryScreen() {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    await exportCSV(displayTrips, user, dateFrom, dateTo);
+    await exportCSV(displayTrips, user, dateFrom, dateTo, language);
   };
 
   const handleView = (trip: Trip) => {
