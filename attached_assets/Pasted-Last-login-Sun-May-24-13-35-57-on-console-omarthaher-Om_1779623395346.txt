@@ -1,0 +1,41 @@
+Last login: Sun May 24 13:35:57 on console
+omarthaher@Omars-MacBook-Pro ~ % cd ~/Fahrtdoc-new && git checkout -- . && git pull && eas build --platform ios --profile production
+remote: Enumerating objects: 43, done.
+remote: Counting objects: 100% (43/43), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 28 (delta 21), reused 28 (delta 21), pack-reused 0 (from 0)
+Unpacking objects: 100% (28/28), 8.37 KiB | 120.00 KiB/s, done.
+From https://github.com/omarthaher-boop/Fahrtdoc-new
+   e32faee..76f6b77  main       -> origin/main
+Updating e32faee..76f6b77
+Fast-forward
+ artifacts/mobile/app.json               |  4 +-
+ artifacts/mobile/app/(main)/profile.tsx | 49 ++++++++++++++++-
+ artifacts/mobile/app/index.tsx          | 93 ++++++++++++++++++++++++++++++++-
+ artifacts/mobile/context/AppContext.tsx | 24 +++++++++
+ artifacts/mobile/package.json           |  2 +-
+ artifacts/mobile/utils/biometrics.ts    | 53 +++++++++++++++++++
+ artifacts/mobile/utils/exportPDF.ts     | 38 +++++---------
+ pnpm-lock.yaml                          | 25 ++++-----
+ replit.md                               | 49 ++++++++++++++---
+ 9 files changed, 288 insertions(+), 49 deletions(-)
+ create mode 100644 artifacts/mobile/utils/biometrics.ts
+✔ Generated eas.json. Learn more: https://docs.expo.dev/build-reference/eas-json/
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+EAS project not configured.
+✔ Would you like to automatically create an EAS project for @omarthaher85/workspace? … yes
+✔ Created @omarthaher85/workspace: https://expo.dev/accounts/omarthaher85/projects/workspace on EAS
+✔ Linked local project to EAS project d61144f8-cb06-4464-920a-e26978bf6e46
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+
+📝  iOS Bundle Identifier Learn more: https://expo.fyi/bundle-identifier
+✔ What would you like your iOS bundle identifier to be? … y
+✔ iOS app only uses standard/exempt encryption? Learn more: https://developer.apple.com/documentation/Security/complying-with-encryption-export-regulations … yes
+Failed to resolve iOS entitlements from Expo config using the bundled config fallback: Cannot find 'expo-modules-autolinking' package in your project, make sure that you have 'expo' package installed
+    Error: build command failed.
+omarthaher@Omars-MacBook-Pro Fahrtdoc-new % 
