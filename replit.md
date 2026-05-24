@@ -65,6 +65,12 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **Lockfile nach jeder `package.json`-Änderung aktualisieren** — nach Versionsänderungen immer `pnpm install --filter @workspace/mobile` lokal ausführen und den aktualisierten `pnpm-lock.yaml` committen. EAS Build verwendet den Lockfile, nicht `package.json` direkt.
 
+- **`expo-local-authentication` braucht KEIN Plugin** — nur `NSFaceIDUsageDescription` in `infoPlist` eintragen. Kein Eintrag unter `plugins` nötig. Ein Plugineintrag ohne node_modules auf dem Build-Mac → `Failed to resolve plugin for module "expo-local-authentication"`.
+
+- **EAS immer aus `artifacts/mobile` ausführen, NICHT aus dem Repo-Root** — `cd artifacts/mobile && eas build ...`. Aus dem Root-Verzeichnis → `expo-modules-autolinking` nicht gefunden, EAS erstellt falsches Projekt.
+
+- **EAS-Projektverknüpfung schützen** — `app.json` muss immer `extra.eas.projectId: "bacc0475-15a8-407c-acea-a8bc71ffbda2"` enthalten. Ohne diese ID erstellt EAS CLI bei jedem Build ein neues Projekt.
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
