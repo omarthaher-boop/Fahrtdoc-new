@@ -1,10 +1,13 @@
 import { Platform } from "react-native";
 
 function getApiBase(): string {
+  // Explicit API URL (baked in at EAS build time via eas.json env)
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (apiUrl) return apiUrl;
+  // Dev: set by the Expo start script in the workflow
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  if (domain) {
-    return `https://${domain}/api`;
-  }
+  if (domain) return `https://${domain}/api`;
+  // Web: use the current origin
   if (Platform.OS === "web" && typeof window !== "undefined") {
     return `${window.location.origin}/api`;
   }
