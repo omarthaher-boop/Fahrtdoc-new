@@ -132,6 +132,8 @@ export default function AuthScreen() {
           );
         }
       }
+    } catch (e) {
+      setError("Ein Fehler ist aufgetreten. Bitte versuche es erneut.");
     } finally {
       setLoading(false);
     }
