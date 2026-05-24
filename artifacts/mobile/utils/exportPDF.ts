@@ -1,4 +1,5 @@
 import { Platform, Alert } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
 import type { Trip, UserProfile } from "@/context/AppContext";
 
 // ─── CSV helpers ─────────────────────────────────────────────────────────────
@@ -85,7 +86,6 @@ async function exportCSVWeb(trips: Trip[], user?: UserProfile | null, dateFrom?:
 }
 
 async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, filename = "Fahrtenbuch.csv"): Promise<void> {
-  const FileSystem = await import("expo-file-system");
   const csv = buildCSV(trips, user, dateFrom, dateTo);
   const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
   await FileSystem.writeAsStringAsync(fileUri, "\uFEFF" + csv, {
@@ -1006,7 +1006,6 @@ async function exportPDFNative(
 
   // Save to temp file and share
   const pdfBase64 = doc.output("datauristring").split(",")[1];
-  const FileSystem = await import("expo-file-system");
   const filename = `Fahrtenbuch_${Date.now()}.pdf`;
   const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
   await FileSystem.writeAsStringAsync(fileUri, pdfBase64, {
