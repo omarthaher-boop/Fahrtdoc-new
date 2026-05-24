@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   StyleSheet,
   Text,
@@ -87,7 +88,18 @@ export default function TripCard({
 
   const handleDelete = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onDelete?.(trip.id);
+    Alert.alert(
+      t("trip.delete.title"),
+      t("trip.delete.message"),
+      [
+        { text: t("trip.delete.cancel"), style: "cancel" },
+        {
+          text: t("trip.delete.confirm"),
+          style: "destructive",
+          onPress: () => onDelete?.(trip.id),
+        },
+      ]
+    );
   };
 
   const handleEdit = () => {
