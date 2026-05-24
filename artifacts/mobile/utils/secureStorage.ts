@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 
 function sanitizeKey(email: string): string {
   return `dk_${email.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
@@ -7,14 +8,22 @@ function sanitizeKey(email: string): string {
 
 async function getOrCreateDataKey(email: string): Promise<CryptoKey> {
   const storeKey = sanitizeKey(email);
-  const stored = localStorage.getItem(storeKey);
-  if (stored) {
-    const bytes = new Uint8Array(stored.match(/.{2}/g)!.map((h) => parseInt(h, 16)));
+
+  let hexKey: string | null = null;
+  if (Platform.OS === "web") {
+    hexKey = localStorage.getItem(storeKey);
+  } else {
+    hexKey = await SecureStore.getItemAsync(storeKey);
+  }
+
+  if (hexKey) {
+    const bytes = new Uint8Array(hexKey.match(/.{2}/g)!.map((h) => parseInt(h, 16)));
     return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, [
       "encrypt",
       "decrypt",
     ]);
   }
+
   const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
     "encrypt",
     "decrypt",
@@ -23,21 +32,31 @@ async function getOrCreateDataKey(email: string): Promise<CryptoKey> {
   const hex = Array.from(new Uint8Array(raw))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  localStorage.setItem(storeKey, hex);
+
+  if (Platform.OS === "web") {
+    localStorage.setItem(storeKey, hex);
+  } else {
+    await SecureStore.setItemAsync(storeKey, hex);
+  }
+
   return key;
 }
 
-async function encryptWeb(plaintext: string, email: string): Promise<string> {
+async function encrypt(plaintext: string, email: string): Promise<string> {
   const key = await getOrCreateDataKey(email);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
-  const ivHex = Array.from(iv).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const ctHex = Array.from(new Uint8Array(ciphertext)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const ivHex = Array.from(iv)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const ctHex = Array.from(new Uint8Array(ciphertext))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   return `${ivHex}:${ctHex}`;
 }
 
-async function decryptWeb(token: string, email: string): Promise<string> {
+async function decrypt(token: string, email: string): Promise<string> {
   const colonIdx = token.indexOf(":");
   const ivHex = token.slice(0, colonIdx);
   const ctHex = token.slice(colonIdx + 1);
@@ -49,30 +68,26 @@ async function decryptWeb(token: string, email: string): Promise<string> {
 }
 
 export async function secureSetItem(email: string, key: string, value: string): Promise<void> {
-  if (Platform.OS === "web") {
-    const encrypted = await encryptWeb(value, email);
-    await AsyncStorage.setItem(key, encrypted);
-  } else {
-    await AsyncStorage.setItem(key, value);
-  }
+  const encrypted = await encrypt(value, email);
+  await AsyncStorage.setItem(key, encrypted);
 }
 
 export async function secureGetItem(email: string, key: string): Promise<string | null> {
   const raw = await AsyncStorage.getItem(key);
   if (!raw) return null;
-  if (Platform.OS === "web") {
-    if (!raw.includes(":")) return raw;
-    try {
-      return await decryptWeb(raw, email);
-    } catch {
-      return raw;
-    }
+  if (!raw.includes(":")) return raw;
+  try {
+    return await decrypt(raw, email);
+  } catch {
+    return raw;
   }
-  return raw;
 }
 
 export async function secureRemoveDataKey(email: string): Promise<void> {
+  const storeKey = sanitizeKey(email);
   if (Platform.OS === "web") {
-    localStorage.removeItem(sanitizeKey(email));
+    localStorage.removeItem(storeKey);
+  } else {
+    await SecureStore.deleteItemAsync(storeKey);
   }
 }
