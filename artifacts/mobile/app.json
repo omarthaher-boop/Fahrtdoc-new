@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.fahrtdoc.app",
       "infoPlist": {
         "UIBackgroundModes": ["location"],
-        "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen."
+        "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
