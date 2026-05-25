@@ -19,6 +19,9 @@ if (Platform.OS === "web") {
   require("median-js-bridge");
 }
 
+// Sets up isMedianApp global + exports the helper function
+import "@/utils/median";
+
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import { ThemeProvider } from "@/context/ThemeContext";
