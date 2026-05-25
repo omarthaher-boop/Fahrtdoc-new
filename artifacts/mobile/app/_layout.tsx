@@ -9,17 +9,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-if (Platform.OS === "web") {
-  // Initialize Median.co JS bridge for web-to-native wrapping
-  require("median-js-bridge");
-}
-
-// Sets up isMedianApp global + exports the helper function
+// Sets up isMedianApp global + exports the helper function (web-only, safe on native)
 import "@/utils/median";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
