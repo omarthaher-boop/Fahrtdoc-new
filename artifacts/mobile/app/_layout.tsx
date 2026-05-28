@@ -20,6 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { useCarPlay } from "@/hooks/useCarPlay";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +35,12 @@ function RootLayoutNav() {
       <Stack.Screen name="(main)" />
     </Stack>
   );
+}
+
+/** Mounts the CarPlay / Android Auto bridge inside AppProvider. */
+function CarPlayBridge({ children }: { children: React.ReactNode }) {
+  useCarPlay();
+  return <>{children}</>;
 }
 
 export default function RootLayout() {
@@ -59,11 +66,13 @@ export default function RootLayout() {
           <LanguageProvider>
             <ThemeProvider>
               <AppProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
+                <CarPlayBridge>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </CarPlayBridge>
               </AppProvider>
             </ThemeProvider>
           </LanguageProvider>

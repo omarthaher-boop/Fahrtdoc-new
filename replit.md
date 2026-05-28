@@ -81,6 +81,14 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - **Metro-Cache nach Paketentfernungen leeren**: Workflow neu starten nach `expo-print`/`expo-sharing`-Entfernung, sonst `Requiring unknown module "1650"`.
 - **`expo-notifications ~0.32.17` existiert nicht** — bei `expo ~54.x` bleibt es bei `~0.29.14` (funktioniert, auch wenn Expo CLI warnt).
 
+## Gotchas — CarPlay & Android Auto
+
+- **Apple CarPlay Entitlement ist Pflicht** — ohne `com.apple.developer.carplay-driving-task` aus dem Apple Developer Portal kann CarPlay weder getestet noch eingereicht werden. Antrag unter https://developer.apple.com/contact/carplay/ stellen (Kategorie: Driving Task App). Dauert 2–4 Wochen.
+- **Kein Config-Plugin für CarPlay möglich** — der pnpm-Workspace-Katalog bricht `npm install` beim EAS-Build, wenn ein Plugin `require('@expo/config-plugins')` nutzt. Nativer Code (Swift `CarPlaySceneDelegate.swift`, Kotlin `FahrtDocCarAppService.kt`) muss nach `expo prebuild` direkt in `ios/` und `android/` eingefügt werden. Vollständige Templates in `artifacts/mobile/docs/carplay-native-setup.md`.
+- **Das Entitlement in `app.json` wirkt erst nach EAS-Build** — `ios.entitlements.com.apple.developer.carplay-driving-task: true` ist bereits in `app.json` gesetzt, wird aber erst im signierten EAS-Build aktiv. Im Expo-Go/managed-Build ist es ein no-op.
+- **JS-Bridge ist aktiv, aber silent** — `utils/carplayBridge.ts` und `hooks/useCarPlay.ts` sind eingebaut und laufen im managed-Build ohne Fehler, da alle NativeModule-Aufrufe optional-chained sind. Ohne das native Modul ist es ein no-op.
+- **Android Auto DHU zum Testen** — auf dem Entwickler-Mac die Android Auto Desktop Head Unit installieren und per USB + ADB testen. Keine physische Autoanbindung nötig.
+
 ## Gotchas — SMTP / E-Mail
 
 - **Infomaniak SMTP**: Host `mail.infomaniak.com`, Port `587`. `SMTP_USER` = vollständige E-Mail-Adresse (`info@centofai.com`). `SMTP_PASS` = Passwort **des Postfachs** (nicht das Infomaniak-Konto-Passwort) — zu finden unter manager.infomaniak.com → E-Mail & Zusammenarbeit → Postfach → Passwort.
