@@ -26,7 +26,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY } from "@/utils/driveDetect";
+import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -474,6 +474,7 @@ export default function ProfileScreen() {
       } catch {
         // Non-fatal
       }
+      cancelDriveWatchdog().catch(() => {});
       setNotifDriveRemind(false);
       await AsyncStorage.setItem(DRIVE_REMIND_KEY, "false");
       savePref(PREF.notifDriveRemind, false);

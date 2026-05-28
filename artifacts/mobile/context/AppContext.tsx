@@ -12,7 +12,7 @@ import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
 import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
-import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY } from "@/utils/driveDetect";
+import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 import {
   showTripNotification,
   hideTripNotification,
@@ -1416,6 +1416,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setActiveTrip(null);
     AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "false").catch(() => {});
+    if (Platform.OS !== "web") {
+      cancelDriveWatchdog().catch(() => {});
+    }
     setPaused(false);
     setPauseStartedAt(null);
     setTotalPausedMs(0);

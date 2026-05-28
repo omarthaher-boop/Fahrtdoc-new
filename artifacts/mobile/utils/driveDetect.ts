@@ -9,10 +9,13 @@ export const DRIVE_TRIP_ACTIVE_KEY = "fahrtdoc_trip_active";
 export const DRIVE_REMIND_KEY = "fahrtdoc_drive_remind";
 const DRIVE_STATE_KEY = "fahrtdoc_drive_state";
 const DRIVE_COOLDOWN_KEY = "fahrtdoc_notify_cooldown";
+const DRIVE_WATCHDOG_KEY = "fahrtdoc_watchdog_notif_id";
 
 const SPEED_DRIVING_MS = 7;
 const SPEED_PARKED_MS = 2.5;
 const COOLDOWN_MS = 5 * 60 * 1000;
+/** If the background task hasn't fired in this many seconds, fire the watchdog notification. */
+const WATCHDOG_SECONDS = 5 * 60;
 
 type DriveState = "driving" | "parked";
 
@@ -29,6 +32,45 @@ async function sendNotification(title: string, body: string) {
     content: { title, body, sound: true },
     trigger: null,
   });
+}
+
+/** Cancel any pending watchdog notification. Call this when a trip ends intentionally or auto-tracking is disabled. */
+export async function cancelDriveWatchdog(): Promise<void> {
+  try {
+    const storedId = await AsyncStorage.getItem(DRIVE_WATCHDOG_KEY);
+    if (storedId) {
+      await Notifications.cancelScheduledNotificationAsync(storedId);
+      await AsyncStorage.removeItem(DRIVE_WATCHDOG_KEY);
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Schedule (or reschedule) a watchdog notification. The notification fires
+ * WATCHDOG_SECONDS in the future. If the background task keeps running it
+ * will cancel and reschedule before it ever fires.
+ */
+async function rescheduleWatchdog(): Promise<void> {
+  try {
+    const storedId = await AsyncStorage.getItem(DRIVE_WATCHDOG_KEY);
+    if (storedId) {
+      await Notifications.cancelScheduledNotificationAsync(storedId).catch(() => {});
+    }
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "FahrtDoc – Fahrterkennung gestoppt",
+        body: "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
+        sound: true,
+        data: { watchdog: true },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: WATCHDOG_SECONDS },
+    });
+    await AsyncStorage.setItem(DRIVE_WATCHDOG_KEY, id);
+  } catch {
+    // Non-fatal
+  }
 }
 
 // Background tasks are not supported in Expo Go — skip registration there.
@@ -49,12 +91,23 @@ if (Constants.appOwnership !== "expo") {
             ]);
 
           const remindEnabled = remindRaw[1] === "true";
-          if (!remindEnabled) return;
+          if (!remindEnabled) {
+            await cancelDriveWatchdog();
+            return;
+          }
 
           const tripActive = tripActiveRaw[1] === "true";
           const prevState = stateRaw[1] as DriveState | null;
           const lastNotify = cooldownRaw[1] ? parseInt(cooldownRaw[1], 10) : 0;
           const now = Date.now();
+
+          // Watchdog: keep rescheduling while a trip is active so if the task
+          // is killed by the OS the notification fires automatically.
+          if (tripActive) {
+            await rescheduleWatchdog();
+          } else {
+            await cancelDriveWatchdog();
+          }
 
           const latestSpeed = data.locations[data.locations.length - 1].coords.speed;
           if (latestSpeed === null || latestSpeed < 0) return;
