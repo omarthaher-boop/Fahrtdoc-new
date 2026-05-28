@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,6 +18,7 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Waypoint } from "@/context/AppContext";
+import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
 
 const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -62,6 +64,29 @@ export default function ActiveTripBanner() {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [geocoding, setGeocoding] = useState(false);
+  const [driveTaskRunning, setDriveTaskRunning] = useState(true);
+
+  const refreshDriveTaskStatus = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    try {
+      const Location = await import("expo-location");
+      const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+      setDriveTaskRunning(running);
+    } catch {
+      setDriveTaskRunning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    refreshDriveTaskStatus();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        refreshDriveTaskStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, [refreshDriveTaskStatus]);
 
   useEffect(() => {
     if (!activeTrip || paused) {
@@ -180,6 +205,13 @@ export default function ActiveTripBanner() {
             <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
               <Feather name="wifi-off" size={12} color={warningColor} />
               <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.gpsOff")}</Text>
+            </View>
+          )}
+
+          {!driveTaskRunning && Platform.OS !== "web" && (
+            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
+              <Feather name="alert-circle" size={12} color={warningColor} />
+              <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.driveDetectStopped")}</Text>
             </View>
           )}
 
