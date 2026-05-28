@@ -212,9 +212,9 @@ function ListRow({
 }
 
 function ToggleRow({
-  icon, label, description, value, onValueChange, showDivider, warningWhenOn, colors,
+  icon, label, description, value, onValueChange, showDivider, warningWhenOn, colors, statusActive,
 }: {
-  icon: FeatherName; label: string; description: string; value: boolean; onValueChange: (v: boolean) => void; showDivider?: boolean; warningWhenOn?: boolean; colors: Colors;
+  icon: FeatherName; label: string; description: string; value: boolean; onValueChange: (v: boolean) => void; showDivider?: boolean; warningWhenOn?: boolean; colors: Colors; statusActive?: boolean;
 }) {
   return (
     <View style={[styles.listRow, showDivider && styles.divider, { borderBottomColor: colors.border, alignItems: "flex-start", paddingVertical: 13 }]}>
@@ -222,7 +222,15 @@ function ToggleRow({
         <Feather name={icon} size={16} color={warningWhenOn && value ? "#D97706" : colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.listLabel, { color: colors.foreground }]}>{label}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+          <Text style={[styles.listLabel, { color: colors.foreground }]}>{label}</Text>
+          {statusActive && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" }} />
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#22C55E", letterSpacing: 0.2 }}>Aktiv</Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.listDesc, { color: colors.mutedForeground }]}>{description}</Text>
       </View>
       <Switch
@@ -359,6 +367,7 @@ export default function ProfileScreen() {
   const [notifDriveRemind, setNotifDriveRemind] = useState(false);
 
   const [autoTracking, setAutoTracking] = useState(true);
+  const [driveTaskRunning, setDriveTaskRunning] = useState(false);
   const [gpsTracking, setGpsTracking] = useState(true);
   const [bgTracking, setBgTracking] = useState(false);
   const [offlineStorage, setOfflineStorage] = useState(true);
@@ -403,6 +412,13 @@ export default function ProfileScreen() {
       if (Platform.OS !== "web") {
         const available = await isBiometricAvailable();
         setFaceIdAvailable(available);
+        try {
+          const Location = await import("expo-location");
+          const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+          setDriveTaskRunning(running);
+        } catch {
+          // Non-fatal
+        }
       }
     };
     load();
@@ -423,6 +439,17 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(key, typeof val === "boolean" ? String(val) : val);
   }, []);
 
+  const refreshDriveTaskStatus = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    try {
+      const Location = await import("expo-location");
+      const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+      setDriveTaskRunning(running);
+    } catch {
+      setDriveTaskRunning(false);
+    }
+  }, []);
+
   const handleAutoTracking = useCallback(async (v: boolean) => {
     setAutoTracking(v);
     savePref(PREF.autoTracking, v);
@@ -440,7 +467,8 @@ export default function ProfileScreen() {
       await AsyncStorage.setItem(DRIVE_REMIND_KEY, "false");
       savePref(PREF.notifDriveRemind, false);
     }
-  }, [savePref, setTrackingPref]);
+    refreshDriveTaskStatus();
+  }, [savePref, setTrackingPref, refreshDriveTaskStatus]);
   const handleGpsTracking = useCallback((v: boolean) => { setGpsTracking(v); savePref(PREF.gpsTracking, v); setTrackingPref("gpsTracking", v); }, [savePref, setTrackingPref]);
   const handleBgTracking = useCallback((v: boolean) => { setBgTracking(v); savePref(PREF.bgTracking, v); setTrackingPref("bgTracking", v); }, [savePref, setTrackingPref]);
   const handleOfflineStorage = useCallback((v: boolean) => {
@@ -582,7 +610,8 @@ export default function ProfileScreen() {
     setNotifDriveRemind(v);
     await AsyncStorage.setItem(DRIVE_REMIND_KEY, String(v));
     savePref(PREF.notifDriveRemind, v);
-  }, [savePref, language, autoTracking]);
+    refreshDriveTaskStatus();
+  }, [savePref, language, autoTracking, refreshDriveTaskStatus]);
 
   const handleOpenEdit = useCallback(() => {
     setEditName(user?.name ?? "");
@@ -823,7 +852,7 @@ export default function ProfileScreen() {
 
           <SectionHeader label={t("section.tracking")} colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider />
+            <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider statusActive={driveTaskRunning} />
             <ToggleRow icon="map-pin" label={t("row.gpsTracking")} description={t("row.gpsTracking.desc")} value={gpsTracking} onValueChange={handleGpsTracking} colors={colors} showDivider />
             <ToggleRow icon="layers" label={t("row.bgTracking")} description={t("row.bgTracking.desc")} value={bgTracking} onValueChange={handleBgTracking} colors={colors} showDivider />
             <ToggleRow icon="database" label={t("row.offline")} description={t("row.offline.desc")} value={offlineStorage} onValueChange={handleOfflineStorage} colors={colors} showDivider />
