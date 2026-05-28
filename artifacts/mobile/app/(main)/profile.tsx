@@ -443,7 +443,30 @@ export default function ProfileScreen() {
   }, [savePref, setTrackingPref]);
   const handleGpsTracking = useCallback((v: boolean) => { setGpsTracking(v); savePref(PREF.gpsTracking, v); setTrackingPref("gpsTracking", v); }, [savePref, setTrackingPref]);
   const handleBgTracking = useCallback((v: boolean) => { setBgTracking(v); savePref(PREF.bgTracking, v); setTrackingPref("bgTracking", v); }, [savePref, setTrackingPref]);
-  const handleOfflineStorage = useCallback((v: boolean) => { setOfflineStorage(v); savePref(PREF.offlineStorage, v); setTrackingPref("offlineStorage", v); }, [savePref, setTrackingPref]);
+  const handleOfflineStorage = useCallback((v: boolean) => {
+    if (!v) {
+      Alert.alert(
+        "Nur lokale Speicherung",
+        "Deine Fahrten werden nur lokal gespeichert. Auf anderen Geräten oder nach einer Neuinstallation sind sie nicht verfügbar. Fortfahren?",
+        [
+          { text: "Abbrechen", style: "cancel" },
+          {
+            text: "Fortfahren",
+            style: "destructive",
+            onPress: () => {
+              setOfflineStorage(false);
+              savePref(PREF.offlineStorage, false);
+              setTrackingPref("offlineStorage", false);
+            },
+          },
+        ]
+      );
+    } else {
+      setOfflineStorage(true);
+      savePref(PREF.offlineStorage, true);
+      setTrackingPref("offlineStorage", true);
+    }
+  }, [savePref, setTrackingPref]);
   const handleTrackingPaused = useCallback((v: boolean) => {
     setTrackingPaused(v);
     savePref(PREF.trackingPaused, v);
