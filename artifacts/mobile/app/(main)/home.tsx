@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Platform,
@@ -21,6 +22,7 @@ import TripDetailModal from "@/components/TripDetailModal";
 import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
+import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
 
 const fmtDur = (s: number) => {
   if (s < 60) return `${s}s`;
@@ -42,6 +44,28 @@ export default function HomeScreen() {
   const [starting, setStarting] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
+  const [driveTaskRunning, setDriveTaskRunning] = useState(false);
+
+  const checkDriveTask = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    try {
+      const Location = await import("expo-location");
+      const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+      setDriveTaskRunning(running);
+    } catch {
+      setDriveTaskRunning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkDriveTask();
+  }, [checkDriveTask]);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkDriveTask();
+    }, [checkDriveTask])
+  );
 
   const PERIOD_LABELS: Record<Period, string> = {
     1: t("home.period.1"),
@@ -98,9 +122,17 @@ export default function HomeScreen() {
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{t("home.greeting")}</Text>
-          <Text style={[styles.userName, { color: colors.foreground }]}>
-            {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
-          </Text>
+          <View style={styles.userNameRow}>
+            <Text style={[styles.userName, { color: colors.foreground }]}>
+              {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
+            </Text>
+            {driveTaskRunning && (
+              <View style={styles.driveActivePill}>
+                <View style={styles.driveActiveDot} />
+                <Text style={styles.driveActiveText}>Aktiv</Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={[styles.plateBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Feather name="truck" size={12} color={colors.primary} />
@@ -318,7 +350,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   greeting: { fontSize: 13, fontWeight: "500" },
+  userNameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   userName: { fontSize: 22, fontWeight: "800", letterSpacing: -0.3 },
+  driveActivePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  driveActiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+  },
+  driveActiveText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#22C55E",
+    letterSpacing: 0.2,
+  },
   plateBadge: {
     flexDirection: "row",
     alignItems: "center",
