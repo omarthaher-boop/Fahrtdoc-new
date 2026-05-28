@@ -11,6 +11,7 @@ import {
 } from "@/utils/biometrics";
 import {
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -449,6 +450,16 @@ export default function ProfileScreen() {
       setDriveTaskRunning(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        refreshDriveTaskStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, [refreshDriveTaskStatus]);
 
   const handleAutoTracking = useCallback(async (v: boolean) => {
     setAutoTracking(v);
