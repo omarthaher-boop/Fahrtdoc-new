@@ -64,7 +64,7 @@
     "expo-notifications": "~0.29.14",
     "expo-secure-store": "~15.0.8",
     "expo-task-manager": "~14.0.9",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "median-js-bridge": "^2.16.0",
     "react-leaflet": "^5.0.0",
