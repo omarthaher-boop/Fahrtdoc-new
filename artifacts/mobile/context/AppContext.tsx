@@ -138,7 +138,7 @@ interface AppContextType {
   pendingTripPath: { lat: number; lon: number }[] | null;
   finalizeTrip: (trip: Trip) => Promise<void>;
   discardPendingTrip: () => void;
-  setTrackingPref: (key: "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => void;
+  setTrackingPref: (key: "autoTracking" | "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -437,6 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Tracking preference values — kept in a ref so startTrip/addTrip/editTrip/deleteTrip
   // always read the latest value without needing them in useCallback dependency arrays.
   const trackingPrefsRef = useRef({
+    autoTracking: true,
     gpsTracking: true,
     bgTracking: false,
     offlineStorage: true,
@@ -449,12 +450,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Load tracking prefs from AsyncStorage once on mount
   useEffect(() => {
     AsyncStorage.multiGet([
+      "pref_auto_tracking",
       "pref_gps_tracking",
       "pref_bg_tracking",
       "pref_offline_storage",
     ]).then((vals) => {
       const m = Object.fromEntries(vals);
       trackingPrefsRef.current = {
+        autoTracking: m["pref_auto_tracking"] !== "false",
         gpsTracking: m["pref_gps_tracking"] !== "false",
         bgTracking: m["pref_bg_tracking"] === "true",
         offlineStorage: m["pref_offline_storage"] !== "false",
@@ -462,7 +465,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, []);
 
-  const setTrackingPref = useCallback((key: "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => {
+  const setTrackingPref = useCallback((key: "autoTracking" | "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => {
     trackingPrefsRef.current = { ...trackingPrefsRef.current, [key]: value };
   }, []);
 
@@ -679,6 +682,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (nextState !== "active") return;
       const token = serverTokenRef.current;
       if (!token) return;
+      if (!trackingPrefsRef.current.offlineStorage) return;
       const now = Date.now();
       if (now - lastRetryMsRef.current < retryBackoffMsRef.current) return;
 
@@ -1132,6 +1136,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const retryWaypointSync = useCallback(async (id: string): Promise<boolean> => {
     const token = serverTokenRef.current;
     if (!token) return false;
+    if (!trackingPrefsRef.current.offlineStorage) return false;
     const trip = trips.find((t) => t.id === id);
     if (!trip || !trip.waypoints || trip.waypoints.length === 0) return false;
     const ok = await serverUpdateTrip(token, id, { waypoints: trip.waypoints });

@@ -426,6 +426,7 @@ export default function ProfileScreen() {
   const handleAutoTracking = useCallback(async (v: boolean) => {
     setAutoTracking(v);
     savePref(PREF.autoTracking, v);
+    setTrackingPref("autoTracking", v);
     if (!v && Platform.OS !== "web") {
       // Auto-tracking disabled — stop drive-detection background task if running
       try {
@@ -439,7 +440,7 @@ export default function ProfileScreen() {
       await AsyncStorage.setItem(DRIVE_REMIND_KEY, "false");
       savePref(PREF.notifDriveRemind, false);
     }
-  }, [savePref]);
+  }, [savePref, setTrackingPref]);
   const handleGpsTracking = useCallback((v: boolean) => { setGpsTracking(v); savePref(PREF.gpsTracking, v); setTrackingPref("gpsTracking", v); }, [savePref, setTrackingPref]);
   const handleBgTracking = useCallback((v: boolean) => { setBgTracking(v); savePref(PREF.bgTracking, v); setTrackingPref("bgTracking", v); }, [savePref, setTrackingPref]);
   const handleOfflineStorage = useCallback((v: boolean) => { setOfflineStorage(v); savePref(PREF.offlineStorage, v); setTrackingPref("offlineStorage", v); }, [savePref, setTrackingPref]);
@@ -484,6 +485,18 @@ export default function ProfileScreen() {
 
   const handleNotifDriveRemind = useCallback(async (v: boolean) => {
     if (Platform.OS === "web") return;
+    if (v && !autoTracking) {
+      // Drive reminders require auto-tracking to be enabled — silently reject
+      setNotifDriveRemind(false);
+      await AsyncStorage.setItem(DRIVE_REMIND_KEY, "false");
+      Alert.alert(
+        language === "de" ? "Automatisches Tracking deaktiviert" : "Auto-tracking disabled",
+        language === "de"
+          ? "Aktiviere zuerst 'Automatisches Tracking', um Fahrt-Erinnerungen zu nutzen."
+          : "Enable 'Automatic tracking' first to use drive reminders."
+      );
+      return;
+    }
     if (v) {
       const Notifications = await import("expo-notifications");
       const { status } = await Notifications.requestPermissionsAsync();
