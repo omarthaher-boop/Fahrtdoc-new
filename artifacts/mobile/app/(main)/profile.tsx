@@ -316,7 +316,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
 
@@ -423,11 +423,33 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(key, typeof val === "boolean" ? String(val) : val);
   }, []);
 
-  const handleAutoTracking = useCallback((v: boolean) => { setAutoTracking(v); savePref(PREF.autoTracking, v); }, [savePref]);
-  const handleGpsTracking = useCallback((v: boolean) => { setGpsTracking(v); savePref(PREF.gpsTracking, v); }, [savePref]);
-  const handleBgTracking = useCallback((v: boolean) => { setBgTracking(v); savePref(PREF.bgTracking, v); }, [savePref]);
-  const handleOfflineStorage = useCallback((v: boolean) => { setOfflineStorage(v); savePref(PREF.offlineStorage, v); }, [savePref]);
-  const handleTrackingPaused = useCallback((v: boolean) => { setTrackingPaused(v); savePref(PREF.trackingPaused, v); }, [savePref]);
+  const handleAutoTracking = useCallback(async (v: boolean) => {
+    setAutoTracking(v);
+    savePref(PREF.autoTracking, v);
+    if (!v && Platform.OS !== "web") {
+      // Auto-tracking disabled — stop drive-detection background task if running
+      try {
+        const Location = await import("expo-location");
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+        if (isRunning) await Location.stopLocationUpdatesAsync(DRIVE_DETECT_TASK);
+      } catch {
+        // Non-fatal
+      }
+      setNotifDriveRemind(false);
+      await AsyncStorage.setItem(DRIVE_REMIND_KEY, "false");
+      savePref(PREF.notifDriveRemind, false);
+    }
+  }, [savePref]);
+  const handleGpsTracking = useCallback((v: boolean) => { setGpsTracking(v); savePref(PREF.gpsTracking, v); setTrackingPref("gpsTracking", v); }, [savePref, setTrackingPref]);
+  const handleBgTracking = useCallback((v: boolean) => { setBgTracking(v); savePref(PREF.bgTracking, v); setTrackingPref("bgTracking", v); }, [savePref, setTrackingPref]);
+  const handleOfflineStorage = useCallback((v: boolean) => { setOfflineStorage(v); savePref(PREF.offlineStorage, v); setTrackingPref("offlineStorage", v); }, [savePref, setTrackingPref]);
+  const handleTrackingPaused = useCallback((v: boolean) => {
+    setTrackingPaused(v);
+    savePref(PREF.trackingPaused, v);
+    if (activeTrip && v !== paused) {
+      togglePause();
+    }
+  }, [savePref, activeTrip, paused, togglePause]);
   const handleDefaultTripType = useCallback((v: "business" | "private") => { setDefaultTripType(v); savePref(PREF.defaultTripType, v); }, [savePref]);
 
   const handleNotifGeneral = useCallback((v: boolean) => { setNotifGeneral(v); savePref(PREF.notifGeneral, v); }, [savePref]);

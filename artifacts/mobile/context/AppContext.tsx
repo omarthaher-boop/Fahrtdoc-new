@@ -138,6 +138,7 @@ interface AppContextType {
   pendingTripPath: { lat: number; lon: number }[] | null;
   finalizeTrip: (trip: Trip) => Promise<void>;
   discardPendingTrip: () => void;
+  setTrackingPref: (key: "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -433,9 +434,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const lastRetryMsRef = useRef<number>(0);
   const retryBackoffMsRef = useRef<number>(30_000);
 
+  // Tracking preference values — kept in a ref so startTrip/addTrip/editTrip/deleteTrip
+  // always read the latest value without needing them in useCallback dependency arrays.
+  const trackingPrefsRef = useRef({
+    gpsTracking: true,
+    bgTracking: false,
+    offlineStorage: true,
+  });
+
   useEffect(() => {
     serverTokenRef.current = serverToken;
   }, [serverToken]);
+
+  // Load tracking prefs from AsyncStorage once on mount
+  useEffect(() => {
+    AsyncStorage.multiGet([
+      "pref_gps_tracking",
+      "pref_bg_tracking",
+      "pref_offline_storage",
+    ]).then((vals) => {
+      const m = Object.fromEntries(vals);
+      trackingPrefsRef.current = {
+        gpsTracking: m["pref_gps_tracking"] !== "false",
+        bgTracking: m["pref_bg_tracking"] === "true",
+        offlineStorage: m["pref_offline_storage"] !== "false",
+      };
+    }).catch(() => {});
+  }, []);
+
+  const setTrackingPref = useCallback((key: "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => {
+    trackingPrefsRef.current = { ...trackingPrefsRef.current, [key]: value };
+  }, []);
 
   useEffect(() => {
     tripsRef.current = trips;
@@ -1015,7 +1044,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return next;
     });
-    if (token) {
+    if (token && trackingPrefsRef.current.offlineStorage) {
       serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
         if (ok && hasWaypoints) {
           // Server confirmed the full trip including waypoints — clear pending flag
@@ -1069,7 +1098,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     const token = serverTokenRef.current;
-    if (token) {
+    if (token && trackingPrefsRef.current.offlineStorage) {
       serverDeleteTrip(token, id).then((ok) => {
         if (!ok) {
           // Local state is updated; if the server soft-delete failed, the trip
@@ -1090,7 +1119,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     const token = serverTokenRef.current;
-    if (token) {
+    if (token && trackingPrefsRef.current.offlineStorage) {
       serverUpdateTrip(token, id, changes).then((ok) => {
         if (!ok) {
           // Local state is updated; if the server update failed, the server
@@ -1176,6 +1205,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { enableHighAccuracy: true, maximumAge: 0 }
         );
       } else {
+        const { gpsTracking, bgTracking } = trackingPrefsRef.current;
+
+        if (!gpsTracking) {
+          // GPS tracking disabled by user — start trip without location data
+          setGpsStatus("denied");
+          setActiveTrip({
+            id: tripId,
+            startTime: Date.now(),
+            type,
+            startAddr: "",
+            distance: 0,
+            positions: [],
+          });
+          AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
+          return;
+        }
+
         const Location = await import("expo-location");
 
         // 1. Foreground permission
@@ -1186,11 +1232,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // 2. Background permission (best-effort — required for background tracking)
-        try {
-          await Location.requestBackgroundPermissionsAsync();
-        } catch {
-          // Permission may not be available in Expo Go — continue with foreground only
+        // 2. Background permission (best-effort — only when background tracking enabled)
+        if (bgTracking) {
+          try {
+            await Location.requestBackgroundPermissionsAsync();
+          } catch {
+            // Permission may not be available in Expo Go — continue with foreground only
+          }
         }
 
         // 3. High-accuracy initial fix
@@ -1202,26 +1250,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // 4. Clear background position store for this new trip
         await AsyncStorage.removeItem(BG_POSITIONS_KEY);
 
-        // 5. Start background location task (persists positions even when app is backgrounded)
-        try {
-          const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-          if (!alreadyRunning) {
-            await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-              accuracy: Location.Accuracy.BestForNavigation,
-              timeInterval: 2000,
-              distanceInterval: 5,
-              foregroundService: {
-                notificationTitle: "FahrtDoc",
-                notificationBody: "Fahrt wird aufgezeichnet …",
-                notificationColor: "#0070D8",
-              },
-              pausesUpdatesAutomatically: false,
-              showsBackgroundLocationIndicator: true,
-              activityType: Location.ActivityType.AutomotiveNavigation,
-            });
+        // 5. Start background location task (only when background tracking enabled)
+        if (bgTracking) {
+          try {
+            const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+            if (!alreadyRunning) {
+              await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+                accuracy: Location.Accuracy.BestForNavigation,
+                timeInterval: 2000,
+                distanceInterval: 5,
+                foregroundService: {
+                  notificationTitle: "FahrtDoc",
+                  notificationBody: "Fahrt wird aufgezeichnet …",
+                  notificationColor: "#0070D8",
+                },
+                pausesUpdatesAutomatically: false,
+                showsBackgroundLocationIndicator: true,
+                activityType: Location.ActivityType.AutomotiveNavigation,
+              });
+            }
+          } catch {
+            // Falls back gracefully if background task can't start (Expo Go limitation)
           }
-        } catch {
-          // Falls back gracefully if background task can't start (Expo Go limitation)
         }
 
         // 6. Foreground watch — keeps React state & live banner updated
@@ -1425,6 +1475,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         pendingTripPath,
         finalizeTrip,
         discardPendingTrip,
+        setTrackingPref,
       }}
     >
       {children}
