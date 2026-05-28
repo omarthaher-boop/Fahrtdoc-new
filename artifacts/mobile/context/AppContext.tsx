@@ -127,6 +127,7 @@ interface AppContextType {
   paused: boolean;
   pauseStartedAt: number | null;
   totalPausedMs: number;
+  gpsTracking: boolean;
   gpsStatus: "ok" | "denied" | "waiting";
   livePos: { lat: number; lon: number } | null;
   startTrip: (type: "business" | "private") => Promise<void>;
@@ -442,6 +443,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     bgTracking: false,
     offlineStorage: true,
   });
+  // Reactive copy of gpsTracking so UI components can re-render when it changes.
+  const [gpsTrackingPref, setGpsTrackingPref] = useState(true);
 
   useEffect(() => {
     serverTokenRef.current = serverToken;
@@ -456,17 +459,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       "pref_offline_storage",
     ]).then((vals) => {
       const m = Object.fromEntries(vals);
+      const gpsTracking = m["pref_gps_tracking"] !== "false";
       trackingPrefsRef.current = {
         autoTracking: m["pref_auto_tracking"] !== "false",
-        gpsTracking: m["pref_gps_tracking"] !== "false",
+        gpsTracking,
         bgTracking: m["pref_bg_tracking"] === "true",
         offlineStorage: m["pref_offline_storage"] !== "false",
       };
+      setGpsTrackingPref(gpsTracking);
     }).catch(() => {});
   }, []);
 
   const setTrackingPref = useCallback((key: "autoTracking" | "gpsTracking" | "bgTracking" | "offlineStorage", value: boolean) => {
     trackingPrefsRef.current = { ...trackingPrefsRef.current, [key]: value };
+    if (key === "gpsTracking") setGpsTrackingPref(value);
   }, []);
 
   useEffect(() => {
@@ -1469,6 +1475,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         paused,
         pauseStartedAt,
         totalPausedMs,
+        gpsTracking: gpsTrackingPref,
         gpsStatus,
         livePos,
         startTrip,

@@ -55,7 +55,7 @@ const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> =>
 export default function ActiveTripBanner() {
   const colors = useColors();
   const { t } = useLanguage();
-  const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos } = useApp();
+  const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [showPauseDialog, setShowPauseDialog] = useState(false);
@@ -155,16 +155,34 @@ export default function ActiveTripBanner() {
     togglePause();
   };
 
+  const warningColor = colors.warning ?? "#FFB703";
+  const warningLight = colors.warningLight ?? "#FFF8E7";
+  const successDark = colors.successDark ?? "#059669";
+
   return (
     <>
-      <View style={[styles.banner, { backgroundColor: paused ? colors.warningLight ?? "#FFF8E7" : colors.successLight, borderColor: paused ? colors.warning ?? "#FFB703" : colors.success }]}>
+      <View style={[styles.banner, { backgroundColor: paused ? warningLight : colors.successLight, borderColor: paused ? warningColor : colors.success }]}>
         <View style={styles.left}>
           <View style={styles.dotRow}>
-            <Animated.View style={[styles.dot, { backgroundColor: paused ? colors.warning ?? "#FFB703" : colors.success, opacity: pulseAnim }]} />
-            <Text style={[styles.label, { color: paused ? colors.warning ?? "#FFB703" : colors.successDark ?? "#059669" }]}>
-              {paused ? "PAUSIERT" : geocoding ? t("waypoint.locating") : "FAHRT LÄUFT"}
+            <Animated.View style={[styles.dot, { backgroundColor: paused ? warningColor : colors.success, opacity: pulseAnim }]} />
+            <Text style={[styles.label, { color: paused ? warningColor : successDark }]}>
+              {paused ? t("tracking.paused") : geocoding ? t("waypoint.locating") : t("tracking.active")}
             </Text>
+            {paused && (
+              <View style={[styles.pausedBadge, { backgroundColor: warningColor }]}>
+                <Feather name="pause" size={10} color="#FFFFFF" />
+                <Text style={styles.pausedBadgeText}>{t("tracking.paused")}</Text>
+              </View>
+            )}
           </View>
+
+          {!gpsTracking && (
+            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
+              <Feather name="wifi-off" size={12} color={warningColor} />
+              <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.gpsOff")}</Text>
+            </View>
+          )}
+
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Feather name="navigation" size={12} color={colors.success} />
@@ -204,12 +222,17 @@ export default function ActiveTripBanner() {
           <TouchableOpacity
             onPress={handlePausePress}
             disabled={geocoding}
-            style={[styles.actionBtn, { backgroundColor: paused ? colors.warning ?? "#FFB703" : colors.successLight, borderColor: paused ? colors.warning ?? "#FFB703" : colors.success }]}
+            style={[
+              styles.actionBtn,
+              paused
+                ? { backgroundColor: warningColor, borderColor: warningColor }
+                : { backgroundColor: colors.successLight, borderColor: colors.success },
+            ]}
           >
             {geocoding ? (
-              <ActivityIndicator size="small" color={colors.successDark ?? "#059669"} />
+              <ActivityIndicator size="small" color={successDark} />
             ) : (
-              <Feather name={paused ? "play" : "pause"} size={16} color={paused ? "#FFFFFF" : colors.successDark ?? "#059669"} />
+              <Feather name={paused ? "play" : "pause"} size={16} color={paused ? "#FFFFFF" : successDark} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -316,9 +339,30 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   left: { flex: 1, gap: 8 },
-  dotRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dotRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   dot: { width: 8, height: 8, borderRadius: 4 },
   label: { fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
+  pausedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  pausedBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  gpsOffRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  gpsOffText: { fontSize: 11, fontWeight: "600", flexShrink: 1 },
   statsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   stat: { flexDirection: "row", alignItems: "center", gap: 4 },
   statNum: { fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums" as const] },

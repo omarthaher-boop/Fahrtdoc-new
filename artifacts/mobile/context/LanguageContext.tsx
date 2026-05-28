@@ -232,6 +232,9 @@ const de: Record<string, string> = {
   "export.error.permission": "Kein Zugriff auf den Speicher. Bitte prüfe die App-Berechtigungen.",
   "export.error.unknown": "Export fehlgeschlagen. Bitte versuche es erneut.",
   "export.error.retry": "Erneut versuchen",
+  "tracking.paused": "PAUSIERT",
+  "tracking.active": "FAHRT LÄUFT",
+  "tracking.gpsOff": "GPS deaktiviert — Daten manuell erfassen",
 };
 
 const en: Record<string, string> = {
@@ -462,6 +465,9 @@ const en: Record<string, string> = {
   "export.error.permission": "Storage access denied. Please check app permissions.",
   "export.error.unknown": "Export failed. Please try again.",
   "export.error.retry": "Try Again",
+  "tracking.paused": "PAUSED",
+  "tracking.active": "TRIP ACTIVE",
+  "tracking.gpsOff": "GPS off — enter data manually",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
