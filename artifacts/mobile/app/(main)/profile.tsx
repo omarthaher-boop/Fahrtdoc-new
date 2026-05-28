@@ -524,6 +524,7 @@ export default function ProfileScreen() {
             return;
           }
         }
+        if (!autoTracking) return;
         const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
         if (!isRunning) {
           await Location.startLocationUpdatesAsync(DRIVE_DETECT_TASK, {
@@ -558,7 +559,7 @@ export default function ProfileScreen() {
     setNotifDriveRemind(v);
     await AsyncStorage.setItem(DRIVE_REMIND_KEY, String(v));
     savePref(PREF.notifDriveRemind, v);
-  }, [savePref, language]);
+  }, [savePref, language, autoTracking]);
 
   const handleOpenEdit = useCallback(() => {
     setEditName(user?.name ?? "");
