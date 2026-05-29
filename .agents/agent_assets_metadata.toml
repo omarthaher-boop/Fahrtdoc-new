@@ -1,8 +1,19 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "kR-ib0RnnYvfn8znCVRMT"
 uri = "file://artifacts/mobile/assets/images/icon.png"
 type = "image"
 title = "drivelog app icon"
+
+[[outputs]]
+id = "DoXbQyY_Qy_NchN-r-kAN"
+uri = "file://exports/exportPDF.txt"
+type = "text"
+title = "exportPDF.ts (PDF/CSV Export Code, 1153 Zeilen)"
+
+[[outputs]]
+id = "m42VUCvGfSu1mbOzZgvbF"
+uri = "file://exports/history.txt"
+type = "text"
+title = "history.tsx (PDF/CSV Aufrufstellen)"
