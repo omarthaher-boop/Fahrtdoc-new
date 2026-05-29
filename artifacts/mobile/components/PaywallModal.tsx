@@ -29,8 +29,9 @@ const FEATURES = [
 export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { offerings, purchase, isPurchasing } = useSubscription();
+  const { offerings, purchase, isPurchasing, isLoading } = useSubscription();
   const [selectedPkg, setSelectedPkg] = useState<"monthly" | "annual">("annual");
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   const currentOffering = offerings?.current;
   const monthlyPkg = currentOffering?.monthly;
@@ -39,8 +40,9 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const activePkg = selectedPkg === "monthly" ? monthlyPkg : annualPkg;
 
   const handlePurchase = async () => {
+    setPurchaseError(null);
     if (!activePkg) {
-      Alert.alert("Fehler", "Kein Produkt gefunden. Bitte später erneut versuchen.");
+      setPurchaseError("Kein Produkt gefunden. Bitte Internetverbindung prüfen und erneut versuchen.");
       return;
     }
     try {
@@ -48,7 +50,7 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
       onClose();
     } catch (e: any) {
       if (e?.userCancelled) return;
-      Alert.alert("Kauf fehlgeschlagen", e?.message ?? "Unbekannter Fehler");
+      setPurchaseError(e?.message ?? "Kauf fehlgeschlagen. Bitte erneut versuchen.");
     }
   };
 
@@ -123,13 +125,23 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
         </ScrollView>
 
         <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+          {purchaseError && (
+            <View style={[styles.errorBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+              <Feather name="alert-circle" size={14} color="#DC2626" />
+              <Text style={styles.errorText}>{purchaseError}</Text>
+            </View>
+          )}
           <TouchableOpacity
-            style={[styles.purchaseBtn, { backgroundColor: colors.primary }, isPurchasing && { opacity: 0.6 }]}
+            style={[
+              styles.purchaseBtn,
+              { backgroundColor: colors.primary },
+              (isPurchasing || isLoading) && { opacity: 0.6 },
+            ]}
             onPress={handlePurchase}
-            disabled={isPurchasing}
+            disabled={isPurchasing || isLoading}
             activeOpacity={0.85}
           >
-            {isPurchasing ? (
+            {isPurchasing || isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.purchaseBtnText}>Jetzt kostenlos starten</Text>
@@ -214,5 +226,21 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
     paddingHorizontal: 8,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#DC2626",
+    lineHeight: 18,
   },
 });
