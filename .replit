@@ -14,7 +14,7 @@ runButton = "Project"
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
-integrations = ["github:1.0.0"]
+integrations = ["github:1.0.0", "revenuecat:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -63,3 +63,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 SMTP_FROM = "FahrtDoc <info@centofai.com>"
+EXPO_PUBLIC_REVENUECAT_TEST_API_KEY = "test_YckavkRrKyoTIiIjQhxkorugdpY"
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY = "appl_oekyzcNcMwUQDJRHmpXLdcOyccj"
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY = "goog_hGvTtELuqMhqUCnVtLDBohANjKM"
+REVENUECAT_PROJECT_ID = "projc35db1b5"

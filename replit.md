@@ -29,6 +29,10 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - `artifacts/mobile/context/AppContext.tsx` — globaler App-State
 - `artifacts/mobile/context/LanguageContext.tsx` — DE/EN-Übersetzungen
 - `lib/db/src/schema/` — Datenbankschema (Drizzle)
+- `artifacts/mobile/lib/revenuecat.tsx` — RevenueCat SubscriptionProvider + useSubscription Hook
+- `artifacts/mobile/components/PaywallModal.tsx` — Paywall UI (Monatlich / Jährlich, Restore)
+- `scripts/src/seedRevenueCat.ts` — Seed-Script: Produkte, Entitlement, Offering in RevenueCat anlegen
+- `scripts/src/revenueCatClient.ts` — RevenueCat API-Client via Replit Connectors SDK
 
 ## Architecture decisions
 

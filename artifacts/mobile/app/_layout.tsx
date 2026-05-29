@@ -23,8 +23,17 @@ import { AppProvider } from "@/context/AppContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { useCarPlay } from "@/hooks/useCarPlay";
+import { SubscriptionProvider, initializeRevenueCat } from "@/lib/revenuecat";
 
 SplashScreen.preventAutoHideAsync();
+
+if (Platform.OS !== "web") {
+  try {
+    initializeRevenueCat();
+  } catch (e) {
+    console.warn("[RevenueCat] Init skipped:", e);
+  }
+}
 
 const queryClient = new QueryClient();
 
@@ -84,14 +93,16 @@ export default function RootLayout() {
           <LanguageProvider>
             <ThemeProvider>
               <AppProvider>
-                <CarPlayBridge>
-                  <GestureHandlerRootView style={{ flex: 1 }}>
-                    <KeyboardProvider>
-                      <NotificationDeepLink />
-                      <RootLayoutNav />
-                    </KeyboardProvider>
-                  </GestureHandlerRootView>
-                </CarPlayBridge>
+                <SubscriptionProvider>
+                  <CarPlayBridge>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <KeyboardProvider>
+                        <NotificationDeepLink />
+                        <RootLayoutNav />
+                      </KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </CarPlayBridge>
+                </SubscriptionProvider>
               </AppProvider>
             </ThemeProvider>
           </LanguageProvider>

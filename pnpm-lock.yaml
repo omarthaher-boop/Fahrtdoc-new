@@ -644,6 +644,13 @@ importers:
         version: 0.31.9
 
   scripts:
+    dependencies:
+      '@replit/connectors-sdk':
+        specifier: latest
+        version: 0.4.1
+      '@replit/revenuecat-sdk':
+        specifier: latest
+        version: 4.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

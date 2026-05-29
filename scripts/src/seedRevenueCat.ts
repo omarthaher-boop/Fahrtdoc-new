@@ -1,6 +1,7 @@
 import { getUncachableRevenueCatClient } from "./revenueCatClient.js";
 
 import {
+  Duration,
   listProjects,
   createProject,
   listApps,
@@ -138,7 +139,7 @@ async function seedRevenueCat() {
     targetApp: App,
     label: string,
     identifier: string,
-    duration: string,
+    duration: Duration,
     isTestStore: boolean
   ): Promise<Product> => {
     const existing = existingProducts.items?.find(
@@ -169,15 +170,15 @@ async function seedRevenueCat() {
   };
 
   const [testMonthly, appMonthly, playMonthly] = await Promise.all([
-    ensureProduct(testStoreApp, "Premium Monthly", MONTHLY_IDENTIFIER, "P1M", true),
-    ensureProduct(appStoreApp, "Premium Monthly", MONTHLY_IDENTIFIER, "P1M", false),
-    ensureProduct(playStoreApp, "Premium Monthly", PLAY_STORE_MONTHLY_IDENTIFIER, "P1M", false),
+    ensureProduct(testStoreApp, "Premium Monthly", MONTHLY_IDENTIFIER, Duration.P1M, true),
+    ensureProduct(appStoreApp, "Premium Monthly", MONTHLY_IDENTIFIER, Duration.P1M, false),
+    ensureProduct(playStoreApp, "Premium Monthly", PLAY_STORE_MONTHLY_IDENTIFIER, Duration.P1M, false),
   ]);
 
   const [testYearly, appYearly, playYearly] = await Promise.all([
-    ensureProduct(testStoreApp, "Premium Yearly", YEARLY_IDENTIFIER, "P1Y", true),
-    ensureProduct(appStoreApp, "Premium Yearly", YEARLY_IDENTIFIER, "P1Y", false),
-    ensureProduct(playStoreApp, "Premium Yearly", PLAY_STORE_YEARLY_IDENTIFIER, "P1Y", false),
+    ensureProduct(testStoreApp, "Premium Yearly", YEARLY_IDENTIFIER, Duration.P1Y, true),
+    ensureProduct(appStoreApp, "Premium Yearly", YEARLY_IDENTIFIER, Duration.P1Y, false),
+    ensureProduct(playStoreApp, "Premium Yearly", PLAY_STORE_YEARLY_IDENTIFIER, Duration.P1Y, false),
   ]);
 
   const addTestPrice = async (product: Product, prices: { amount_micros: number; currency: string }[]) => {

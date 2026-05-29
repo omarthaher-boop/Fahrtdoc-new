@@ -21,6 +21,8 @@ import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { exportPDF, exportCSV } from "@/utils/exportPDF";
+import PaywallModal from "@/components/PaywallModal";
+import { useSubscription } from "@/lib/revenuecat";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 
@@ -75,6 +77,9 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const { trips, deleteTrip, editTrip, retryWaypointSync, user } = useApp();
   const { t, language } = useLanguage();
+
+  const { isSubscribed } = useSubscription();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -269,6 +274,7 @@ export default function HistoryScreen() {
   };
 
   const handleExportPDF = async () => {
+    if (!isSubscribed) { setShowPaywall(true); return; }
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
@@ -278,6 +284,7 @@ export default function HistoryScreen() {
   };
 
   const handleExportCSV = async () => {
+    if (!isSubscribed) { setShowPaywall(true); return; }
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
@@ -590,6 +597,9 @@ export default function HistoryScreen() {
         visible={viewingTrip !== null}
         onClose={() => setViewingTrip(null)}
       />
+
+      {/* Paywall modal — shown when non-premium user tries PDF/CSV export */}
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
     </View>
   );
 }
