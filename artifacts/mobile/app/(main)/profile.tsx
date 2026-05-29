@@ -32,6 +32,9 @@ import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useLanguage, type Language } from "@/context/LanguageContext";
+import { useSubscription } from "@/lib/revenuecat";
+import PaywallModal from "@/components/PaywallModal";
+import Purchases from "react-native-purchases";
 
 const APP_VERSION = "2.4.1";
 
@@ -326,6 +329,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
+  const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
 
@@ -345,6 +349,7 @@ export default function ProfileScreen() {
   const [faqModalVisible, setFaqModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [emModalVisible, setEmModalVisible] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPlate, setEditPlate] = useState(user?.plate ?? "");
@@ -862,6 +867,74 @@ export default function ProfileScreen() {
             <ListRow icon="navigation" label={t("row.vehicleProfile")} onPress={handleOpenVehicle} colors={colors} />
           </View>
 
+          <SectionHeader label={t("section.subscription")} colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.listRow, styles.divider, { borderBottomColor: colors.border }]}>
+              <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+                <Feather name="star" size={16} color={colors.primary} />
+              </View>
+              <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("row.subscriptionStatus")}</Text>
+              <View style={[styles.subBadge, { backgroundColor: isSubscribed ? colors.primary : colors.secondary, borderColor: isSubscribed ? colors.primary : colors.border }]}>
+                <Text style={[styles.subBadgeText, { color: isSubscribed ? "#fff" : colors.mutedForeground }]}>
+                  {isSubscribed ? t("sub.active") : t("sub.free")}
+                </Text>
+              </View>
+            </View>
+            {isSubscribed ? (
+              <>
+                {Platform.OS !== "web" && (
+                  <ListRow
+                    icon="settings"
+                    label={t("row.manageSubscription")}
+                    onPress={async () => {
+                      try { await Purchases.showManageSubscriptions(); } catch { /* not supported on this platform */ }
+                    }}
+                    colors={colors}
+                    showDivider
+                  />
+                )}
+                <ListRow
+                  icon="refresh-cw"
+                  label={t("row.restorePurchases")}
+                  value={isRestoring ? "…" : undefined}
+                  onPress={async () => {
+                    try {
+                      await restore();
+                      Alert.alert(t("sub.restoreSuccess"), t("sub.restoreSuccessMsg"));
+                    } catch {
+                      Alert.alert(t("sub.restoreError"), t("sub.restoreErrorMsg"));
+                    }
+                  }}
+                  colors={colors}
+                />
+              </>
+            ) : (
+              <>
+                <ListRow
+                  icon="zap"
+                  label={t("row.upgradePremium")}
+                  onPress={() => setShowPaywall(true)}
+                  colors={colors}
+                  showDivider
+                />
+                <ListRow
+                  icon="refresh-cw"
+                  label={t("row.restorePurchases")}
+                  value={isRestoring ? "…" : undefined}
+                  onPress={async () => {
+                    try {
+                      await restore();
+                      Alert.alert(t("sub.restoreSuccess"), t("sub.restoreSuccessMsg"));
+                    } catch {
+                      Alert.alert(t("sub.restoreError"), t("sub.restoreErrorMsg"));
+                    }
+                  }}
+                  colors={colors}
+                />
+              </>
+            )}
+          </View>
+
           <SectionHeader label={t("section.tracking")} colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider statusActive={driveTaskRunning} />
@@ -1142,6 +1215,8 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
+
       {/* FAQ Modal */}
       <Modal visible={faqModalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalScreen, { backgroundColor: colors.background }]}>
@@ -1379,6 +1454,8 @@ const styles = StyleSheet.create({
   listIconWrap: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   listLabel: { fontSize: 15, fontWeight: "500", flex: 1 },
   listValue: { fontSize: 14 },
+  subBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
+  subBadgeText: { fontSize: 12, fontWeight: "700" },
   listDesc: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   divider: { borderBottomWidth: 1 },
   notifRow: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
