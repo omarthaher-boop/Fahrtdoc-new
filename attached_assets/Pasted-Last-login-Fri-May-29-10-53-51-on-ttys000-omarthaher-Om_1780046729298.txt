@@ -1,0 +1,39 @@
+Last login: Fri May 29 10:53:51 on ttys000
+omarthaher@Omars-MacBook-Pro ~ % cd ~/Fahrtdoc-new
+git pull origin main
+pnpm install
+cd artifacts/mobile
+npx expo prebuild --platform ios --clean
+From https://github.com/omarthaher-boop/Fahrtdoc-new
+ * branch            main       -> FETCH_HEAD
+Updating b0ce576..ac772ae
+error: Your local changes to the following files would be overwritten by merge:
+	pnpm-lock.yaml
+Please commit your changes or stash them before you merge.
+Aborting
+Scope: all 9 workspace projects
+Already up to date
+Done in 602ms using pnpm v11.2.2
+! Git branch has uncommitted file changes
+› It's recommended to commit all changes before proceeding in case you want to revert generated changes.
+
+✔ Continue with uncommitted changes? … yes
+
+✔ Cleared ios code
+✔ Created native directory
+✔ Updated package.json | no changes
+✖ Prebuild failed
+TypeError: [ios.infoPlist]: withIosInfoPlistBaseMod: DOMParser.parseFromString: the provided mimeType "undefined" is not valid.
+TypeError: [ios.infoPlist]: withIosInfoPlistBaseMod: DOMParser.parseFromString: the provided mimeType "undefined" is not valid.
+    at DOMParser.parseFromString (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@xmldom+xmldom@0.9.10/node_modules/@xmldom/xmldom/lib/dom-parser.js:222:9)
+    at Object.parse (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+plist@0.4.8/node_modules/@expo/plist/build/parse.js:69:64)
+    at read (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+config-plugins@54.0.4/node_modules/@expo/config-plugins/build/plugins/withIosBaseMods.js:292:39)
+    at async action (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+config-plugins@54.0.4/node_modules/@expo/config-plugins/build/plugins/createBaseMod.js:59:30)
+    at async interceptingMod (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+config-plugins@54.0.4/node_modules/@expo/config-plugins/build/plugins/withMod.js:104:21)
+    at async evalModsAsync (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+config-plugins@54.0.4/node_modules/@expo/config-plugins/build/plugins/mod-compiler.js:206:25)
+    at async compileModsAsync (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+config-plugins@54.0.4/node_modules/@expo/config-plugins/build/plugins/mod-compiler.js:123:10)
+    at async configureProjectAsync (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+cli@54.0.24_expo-router@6.0.23_expo@54.0.34_react-native@0.81.5_@babel+core@7.29._a5b3c719bb5ccdac93692d80fc3c093b/node_modules/@expo/cli/build/src/prebuild/configureProjectAsync.js:92:14)
+    at async prebuildAsync (/Users/omarthaher/Fahrtdoc-new/node_modules/.pnpm/@expo+cli@54.0.24_expo-router@6.0.23_expo@54.0.34_react-native@0.81.5_@babel+core@7.29._a5b3c719bb5ccdac93692d80fc3c093b/node_modules/@expo/cli/build/src/prebuild/prebuildAsync.js:164:9)
+omarthaher@Omars-MacBook-Pro mobile % 
+
+
