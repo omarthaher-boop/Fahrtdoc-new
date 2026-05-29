@@ -847,11 +847,6 @@ export default function ProfileScreen() {
               <Text style={[styles.statusLabel, { color: colors.mutedForeground }]}>{t("profile.plate")}</Text>
               <Text style={[styles.statusValue, { color: colors.foreground }]}>{user?.plate || "-"}</Text>
             </View>
-            <View style={[styles.statusCell, { borderRightColor: colors.border }]}>
-              <Feather name="award" size={15} color={colors.primary} />
-              <Text style={[styles.statusLabel, { color: colors.mutedForeground }]}>{t("profile.account")}</Text>
-              <Text style={[styles.statusValue, { color: colors.primary, fontWeight: "700" }]}>{t("profile.premium")}</Text>
-            </View>
             <View style={styles.statusCell}>
               <Feather name="check-circle" size={15} color={isSynced ? colors.success : colors.mutedForeground} />
               <Text style={[styles.statusLabel, { color: colors.mutedForeground }]}>{t("profile.sync")}</Text>
