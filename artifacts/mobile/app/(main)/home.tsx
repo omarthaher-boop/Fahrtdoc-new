@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Platform,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -19,7 +20,7 @@ import SaveTripSheet from "@/components/SaveTripSheet";
 import StatCard from "@/components/StatCard";
 import TripCard from "@/components/TripCard";
 import TripDetailModal from "@/components/TripDetailModal";
-import { useApp, Trip } from "@/context/AppContext";
+import { useApp, Trip, reverseGeocode } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
@@ -45,6 +46,9 @@ export default function HomeScreen() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [driveTaskRunning, setDriveTaskRunning] = useState(false);
+  const [modalStartAddr, setModalStartAddr] = useState("");
+  const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
+  const startAddrInputRef = useRef<TextInput>(null);
 
   const checkDriveTask = useCallback(async () => {
     if (Platform.OS === "web") return;
@@ -95,14 +99,42 @@ export default function HomeScreen() {
   const openStartModal = (type: "business" | "private") => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setPendingType(type);
+    setModalStartAddr("");
+    setModalStartAddrLoading(true);
     setShowStartModal(true);
+
+    if (Platform.OS === "web") {
+      navigator.geolocation?.getCurrentPosition(
+        async (pos) => {
+          const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          setModalStartAddr(addr);
+          setModalStartAddrLoading(false);
+        },
+        () => setModalStartAddrLoading(false),
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
+      );
+    } else {
+      import("expo-location").then(async (Location) => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") { setModalStartAddrLoading(false); return; }
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          setModalStartAddr(addr);
+        } catch {
+          // ignore — user can type manually
+        } finally {
+          setModalStartAddrLoading(false);
+        }
+      });
+    }
   };
 
   const confirmStart = async () => {
     if (!pendingType) return;
     setStarting(true);
     setShowStartModal(false);
-    await startTrip(pendingType);
+    await startTrip(pendingType, modalStartAddr || undefined);
     setStarting(false);
     setPendingType(null);
   };
@@ -321,11 +353,32 @@ export default function HomeScreen() {
             <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
               {t("home.modalSub")}
             </Text>
-            <View style={[styles.modalDestRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-              <Feather name="map-pin" size={13} color={colors.mutedForeground} />
-              <Text style={[styles.modalDestText, { color: colors.mutedForeground }]}>
-                Zielort wird beim Ankommen automatisch erfasst.
-              </Text>
+            <View style={[styles.modalAddrBlock]}>
+              <View style={[styles.modalAddrRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="navigation" size={13} color={pendingType === "business" ? colors.primary : colors.success} />
+                <TextInput
+                  ref={startAddrInputRef}
+                  style={[styles.modalAddrInput, { color: colors.foreground }]}
+                  value={modalStartAddr}
+                  onChangeText={setModalStartAddr}
+                  placeholder={modalStartAddrLoading ? "Standort wird ermittelt…" : "Startadresse eingeben…"}
+                  placeholderTextColor={colors.mutedForeground}
+                  returnKeyType="done"
+                  editable={!modalStartAddrLoading}
+                  selectTextOnFocus
+                />
+                {modalStartAddr.length > 0 && (
+                  <TouchableOpacity onPress={() => setModalStartAddr("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Feather name="x" size={13} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.modalZielRow}>
+                <Feather name="map-pin" size={11} color={colors.mutedForeground} />
+                <Text style={[styles.modalZielText, { color: colors.mutedForeground }]}>
+                  Zielort wird beim Ankommen automatisch erfasst.
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: pendingType === "business" ? colors.primary : colors.success }]}
@@ -464,19 +517,25 @@ const styles = StyleSheet.create({
   },
   modalIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   modalTitle: { fontSize: 20, fontWeight: "800", textAlign: "center" },
-  modalSub: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 4 },
-  modalDestRow: {
+  modalSub: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 8 },
+  modalAddrBlock: { alignSelf: "stretch", gap: 6, marginBottom: 4 },
+  modalAddrRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  modalAddrInput: { flex: 1, fontSize: 13, lineHeight: 18, padding: 0 },
+  modalZielRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 4,
-    alignSelf: "stretch",
+    paddingHorizontal: 4,
   },
-  modalDestText: { fontSize: 12, flex: 1, lineHeight: 17 },
+  modalZielText: { fontSize: 11, flex: 1, lineHeight: 16, opacity: 0.75 },
   modalBtn: {
     flexDirection: "row",
     alignItems: "center",

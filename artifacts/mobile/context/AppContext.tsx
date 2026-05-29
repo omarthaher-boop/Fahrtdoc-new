@@ -130,7 +130,7 @@ interface AppContextType {
   gpsTracking: boolean;
   gpsStatus: "ok" | "denied" | "waiting";
   livePos: { lat: number; lon: number } | null;
-  startTrip: (type: "business" | "private") => Promise<void>;
+  startTrip: (type: "business" | "private", startAddrOverride?: string) => Promise<void>;
   stopTrip: () => Promise<Trip | null>;
   togglePause: (waypoint?: Waypoint) => void;
   elapsed: number;
@@ -182,7 +182,7 @@ const fetchOsrmRoute = async (
   }
 };
 
-const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
+export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
   try {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 4000);
@@ -1162,7 +1162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [trips, persistTripsLocal]);
 
   const startTrip = useCallback(
-    async (type: "business" | "private") => {
+    async (type: "business" | "private", startAddrOverride?: string) => {
       setGpsStatus("waiting");
       const tripId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
@@ -1173,16 +1173,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: tripId,
           startTime: Date.now(),
           type,
-          startAddr: "",
+          startAddr: startAddrOverride ?? "",
           distance: 0,
           positions: [{ lat, lon }],
         });
         AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
-        reverseGeocode(lat, lon).then((addr) => {
-          setActiveTrip((prev) =>
-            prev ? { ...prev, startAddr: addr } : prev
-          );
-        });
+        if (!startAddrOverride) {
+          reverseGeocode(lat, lon).then((addr) => {
+            setActiveTrip((prev) =>
+              prev ? { ...prev, startAddr: addr } : prev
+            );
+          });
+        }
       };
 
       if (Platform.OS === "web") {
