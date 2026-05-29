@@ -129,7 +129,9 @@ async function exportCSVWeb(trips: Trip[], user?: UserProfile | null, dateFrom?:
 
 async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, filename = "Fahrtenbuch.csv"): Promise<void> {
   const csv = buildCSV(trips, user, dateFrom, dateTo);
-  const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+  const cacheDir = FileSystem.cacheDirectory;
+  if (!cacheDir) throw new Error("cacheDirectory unavailable");
+  const fileUri = cacheDir + filename;
   await FileSystem.writeAsStringAsync(fileUri, "\uFEFF" + csv, {
     encoding: FileSystem.EncodingType.UTF8,
   });
@@ -202,13 +204,9 @@ async function getAppLogoBase64(): Promise<string | null> {
         reader.readAsDataURL(blob);
       });
     } else {
-      const { Image } = await import("react-native");
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const source = Image.resolveAssetSource(require("../assets/images/logo.png"));
-      if (!source?.uri) return null;
-      const { readAsStringAsync } = await import("expo-file-system");
-      const base64 = await readAsStringAsync(source.uri, { encoding: "base64" });
-      return `data:image/png;base64,${base64}`;
+      // Bundled assets cannot be reliably read via FileSystem in Hermes
+      // production builds (TestFlight/Release). Skip the app logo on native.
+      return null;
     }
   } catch {
     return null;
@@ -1048,7 +1046,9 @@ async function exportPDFNative(
   // Save to temp file and share
   const pdfBase64 = doc.output("datauristring").split(",")[1];
   const filename = `Fahrtenbuch_${Date.now()}.pdf`;
-  const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+  const cacheDir2 = FileSystem.cacheDirectory;
+  if (!cacheDir2) throw new Error("cacheDirectory unavailable");
+  const fileUri = cacheDir2 + filename;
   await FileSystem.writeAsStringAsync(fileUri, pdfBase64, {
     encoding: FileSystem.EncodingType.Base64,
   });

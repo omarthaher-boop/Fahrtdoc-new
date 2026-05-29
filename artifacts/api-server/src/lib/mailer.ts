@@ -31,6 +31,7 @@ export async function sendEmailChangeCode(to: string, code: string, newEmail: st
 
   await transporter.sendMail({
     from: SMTP_FROM,
+    replyTo: SMTP_FROM,
     to,
     subject: "FahrtDoc – E-Mail-Adresse ändern",
     text: `Dein Bestätigungscode für die E-Mail-Änderung lautet: ${code}\n\nNeue E-Mail-Adresse: ${newEmail}\n\nDer Code ist 5 Minuten gültig und kann nur einmal verwendet werden.`,
@@ -67,6 +68,7 @@ export async function sendPasswordChangeCode(to: string, code: string): Promise<
 
   await transporter.sendMail({
     from: SMTP_FROM,
+    replyTo: SMTP_FROM,
     to,
     subject: "FahrtDoc – Dein Bestätigungscode",
     text: `Dein Bestätigungscode lautet: ${code}\n\nDer Code ist 5 Minuten gültig und kann nur einmal verwendet werden.`,

@@ -88,6 +88,8 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **Metro-Cache nach Paketentfernungen leeren**: Workflow neu starten nach `expo-print`/`expo-sharing`-Entfernung, sonst `Requiring unknown module "1650"`.
 - **`expo-notifications ~0.32.17` existiert nicht** — bei `expo ~54.x` bleibt es bei `~0.29.14` (funktioniert, auch wenn Expo CLI warnt).
+- **`Image.resolveAssetSource` + `FileSystem.readAsStringAsync` crasht in TestFlight** — Gebündelte Assets (z.B. Logo) können in Hermes-Production-Builds nicht per `expo-file-system` gelesen werden. `readAsStringAsync` auf einem Asset-URI wirft eine Exception → App-Crash. Lösung: nativen Branch in `getAppLogoBase64` entfernt (gibt `null` zurück). PDF-Inhalt bleibt identisch, nur das kleine App-Logo im PDF-Header fehlt auf Native.
+- **`FileSystem.cacheDirectory` kann `null` sein** — immer prüfen und explizit werfen statt `?? ""` als Fallback nutzen, sonst wird die Datei unter einem ungültigen Pfad geschrieben.
 
 ## Gotchas — CarPlay & Android Auto
 

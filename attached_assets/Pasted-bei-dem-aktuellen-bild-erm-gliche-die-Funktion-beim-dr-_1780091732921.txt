@@ -1,0 +1,171 @@
+bei dem aktuellen bild ermögliche die Funktion, beim drücken auf PDF, dass eine PDF-Datei und keinen Text runtergeladen  wird. D kannst du mir folgende prompt in einem code für replit umwandeln und vorschau zeigen?Du bist jetzt der softwareingineur und solltest du die profilseite nach folgenden Kriterien bearbeiten und ergänzen. 
+
+Der Screen soll optisch sauber, übersichtlich, hochwertig und modern wirken. Verwende ein klares Card-Design mit weichem Schatten, abgerundeten Ecken, viel Weißraum, dezenter hellgrauer Hintergrundfarbe und blauen Akzenten. Die UI soll wie eine echte produktionsreife App aussehen.
+
+Wichtig:
+- Der Screen ist die Profil-Seite der App.
+- Der Tab „Profil“ ist aktiv markiert.
+- Alle Funktionen sollen klar sichtbar, logisch gruppiert und sicher bedienbar sein.
+- Verwende die sprache für die Texte, so wie die Sprache der App
+- Verwende Icons passend zu jeder Funktion.
+- Verwende moderne Toggle-Switches für aktivierbare Funktionen.
+- Der Screen soll für IOS und Andriod optimiert sein.
+
+Layout-Struktur:
+
+1. Header
+- Titel: „Profil“
+- Rechts oben ein Zahnrad-Icon für Einstellungen
+- ergänze die Möglichkeit zur hellem oder dunklem Design bzw. System entsprechend
+- Genügend Abstand zum oberen Rand
+
+2. Profilkarte
+Eine große Card mit:
+- Rundem Avatar mit Initialen „MM“
+- Name: „Max Mustermann“
+- E-Mail: „max.mustermann@beispiel.ch“
+- Button: „Profil bearbeiten“
+- Der Button soll als Outline-Button mit Stift-Icon gestaltet sein
+
+3. Status-Karte
+Direkt unter der Profilkarte eine kompakte horizontale Status-Card mit drei Bereichen:
+- Kennzeichen: „B–MM1234“
+- Konto: „Premium“
+- Sync-Status: „Synchronisiert“
+Der Sync-Status soll grün dargestellt werden.
+Die drei Bereiche sollen optisch getrennt sein, aber in einer gemeinsamen Card stehen.
+
+4. Bereich: Konto
+Eine Card mit folgenden Zeilen:
+- Persönliche Daten
+- Fahrprofil & Fahrzeugdaten
+
+Wichtig:
+- Entferne die separate Funktion „Firmenkopf und logo“.
+- „Fahrprofil“ und „Fahrzeugdaten“ sollen zu einem gemeinsamen Menüpunkt zusammengeführt werden:
+„Fahrprofil & Fahrzeugdaten“
+- Jede Zeile soll links ein Icon, mittig den Text und rechts einen Chevron-Pfeil haben.
+
+5. Bereich: Tracking & Fahrterkennung
+Ergänze einen eigenen neuen Bereich mit dem Titel:
+„Tracking & Fahrterkennung“
+
+Dieser Bereich soll folgende Funktionen enthalten:
+
+- Automatisches Tracking
+Beschreibung: „Fahrten automatisch erkennen und aufzeichnen“
+Toggle: eingeschaltet
+
+- GPS-Tracking
+Beschreibung: „Standort während einer Fahrt erfassen“
+Toggle: eingeschaltet
+
+- Hintergrund-Tracking
+Beschreibung: „Fahrten auch bei geschlossener App erkennen“
+Toggle: eingeschaltet
+
+- Offline-Speicherung
+Beschreibung: „Fahrten ohne Internet zwischenspeichern“
+Toggle: eingeschaltet
+
+- Tracking pausieren
+Beschreibung: „Aufzeichnung vorübergehend deaktivieren“
+Toggle: ausgeschaltet
+
+Wichtig:
+- Alle sicherheitsrelevanten und wichtigen Tracking-Funktionen sollen standardmäßig eingeschaltet sein.
+- „Tracking pausieren“ soll standardmäßig ausgeschaltet sein, damit Tracking aktiv bleibt.
+- Nutze klare visuelle Zustände:
+Eingeschaltet = blauer Toggle
+Ausgeschaltet = grauer Toggle
+Bei ausgeschalteten Tracking, kann die automatische fahrtaufzeichnung auf die Startseite nicht erfolgen. Hier sollte der Nutzer die Frage erhalten, ob er die automatische Tracking einschalten will. 
+
+6. Bereich: Einstellungen
+Eine Card mit folgenden Zeilen:
+- Benachrichtigungen
+- Standard-Fahrtart
+- Sprache 
+- Design
+
+Details:
+- Bei „Standard-Fahrtart“ soll rechts ein Segment-Control stehen mit:
+„Geschäftlich“ aktiv
+„Privat“ inaktiv
+- Bei „Sprache“ rechts: „Deutsch“
+- Bei „Design“ rechts: „Hell“ Auswahlmöglichkeit zwischen Hell, Dunkel, Systemeinstellung
+- Alle anderen Zeilen mit Chevron-Pfeil
+
+7. Bereich: Sicherheit & Datenschutz
+Eine Card mit folgenden Funktionen:
+- Passwort ändern
+- Datenschutz
+- Face ID / App-Sperre
+
+Details:
+- „Face ID / App-Sperre“ soll einen Toggle haben
+- Dieser Toggle soll eingeschaltet sein
+- Passwort ändern und Datenschutz haben rechts einen Chevron-Pfeil
+Bei Passwort ändern sollte erstmals ein Code per Mail zugeschickt werden. Nach Eingabe der richtigen Code kann erst die Änderung des Passwortes eingeschaltet und erfolgt werden. 
+
+8. Bereich: Support
+Eine Card mit:
+- Hilfe & FAQ
+- Kontakt
+- App-Version
+
+Details:
+- Hilfe & FAQ und Kontakt mit Chevron-Pfeil
+- App-Version zeigt rechts „v2.4.1“
+
+9. Abmelden
+- Ganz unten ein klarer roter Outline-Button:
+„Abmelden“
+- Mit Logout-Icon links
+- Button soll nicht zu aggressiv wirken, aber klar als sicherheitsrelevante Aktion erkennbar sein
+
+10. Bottom Navigation
+Feste Bottom Navigation mit:
+- Start
+- Fahrten
+- Profil
+
+Profil ist aktiv:
+- Blaues Icon
+- Blauer Text
+Start und Fahrten grau/inaktiv
+
+Design-Vorgaben:
+- Hintergrund: sehr helles Grau, z. B. #F7F9FC
+- Cards: Weiß, #FFFFFF
+- Primärfarbe: modernes Blau, z. B. #2563EB
+- Erfolg/Sync: Grün, z. B. #16A34A
+- Warnung/Logout: Rot, z. B. #EF4444
+- Textfarbe: dunkles Navy/Schwarz, z. B. #0F172A
+- Sekundärtext: Grau-Blau, z. B. #64748B
+- Border: sehr hell, z. B. #E2E8F0
+- Border Radius: 18–24 px
+- Schatten: subtil und hochwertig
+- Schrift: moderne Sans-Serif, z. B. Inter, SF Pro oder system font
+- Keine überladenen Farben
+- Viel Abstand zwischen den Bereichen
+- Alles soll sauber ausgerichtet sein
+
+Interaktion:
+- Alle Toggle-Funktionen sollen anklickbar sein.
+- Der Zustand der Toggle-Switches soll sich beim Klick ändern.
+- Segment-Control für „Standard-Fahrtart“ soll zwischen Geschäftlich und Privat wechseln können.
+- Die UI soll vollständig responsiv und mobil optimiert sein.
+- Verwende Komponenten sauber und wiederverwendbar.
+
+Technische Umsetzung:
+- Falls React verwendet wird:
+- Erstelle eine einzelne ProfilScreen-Komponente.
+- Nutze moderne Komponentenstruktur.
+- Nutze State für Toggle-Switches und Standard-Fahrtart.
+- Nutze keine unnötigen externen Abhängigkeiten.
+- Icons können mit lucide-react umgesetzt werden.
+- Styling kann mit Tailwind CSS erfolgen.
+- Der Code soll sauber, wartbar und direkt lauffähig sein.
+
+Ziel:
+Ein moderner, professioneller Profil-Screen für eine Fahrtenbuch-App, bei dem Konto, Tracking, Einstellungen, Sicherheit, Support und Logout klar strukturiert sind. Alle wichtigen Tracking- und Sicherheitsfunktionen sollen sichtbar und standardmäßig sicher eingeschaltet sein.

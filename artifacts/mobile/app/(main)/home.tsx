@@ -321,6 +321,12 @@ export default function HomeScreen() {
             <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
               {t("home.modalSub")}
             </Text>
+            <View style={[styles.modalDestRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Feather name="map-pin" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.modalDestText, { color: colors.mutedForeground }]}>
+                Zielort wird beim Ankommen automatisch erfasst.
+              </Text>
+            </View>
             <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: pendingType === "business" ? colors.primary : colors.success }]}
               onPress={confirmStart}
@@ -458,7 +464,19 @@ const styles = StyleSheet.create({
   },
   modalIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   modalTitle: { fontSize: 20, fontWeight: "800", textAlign: "center" },
-  modalSub: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  modalSub: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 4 },
+  modalDestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 4,
+    alignSelf: "stretch",
+  },
+  modalDestText: { fontSize: 12, flex: 1, lineHeight: 17 },
   modalBtn: {
     flexDirection: "row",
     alignItems: "center",
