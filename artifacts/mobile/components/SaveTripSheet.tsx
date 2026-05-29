@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -366,7 +367,16 @@ export default function SaveTripSheet() {
                 {/* Action buttons */}
                 <TouchableOpacity
                   style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
-                  onPress={handleSave}
+                  onPress={() => {
+                    Alert.alert(
+                      "Fahrt speichern?",
+                      "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
+                      [
+                        { text: "Abbrechen", style: "cancel" },
+                        { text: "Speichern", onPress: handleSave },
+                      ]
+                    );
+                  }}
                   testID="save-trip-confirm"
                 >
                   <Feather name="check" size={15} color="#FFF" />
@@ -386,8 +396,21 @@ export default function SaveTripSheet() {
                   <TouchableOpacity
                     style={[styles.editBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
                     onPress={() => {
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      discardPendingTrip();
+                      Alert.alert(
+                        "Fahrt verwerfen?",
+                        "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
+                        [
+                          { text: "Zurück", style: "cancel" },
+                          {
+                            text: "Verwerfen",
+                            style: "destructive",
+                            onPress: () => {
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                              discardPendingTrip();
+                            },
+                          },
+                        ]
+                      );
                     }}
                     testID="save-trip-cancel"
                   >
