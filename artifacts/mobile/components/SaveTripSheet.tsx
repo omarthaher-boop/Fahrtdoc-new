@@ -368,14 +368,20 @@ export default function SaveTripSheet() {
                 <TouchableOpacity
                   style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
                   onPress={() => {
-                    Alert.alert(
-                      "Fahrt speichern?",
-                      "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
-                      [
-                        { text: "Abbrechen", style: "cancel" },
-                        { text: "Speichern", onPress: handleSave },
-                      ]
-                    );
+                    if (Platform.OS === "web") {
+                      if (window.confirm("Fahrt speichern?\n\nDie Fahrt wird mit den gewählten Kilometern gespeichert.")) {
+                        handleSave();
+                      }
+                    } else {
+                      Alert.alert(
+                        "Fahrt speichern?",
+                        "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
+                        [
+                          { text: "Abbrechen", style: "cancel" },
+                          { text: "Speichern", onPress: handleSave },
+                        ]
+                      );
+                    }
                   }}
                   testID="save-trip-confirm"
                 >
@@ -396,21 +402,27 @@ export default function SaveTripSheet() {
                   <TouchableOpacity
                     style={[styles.editBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
                     onPress={() => {
-                      Alert.alert(
-                        "Fahrt verwerfen?",
-                        "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
-                        [
-                          { text: "Zurück", style: "cancel" },
-                          {
-                            text: "Verwerfen",
-                            style: "destructive",
-                            onPress: () => {
-                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                              discardPendingTrip();
+                      if (Platform.OS === "web") {
+                        if (window.confirm("Fahrt verwerfen?\n\nDie aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.")) {
+                          discardPendingTrip();
+                        }
+                      } else {
+                        Alert.alert(
+                          "Fahrt verwerfen?",
+                          "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
+                          [
+                            { text: "Zurück", style: "cancel" },
+                            {
+                              text: "Verwerfen",
+                              style: "destructive",
+                              onPress: () => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                discardPendingTrip();
+                              },
                             },
-                          },
-                        ]
-                      );
+                          ]
+                        );
+                      }
                     }}
                     testID="save-trip-cancel"
                   >
