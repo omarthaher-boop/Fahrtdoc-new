@@ -71,6 +71,8 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **EAS-Projektverknüpfung schützen** — `app.json` muss immer `extra.eas.projectId: "bacc0475-15a8-407c-acea-a8bc71ffbda2"` enthalten. Ohne diese ID erstellt EAS CLI bei jedem Build ein neues Projekt.
 
+- **Keine pnpm-Overrides für Expo-interne Build-Dependencies** — Task #122 hat drei Overrides gesetzt die EAS Builds brechen: (1) `@xmldom/xmldom: ^0.9.10` → bricht `expo prebuild` ("mimeType undefined"); (2) `minimatch>brace-expansion: ^2.0.3` → bricht EAS Fingerprint ("expand is not a function"); (3) `esbuild>@esbuild/darwin-*: "-"` → bricht EAS Prebuild auf macOS. Alle drei sind in `pnpm-workspace.yaml` dokumentiert und entfernt.
+
 - **esbuild darwin-Binaries NICHT aus pnpm-Overrides ausschließen** — `pnpm-workspace.yaml` enthält Overrides die unnötige Plattform-Pakete mit `"-"` ausschließen. `@esbuild/darwin-arm64` und `@esbuild/darwin-x64` dürfen NICHT ausgeschlossen werden — EAS baut auf macOS und braucht diese Binaries. Ohne sie: `[esbuild] Failed to find package` → Prebuild schlägt fehl.
 
 ## Gotchas — Git / GitHub Workflow
