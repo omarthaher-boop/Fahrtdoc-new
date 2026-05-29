@@ -166,5 +166,7 @@ overrides:
   qs: "^6.15.2"
   postcss: "^8.5.15"
   picomatch: "^4.0.4"
-  "@xmldom/xmldom": "^0.9.10"
+  # @xmldom/xmldom intentionally NOT overridden — @expo/plist@0.4.8 requires
+  # the 0.8.x API (DOMParser.parseFromString without mimeType). Forcing 0.9.x
+  # breaks expo prebuild with "mimeType undefined" error.
   "minimatch>brace-expansion": "^2.0.3"
