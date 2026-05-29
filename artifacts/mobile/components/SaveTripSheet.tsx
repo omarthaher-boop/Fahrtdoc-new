@@ -29,7 +29,7 @@ const fmtDur = (s: number) => {
 export default function SaveTripSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { pendingTrip, pendingTripCoords, pendingTripPath, finalizeTrip } = useApp();
+  const { pendingTrip, pendingTripCoords, pendingTripPath, finalizeTrip, discardPendingTrip } = useApp();
   const { t } = useLanguage();
 
   const [routes, setRoutes] = useState<RouteOption[]>([]);
@@ -364,28 +364,35 @@ export default function SaveTripSheet() {
                 ))}
 
                 {/* Action buttons */}
+                <TouchableOpacity
+                  style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
+                  onPress={handleSave}
+                  testID="save-trip-confirm"
+                >
+                  <Feather name="check" size={15} color="#FFF" />
+                  <Text style={styles.saveBtnText}>Speichern</Text>
+                </TouchableOpacity>
+
                 <View style={styles.btnRow}>
                   <TouchableOpacity
-                    style={[
-                      styles.editBtn,
-                      { borderColor: colors.border, backgroundColor: colors.secondary },
-                    ]}
+                    style={[styles.editBtn, { borderColor: colors.border, backgroundColor: colors.secondary }]}
                     onPress={() => setShowEditModal(true)}
                     testID="save-trip-edit"
                   >
-                    <Feather name="edit-2" size={15} color={colors.foreground} />
-                    <Text style={[styles.editBtnText, { color: colors.foreground }]}>
-                      Fahrt bearbeiten
-                    </Text>
+                    <Feather name="edit-2" size={14} color={colors.foreground} />
+                    <Text style={[styles.editBtnText, { color: colors.foreground }]}>Bearbeiten</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-                    onPress={handleSave}
-                    testID="save-trip-confirm"
+                    style={[styles.editBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      discardPendingTrip();
+                    }}
+                    testID="save-trip-cancel"
                   >
-                    <Feather name="check" size={15} color="#FFF" />
-                    <Text style={styles.saveBtnText}>Fahrt speichern</Text>
+                    <Feather name="x" size={14} color={colors.destructive} />
+                    <Text style={[styles.editBtnText, { color: colors.destructive }]}>Abbrechen</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -533,7 +540,7 @@ const styles = StyleSheet.create({
   btnRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 16,
+    marginTop: 8,
     marginBottom: 4,
   },
   editBtn: {
@@ -547,6 +554,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   editBtnText: { fontSize: 14, fontWeight: "700" },
+  saveBtnFull: {
+    flex: 0,
+    alignSelf: "stretch",
+    marginTop: 16,
+  },
   saveBtn: {
     flex: 1,
     flexDirection: "row",
