@@ -111,22 +111,29 @@ export default function HomeScreen() {
           setModalStartAddrLoading(false);
         },
         () => setModalStartAddrLoading(false),
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
       );
     } else {
-      import("expo-location").then(async (Location) => {
+      (async () => {
         try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== "granted") { setModalStartAddrLoading(false); return; }
-          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-          setModalStartAddr(addr);
+          const Location = await import("expo-location");
+          // Request permission (may already be granted from background tracking)
+          await Location.requestForegroundPermissionsAsync();
+          // Try last known position first (instant), fall back to fresh fix
+          let pos = await Location.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 200 });
+          if (!pos) {
+            pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          }
+          if (pos) {
+            const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+            setModalStartAddr(addr);
+          }
         } catch {
-          // ignore — user can type manually
+          // user can type manually
         } finally {
           setModalStartAddrLoading(false);
         }
-      });
+      })();
     }
   };
 
