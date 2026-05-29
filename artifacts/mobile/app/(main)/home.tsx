@@ -101,8 +101,6 @@ export default function HomeScreen() {
   const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
-  const FREE_TRIP_LIMIT = 5;
-
   const openStartModal = (type: "business" | "private") => {
     if (activeTrip) {
       if (Platform.OS === "web") {
@@ -114,10 +112,6 @@ export default function HomeScreen() {
           [{ text: "OK", style: "cancel" }]
         );
       }
-      return;
-    }
-    if (!isSubscribed && trips.length >= FREE_TRIP_LIMIT) {
-      setShowPaywall(true);
       return;
     }
     if (Platform.OS !== "web") Haptics.selectionAsync();
