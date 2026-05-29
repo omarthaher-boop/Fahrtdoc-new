@@ -798,7 +798,7 @@ export default function ProfileScreen() {
     .toUpperCase();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 100);
+  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 160);
 
   const themeIcon: FeatherName = themePreference === "dark" ? "moon" : themePreference === "light" ? "sun" : "monitor";
   const langLabel = language === "de" ? t("lang.de") : t("lang.en");
@@ -885,48 +885,16 @@ export default function ProfileScreen() {
                       try { await Purchases.showManageSubscriptions(); } catch { /* not supported on this platform */ }
                     }}
                     colors={colors}
-                    showDivider
                   />
                 )}
-                <ListRow
-                  icon="refresh-cw"
-                  label={t("row.restorePurchases")}
-                  value={isRestoring ? "…" : undefined}
-                  onPress={async () => {
-                    try {
-                      await restore();
-                      Alert.alert(t("sub.restoreSuccess"), t("sub.restoreSuccessMsg"));
-                    } catch {
-                      Alert.alert(t("sub.restoreError"), t("sub.restoreErrorMsg"));
-                    }
-                  }}
-                  colors={colors}
-                />
               </>
             ) : (
-              <>
-                <ListRow
-                  icon="zap"
-                  label={t("row.upgradePremium")}
-                  onPress={() => setShowPaywall(true)}
-                  colors={colors}
-                  showDivider
-                />
-                <ListRow
-                  icon="refresh-cw"
-                  label={t("row.restorePurchases")}
-                  value={isRestoring ? "…" : undefined}
-                  onPress={async () => {
-                    try {
-                      await restore();
-                      Alert.alert(t("sub.restoreSuccess"), t("sub.restoreSuccessMsg"));
-                    } catch {
-                      Alert.alert(t("sub.restoreError"), t("sub.restoreErrorMsg"));
-                    }
-                  }}
-                  colors={colors}
-                />
-              </>
+              <ListRow
+                icon="zap"
+                label={t("row.upgradePremium")}
+                onPress={() => setShowPaywall(true)}
+                colors={colors}
+              />
             )}
           </View>
 

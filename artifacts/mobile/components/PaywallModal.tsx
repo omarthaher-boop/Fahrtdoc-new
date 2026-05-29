@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useSubscription } from "@/lib/revenuecat";
 
@@ -26,7 +27,8 @@ const FEATURES = [
 
 export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const colors = useColors();
-  const { offerings, purchase, restore, isPurchasing, isRestoring } = useSubscription();
+  const insets = useSafeAreaInsets();
+  const { offerings, purchase, isPurchasing } = useSubscription();
   const [selectedPkg, setSelectedPkg] = useState<"monthly" | "annual">("annual");
 
   const currentOffering = offerings?.current;
@@ -49,23 +51,13 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
     }
   };
 
-  const handleRestore = async () => {
-    try {
-      await restore();
-      Alert.alert("Wiederhergestellt", "Dein Abonnement wurde wiederhergestellt.");
-      onClose();
-    } catch (e: any) {
-      Alert.alert("Fehler", e?.message ?? "Wiederherstellung fehlgeschlagen");
-    }
-  };
-
   const monthlyPrice = monthlyPkg?.product?.priceString ?? "4,99 €/Monat";
   const annualPrice = annualPkg?.product?.priceString ?? "39,99 €/Jahr";
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 14 }]}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Feather name="x" size={22} color={colors.mutedForeground} />
           </TouchableOpacity>
@@ -131,22 +123,15 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
 
         <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
           <TouchableOpacity
-            style={[styles.purchaseBtn, { backgroundColor: colors.primary }, (isPurchasing || isRestoring) && { opacity: 0.6 }]}
+            style={[styles.purchaseBtn, { backgroundColor: colors.primary }, isPurchasing && { opacity: 0.6 }]}
             onPress={handlePurchase}
-            disabled={isPurchasing || isRestoring}
+            disabled={isPurchasing}
             activeOpacity={0.85}
           >
             {isPurchasing ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.purchaseBtnText}>Jetzt kostenlos starten</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleRestore} disabled={isPurchasing || isRestoring} style={styles.restoreBtn}>
-            {isRestoring ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <Text style={[styles.restoreText, { color: colors.mutedForeground }]}>Kauf wiederherstellen</Text>
             )}
           </TouchableOpacity>
         </View>

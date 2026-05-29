@@ -36,7 +36,8 @@ export default function SaveTripSheet() {
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string>("actual");
+  const [gpsChecked, setGpsChecked] = useState(true);
+  const [routeCheckedId, setRouteCheckedId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [draftTrip, setDraftTrip] = useState<Trip | null>(null);
 
@@ -44,12 +45,14 @@ export default function SaveTripSheet() {
     if (!pendingTrip) {
       setRoutes([]);
       setRouteError(null);
-      setSelectedId("actual");
+      setGpsChecked(true);
+      setRouteCheckedId(null);
       setDraftTrip(null);
       return;
     }
     setDraftTrip(pendingTrip);
-    setSelectedId("actual");
+    setGpsChecked(true);
+    setRouteCheckedId(null);
 
     if (!pendingTripCoords) return;
     setLoadingRoutes(true);
@@ -60,7 +63,11 @@ export default function SaveTripSheet() {
       pendingTripCoords.endLat,
       pendingTripCoords.endLon
     )
-      .then(setRoutes)
+      .then((r) => {
+        setRoutes(r);
+        const shortest = r.find((x) => x.isShortest) ?? r[0];
+        if (shortest) setRouteCheckedId(shortest.id);
+      })
       .catch(() => setRouteError("Routen konnten nicht geladen werden"))
       .finally(() => setLoadingRoutes(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,16 +80,26 @@ export default function SaveTripSheet() {
   const handleSave = useCallback(async () => {
     if (!draftTrip) return;
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Primary km: GPS if GPS is checked, otherwise use the checked route km
     let km = draftTrip.km;
-    if (selectedId !== "actual") {
-      const route = routes.find((r) => r.id === selectedId);
+    if (!gpsChecked && routeCheckedId) {
+      const route = routes.find((r) => r.id === routeCheckedId);
       if (route) km = route.km;
     }
-    // Always record the shortest available route as kmRoute so the PDF comparison column is filled
-    const shortestRoute = routes.find((r) => r.isShortest);
-    const kmRoute = shortestRoute?.km ?? draftTrip.kmRoute;
+
+    // kmRoute: use the explicitly checked route, or fallback to shortest available OSRM route
+    let kmRoute = draftTrip.kmRoute;
+    if (routeCheckedId) {
+      const route = routes.find((r) => r.id === routeCheckedId);
+      if (route) kmRoute = route.km;
+    } else {
+      const shortest = routes.find((r) => r.isShortest);
+      if (shortest) kmRoute = shortest.km;
+    }
+
     await finalizeTrip({ ...draftTrip, km, kmRoute });
-  }, [draftTrip, selectedId, routes, finalizeTrip]);
+  }, [draftTrip, gpsChecked, routeCheckedId, routes, finalizeTrip]);
 
   const handleEditSave = useCallback(
     async (_id: string, changes: Partial<Trip>) => {
@@ -128,7 +145,7 @@ export default function SaveTripSheet() {
                       Fahrt beenden
                     </Text>
                     <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                      Kilometerstand auswählen & speichern
+                      Fahrt bearbeiten und speichern
                     </Text>
                   </View>
                 </View>
@@ -221,30 +238,21 @@ export default function SaveTripSheet() {
                   style={[
                     styles.routeCard,
                     {
-                      backgroundColor:
-                        selectedId === "actual" ? colors.accent : colors.secondary,
-                      borderColor:
-                        selectedId === "actual" ? colors.primary : colors.border,
+                      backgroundColor: gpsChecked ? colors.accent : colors.secondary,
+                      borderColor: gpsChecked ? colors.primary : colors.border,
                     },
                   ]}
-                  onPress={() => setSelectedId("actual")}
+                  onPress={() => setGpsChecked(!gpsChecked)}
                   activeOpacity={0.75}
                 >
                   <View style={styles.routeLeft}>
                     <View
                       style={[
-                        styles.radioOuter,
-                        {
-                          borderColor:
-                            selectedId === "actual" ? colors.primary : colors.border,
-                        },
+                        styles.checkOuter,
+                        { borderColor: gpsChecked ? colors.primary : colors.border, backgroundColor: gpsChecked ? colors.primary : "transparent" },
                       ]}
                     >
-                      {selectedId === "actual" && (
-                        <View
-                          style={[styles.radioInner, { backgroundColor: colors.primary }]}
-                        />
-                      )}
+                      {gpsChecked && <Feather name="check" size={12} color="#FFF" />}
                     </View>
                     <View>
                       <Text style={[styles.routeName, { color: colors.foreground }]}>
@@ -297,30 +305,24 @@ export default function SaveTripSheet() {
                     style={[
                       styles.routeCard,
                       {
-                        backgroundColor:
-                          selectedId === route.id ? colors.accent : colors.secondary,
-                        borderColor:
-                          selectedId === route.id ? colors.primary : colors.border,
+                        backgroundColor: routeCheckedId === route.id ? colors.accent : colors.secondary,
+                        borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
                       },
                     ]}
-                    onPress={() => setSelectedId(route.id)}
+                    onPress={() => setRouteCheckedId(routeCheckedId === route.id ? null : route.id)}
                     activeOpacity={0.75}
                   >
                     <View style={styles.routeLeft}>
                       <View
                         style={[
-                          styles.radioOuter,
+                          styles.checkOuter,
                           {
-                            borderColor:
-                              selectedId === route.id ? colors.primary : colors.border,
+                            borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
+                            backgroundColor: routeCheckedId === route.id ? colors.primary : "transparent",
                           },
                         ]}
                       >
-                        {selectedId === route.id && (
-                          <View
-                            style={[styles.radioInner, { backgroundColor: colors.primary }]}
-                          />
-                        )}
+                        {routeCheckedId === route.id && <Feather name="check" size={12} color="#FFF" />}
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={styles.routeNameRow}>
@@ -534,16 +536,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   routeLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  radioOuter: {
+  checkOuter: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
-  radioInner: { width: 10, height: 10, borderRadius: 5 },
   routeNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   routeName: { fontSize: 14, fontWeight: "700" },
   routeSub: { fontSize: 12, marginTop: 2 },

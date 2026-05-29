@@ -187,19 +187,20 @@ export const reverseGeocode = async (lat: number, lon: number): Promise<string> 
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de&zoom=18&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de&zoom=19&addressdetails=1&namedetails=1`,
       { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
     );
     clearTimeout(tid);
     const d = await r.json();
-    const road = d.address?.road || d.address?.pedestrian || d.address?.path || "";
-    const houseNumber = d.address?.house_number || "";
+    const road = d.address?.road || d.address?.pedestrian || d.address?.path || d.address?.street || "";
+    const houseNumber = d.address?.house_number || d.address?.housenumber || "";
     const postcode = d.address?.postcode || "";
     const city =
       d.address?.city ||
       d.address?.town ||
       d.address?.village ||
       d.address?.suburb ||
+      d.address?.municipality ||
       "";
     const street = houseNumber ? `${road} ${houseNumber}`.trim() : road;
     const locality = [postcode, city].filter(Boolean).join(" ");
