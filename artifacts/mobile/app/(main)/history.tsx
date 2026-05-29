@@ -410,7 +410,7 @@ export default function HistoryScreen() {
                   onChangeText={setDateFrom}
                   placeholder={t("history.datePlaceholder")}
                   placeholderTextColor={colors.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
                 />
               </View>
             </View>
@@ -427,7 +427,7 @@ export default function HistoryScreen() {
                   onChangeText={setDateTo}
                   placeholder={t("history.datePlaceholder")}
                   placeholderTextColor={colors.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
                 />
               </View>
             </View>

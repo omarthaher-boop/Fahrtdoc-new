@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -97,6 +98,18 @@ export default function HomeScreen() {
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
   const openStartModal = (type: "business" | "private") => {
+    if (activeTrip) {
+      if (Platform.OS === "web") {
+        window.alert("Es läuft bereits eine Fahrt!\n\nBitte beende die aktuelle Fahrt, bevor du eine neue startest.");
+      } else {
+        Alert.alert(
+          "Fahrt läuft bereits",
+          "Bitte beende die aktuelle Fahrt, bevor du eine neue startest.",
+          [{ text: "OK", style: "cancel" }]
+        );
+      }
+      return;
+    }
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setPendingType(type);
     setModalStartAddr("");
@@ -192,31 +205,31 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.quickStart")}</Text>
             <View style={styles.quickRow}>
               <TouchableOpacity
-                style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.quickBtn, { backgroundColor: "#EEF2FF", borderColor: "#C7D2FE" }]}
                 onPress={() => openStartModal("business")}
                 disabled={starting}
                 testID="start-business"
               >
-                <View style={[styles.quickIcon, { backgroundColor: colors.accent }]}>
-                  <Feather name="briefcase" size={22} color={colors.primary} />
+                <View style={[styles.quickIcon, { backgroundColor: "#6366F1" }]}>
+                  <Feather name="briefcase" size={22} color="#FFFFFF" />
                 </View>
-                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{t("home.businessTrip")}</Text>
-                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>{t("home.businessSub")}</Text>
-                <Feather name="arrow-right" size={16} color={colors.primary} style={styles.quickArrow} />
+                <Text style={[styles.quickLabel, { color: "#312E81" }]}>{t("home.businessTrip")}</Text>
+                <Text style={[styles.quickSub, { color: "#6366F1" }]}>{t("home.businessSub")}</Text>
+                <Feather name="arrow-right" size={16} color="#6366F1" style={styles.quickArrow} />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.quickBtn, { backgroundColor: "#F0FDF4", borderColor: "#86EFAC" }]}
                 onPress={() => openStartModal("private")}
                 disabled={starting}
                 testID="start-private"
               >
-                <View style={[styles.quickIcon, { backgroundColor: colors.successLight }]}>
-                  <Feather name="user" size={22} color={colors.success} />
+                <View style={[styles.quickIcon, { backgroundColor: "#22C55E" }]}>
+                  <Feather name="user" size={22} color="#FFFFFF" />
                 </View>
-                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{t("home.privateTrip")}</Text>
-                <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>{t("home.privateSub")}</Text>
-                <Feather name="arrow-right" size={16} color={colors.success} style={styles.quickArrow} />
+                <Text style={[styles.quickLabel, { color: "#14532D" }]}>{t("home.privateTrip")}</Text>
+                <Text style={[styles.quickSub, { color: "#16A34A" }]}>{t("home.privateSub")}</Text>
+                <Feather name="arrow-right" size={16} color="#16A34A" style={styles.quickArrow} />
               </TouchableOpacity>
             </View>
             {gpsStatus === "denied" && (

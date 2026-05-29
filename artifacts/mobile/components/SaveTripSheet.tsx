@@ -134,6 +134,8 @@ export default function SaveTripSheet() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 8 }}
               >
                 {/* Header */}
                 <View style={styles.titleRow}>
