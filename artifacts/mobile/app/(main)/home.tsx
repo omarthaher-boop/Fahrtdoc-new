@@ -21,9 +21,11 @@ import SaveTripSheet from "@/components/SaveTripSheet";
 import StatCard from "@/components/StatCard";
 import TripCard from "@/components/TripCard";
 import TripDetailModal from "@/components/TripDetailModal";
+import PaywallModal from "@/components/PaywallModal";
 import { useApp, Trip, reverseGeocode } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
+import { useSubscription } from "@/lib/revenuecat";
 import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
 
 const fmtDur = (s: number) => {
@@ -40,8 +42,10 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync, deleteTrip, editTrip } = useApp();
+  const { isSubscribed } = useSubscription();
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
   const [starting, setStarting] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -97,6 +101,8 @@ export default function HomeScreen() {
   const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
+  const FREE_TRIP_LIMIT = 5;
+
   const openStartModal = (type: "business" | "private") => {
     if (activeTrip) {
       if (Platform.OS === "web") {
@@ -108,6 +114,10 @@ export default function HomeScreen() {
           [{ text: "OK", style: "cancel" }]
         );
       }
+      return;
+    }
+    if (!isSubscribed && trips.length >= FREE_TRIP_LIMIT) {
+      setShowPaywall(true);
       return;
     }
     if (Platform.OS !== "web") Haptics.selectionAsync();
@@ -355,6 +365,9 @@ export default function HomeScreen() {
         visible={viewingTrip !== null}
         onClose={() => setViewingTrip(null)}
       />
+
+      {/* Paywall — shown when free user exceeds 5 trip limit */}
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
 
       {/* Start Trip Confirm Modal */}
       <Modal visible={showStartModal} transparent animationType="fade">

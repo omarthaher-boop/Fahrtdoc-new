@@ -21,6 +21,7 @@ interface PaywallModalProps {
 
 const FEATURES = [
   "PDF & CSV Export des Fahrtenbuchs",
+  "Fahrtenbuch per E-Mail senden",
   "Unbegrenzte Fahrtenhistorie",
   "Prioritäts-Support",
 ];
@@ -134,6 +135,9 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
               <Text style={styles.purchaseBtnText}>Jetzt kostenlos starten</Text>
             )}
           </TouchableOpacity>
+          <Text style={[styles.cancelWarning, { color: colors.mutedForeground }]}>
+            Wenn Sie Ihr Abo beenden, werden alle Ihre Daten gelöscht und können nicht wiederhergestellt werden.
+          </Text>
         </View>
       </View>
     </Modal>
@@ -203,4 +207,12 @@ const styles = StyleSheet.create({
   purchaseBtnText: { color: "#fff", fontSize: 17, fontFamily: "Inter_600SemiBold" },
   restoreBtn: { alignItems: "center", paddingVertical: 4 },
   restoreText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  cancelWarning: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 16,
+    marginTop: 4,
+    paddingHorizontal: 8,
+  },
 });
