@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.fahrtdoc.app",
+      "bundleIdentifier": "app.replit.fahrtdoc",
       "infoPlist": {
         "UIBackgroundModes": ["location"],
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
