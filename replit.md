@@ -99,6 +99,10 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - **`SMTP_FROM`** ist als Env-Var (nicht Secret) gesetzt: `FahrtDoc <info@centofai.com>`.
 - **Secrets niemals in Git** — SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT leben nur in Replit Secrets und müssen bei neuem Deployment manuell gesetzt werden.
 
+## Offene Aufgaben (Erinnerungen)
+
+- **Skalierung / Hosting-Upgrade**: Wenn die Nutzerzahl wächst (>100 gleichzeitige Nutzer), API-Server auf Replit Reserved VM oder externes Hosting (Railway, Fly.io) migrieren. Aktuell reicht Replit für den App Store Launch.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
