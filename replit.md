@@ -71,6 +71,8 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **EAS-Projektverknüpfung schützen** — `app.json` muss immer `extra.eas.projectId: "bacc0475-15a8-407c-acea-a8bc71ffbda2"` enthalten. Ohne diese ID erstellt EAS CLI bei jedem Build ein neues Projekt.
 
+- **esbuild darwin-Binaries NICHT aus pnpm-Overrides ausschließen** — `pnpm-workspace.yaml` enthält Overrides die unnötige Plattform-Pakete mit `"-"` ausschließen. `@esbuild/darwin-arm64` und `@esbuild/darwin-x64` dürfen NICHT ausgeschlossen werden — EAS baut auf macOS und braucht diese Binaries. Ohne sie: `[esbuild] Failed to find package` → Prebuild schlägt fehl.
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
