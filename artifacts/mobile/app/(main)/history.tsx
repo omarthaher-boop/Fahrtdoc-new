@@ -178,21 +178,35 @@ export default function HistoryScreen() {
     });
   }, [trips, cutoff, typeFilter, dateFrom, dateTo]);
 
+  const FREE_TRIP_LIMIT = 5;
+
+  // Free users: show only the 5 most recent trips
+  const filteredForDisplay = useMemo(() => {
+    if (isSubscribed) return filtered;
+    const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sorted.slice(0, FREE_TRIP_LIMIT);
+  }, [filtered, isSubscribed]);
+
+  const hiddenTripCount = useMemo(() => {
+    if (isSubscribed) return 0;
+    return Math.max(0, filtered.length - FREE_TRIP_LIMIT);
+  }, [filtered, isSubscribed]);
+
   // Which trips the stats card and export act on
   const selectedTrips = useMemo(
-    () => filtered.filter((t) => selectedIds.has(t.id)),
-    [filtered, selectedIds]
+    () => filteredForDisplay.filter((t) => selectedIds.has(t.id)),
+    [filteredForDisplay, selectedIds]
   );
   // In selection mode: use checked trips (even if empty). Outside selection mode: use all filtered trips.
-  const displayTrips = selectionMode ? selectedTrips : filtered;
+  const displayTrips = selectionMode ? selectedTrips : filteredForDisplay;
 
   const statsKm = useMemo(() => displayTrips.reduce((a, b) => a + b.km, 0), [displayTrips]);
   const statsDur = useMemo(() => displayTrips.reduce((a, b) => a + b.dur, 0), [displayTrips]);
 
   const locale = language === "en" ? "en-US" : "de-DE";
   const groups = useMemo(
-    () => groupByDate(filtered, t("history.today"), t("history.yesterday"), locale),
-    [filtered, t, locale]
+    () => groupByDate(filteredForDisplay, t("history.today"), t("history.yesterday"), locale),
+    [filteredForDisplay, t, locale]
   );
 
   const isDateRangeActive = !!dateFrom || !!dateTo;
@@ -580,6 +594,26 @@ export default function HistoryScreen() {
               ))}
             </View>
           ))}
+
+          {/* Premium upgrade banner — shown when older trips are hidden */}
+          {hiddenTripCount > 0 && (
+            <TouchableOpacity
+              onPress={() => setShowPaywall(true)}
+              activeOpacity={0.85}
+              style={[styles.premiumBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "40" }]}
+            >
+              <Feather name="lock" size={18} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.premiumBannerTitle, { color: colors.primary }]}>
+                  {hiddenTripCount} ältere {hiddenTripCount === 1 ? "Fahrt" : "Fahrten"} verborgen
+                </Text>
+                <Text style={[styles.premiumBannerSub, { color: colors.mutedForeground }]}>
+                  Premium freischalten für unbegrenzte Fahrtenhistorie
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -790,6 +824,17 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     lineHeight: 12,
   },
+  premiumBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  premiumBannerTitle: { fontSize: 14, fontWeight: "700" },
+  premiumBannerSub: { fontSize: 12, marginTop: 2 },
   group: { marginBottom: 8 },
   sectionHeader: {
     flexDirection: "row",
