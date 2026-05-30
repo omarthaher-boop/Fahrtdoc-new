@@ -23,6 +23,7 @@ import { useColors } from "@/hooks/useColors";
 import { exportPDF, exportCSV } from "@/utils/exportPDF";
 import PaywallModal from "@/components/PaywallModal";
 import { useSubscription } from "@/lib/revenuecat";
+import { SUBSCRIPTION_ENABLED, FREE_TRIP_LIMIT } from "@/config/subscription";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 
@@ -178,17 +179,15 @@ export default function HistoryScreen() {
     });
   }, [trips, cutoff, typeFilter, dateFrom, dateTo]);
 
-  const FREE_TRIP_LIMIT = 5;
-
-  // Free users: show only the 5 most recent trips
+  // Free users: show only the most recent FREE_TRIP_LIMIT trips (when SUBSCRIPTION_ENABLED)
   const filteredForDisplay = useMemo(() => {
-    if (isSubscribed) return filtered;
+    if (!SUBSCRIPTION_ENABLED || isSubscribed) return filtered;
     const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return sorted.slice(0, FREE_TRIP_LIMIT);
   }, [filtered, isSubscribed]);
 
   const hiddenTripCount = useMemo(() => {
-    if (isSubscribed) return 0;
+    if (!SUBSCRIPTION_ENABLED || isSubscribed) return 0;
     return Math.max(0, filtered.length - FREE_TRIP_LIMIT);
   }, [filtered, isSubscribed]);
 
@@ -288,7 +287,7 @@ export default function HistoryScreen() {
   };
 
   const handleExportPDF = async () => {
-    if (!isSubscribed) { setShowPaywall(true); return; }
+    if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
@@ -298,7 +297,7 @@ export default function HistoryScreen() {
   };
 
   const handleExportCSV = async () => {
-    if (!isSubscribed) { setShowPaywall(true); return; }
+    if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
