@@ -212,7 +212,7 @@ export default function HistoryScreen() {
   const isDateRangeActive = !!dateFrom || !!dateTo;
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
+  const bottomPad = insets.bottom + (Platform.OS === "web" ? 90 : 120) + (hiddenTripCount > 0 ? 80 : 0);
 
   // --- Selection handlers ---
   const toggleSelectionMode = () => {
