@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -191,7 +191,7 @@ export default function HomeScreen() {
           </View>
         </View>
         <View style={[styles.plateBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Feather name="truck" size={12} color={colors.primary} />
+          <MaterialCommunityIcons name="car" size={14} color={colors.primary} />
           <Text style={[styles.plateText, { color: colors.sub }]}>{user?.plate ?? "—"}</Text>
         </View>
       </View>
