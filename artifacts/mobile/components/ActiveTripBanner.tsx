@@ -218,12 +218,6 @@ export default function ActiveTripBanner() {
             </View>
           )}
 
-          {!driveTaskRunning && Platform.OS !== "web" && (
-            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
-              <Feather name="alert-circle" size={12} color={warningColor} />
-              <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.driveDetectStopped")}</Text>
-            </View>
-          )}
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
