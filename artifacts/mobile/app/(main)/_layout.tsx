@@ -1,7 +1,5 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Redirect, Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
@@ -9,26 +7,6 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
-
-function NativeMainTabs() {
-  const { t } = useLanguage();
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="home">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>{t("nav.home")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
-        <Label>{t("nav.trips")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>{t("nav.profile")}</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
 
 function ClassicMainTabs() {
   const colors = useColors();
@@ -111,8 +89,5 @@ export default function MainTabLayout() {
 
   if (!user) return <Redirect href="/" />;
 
-  if (isLiquidGlassAvailable()) {
-    return <NativeMainTabs />;
-  }
   return <ClassicMainTabs />;
 }
