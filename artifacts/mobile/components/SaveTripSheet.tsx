@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,11 +10,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import EditTripModal from "@/components/EditTripModal";
 import TripRouteMap from "@/components/TripRouteMap";
 import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -25,6 +25,26 @@ const fmtDur = (s: number) => {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}h ${m}min` : `${m} min`;
+};
+
+const forwardGeocode = async (address: string): Promise<{ lat: number; lon: number } | null> => {
+  try {
+    const encoded = encodeURIComponent(address);
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+    );
+    clearTimeout(tid);
+    const data = await r.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
 export default function SaveTripSheet() {
@@ -38,8 +58,11 @@ export default function SaveTripSheet() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [gpsChecked, setGpsChecked] = useState(true);
   const [routeCheckedId, setRouteCheckedId] = useState<string | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [draftTrip, setDraftTrip] = useState<Trip | null>(null);
+  const [editingField, setEditingField] = useState<"end" | number | null>(null);
+  const [fieldDraftValue, setFieldDraftValue] = useState("");
+  const [routeOverrideEnd, setRouteOverrideEnd] = useState<{ lat: number; lon: number } | null>(null);
+  const isConfirmingRef = useRef(false);
 
   useEffect(() => {
     if (!pendingTrip) {
@@ -48,6 +71,9 @@ export default function SaveTripSheet() {
       setGpsChecked(true);
       setRouteCheckedId(null);
       setDraftTrip(null);
+      setEditingField(null);
+      setFieldDraftValue("");
+      setRouteOverrideEnd(null);
       return;
     }
     setDraftTrip(pendingTrip);
@@ -77,18 +103,67 @@ export default function SaveTripSheet() {
     if (pendingTrip) setDraftTrip(pendingTrip);
   }, [pendingTrip]);
 
+  const startFieldEdit = (field: "end" | number, currentValue: string) => {
+    setEditingField(field);
+    setFieldDraftValue(currentValue);
+  };
+
+  const confirmFieldEdit = useCallback(async () => {
+    if (isConfirmingRef.current) return;
+    const field = editingField;
+    if (field === null || !draftTrip) {
+      setEditingField(null);
+      return;
+    }
+    isConfirmingRef.current = true;
+    setEditingField(null);
+
+    if (field === "end") {
+      const newAddr = fieldDraftValue.trim() || draftTrip.endAddr;
+      setDraftTrip((prev) => (prev ? { ...prev, endAddr: newAddr } : null));
+
+      if (pendingTripCoords && newAddr && newAddr !== draftTrip.endAddr) {
+        setLoadingRoutes(true);
+        setRouteError(null);
+        const coords = await forwardGeocode(newAddr);
+        const endLat = coords?.lat ?? (routeOverrideEnd?.lat ?? pendingTripCoords.endLat);
+        const endLon = coords?.lon ?? (routeOverrideEnd?.lon ?? pendingTripCoords.endLon);
+        if (coords) setRouteOverrideEnd(coords);
+
+        fetchRoutes(pendingTripCoords.startLat, pendingTripCoords.startLon, endLat, endLon)
+          .then((r) => {
+            setRoutes(r);
+            const shortest = r.find((x) => x.isShortest) ?? r[0];
+            if (shortest) setRouteCheckedId(shortest.id);
+          })
+          .catch(() => setRouteError("Routen konnten nicht geladen werden"))
+          .finally(() => setLoadingRoutes(false));
+      }
+    } else {
+      const idx = field as number;
+      const newAddr = fieldDraftValue.trim();
+      setDraftTrip((prev) => {
+        if (!prev) return null;
+        const newWaypoints = [...(prev.waypoints ?? [])];
+        if (newWaypoints[idx]) {
+          newWaypoints[idx] = { ...newWaypoints[idx], addr: newAddr || newWaypoints[idx].addr };
+        }
+        return { ...prev, waypoints: newWaypoints };
+      });
+    }
+    isConfirmingRef.current = false;
+  }, [editingField, fieldDraftValue, draftTrip, pendingTripCoords, routeOverrideEnd]);
+
   const handleSave = useCallback(async () => {
     if (!draftTrip) return;
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Primary km: GPS if GPS is checked, otherwise use the checked route km
     let km = draftTrip.km;
     if (!gpsChecked && routeCheckedId) {
       const route = routes.find((r) => r.id === routeCheckedId);
       if (route) km = route.km;
     }
 
-    // kmRoute: use the explicitly checked route, or fallback to shortest available OSRM route
     let kmRoute = draftTrip.kmRoute;
     if (routeCheckedId) {
       const route = routes.find((r) => r.id === routeCheckedId);
@@ -101,352 +176,353 @@ export default function SaveTripSheet() {
     await finalizeTrip({ ...draftTrip, km, kmRoute });
   }, [draftTrip, gpsChecked, routeCheckedId, routes, finalizeTrip]);
 
-  const handleEditSave = useCallback(
-    async (_id: string, changes: Partial<Trip>) => {
-      if (!draftTrip) return;
-      setShowEditModal(false);
-      await finalizeTrip({ ...draftTrip, ...changes, edited: true });
-    },
-    [draftTrip, finalizeTrip]
-  );
-
   if (!pendingTrip) return null;
 
   return (
-    <>
-      <Modal visible transparent animationType="slide" onRequestClose={() => {}}>
-        <View style={styles.overlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.sheetWrapper}
+    <Modal visible transparent animationType="slide" onRequestClose={() => {}}>
+      <View style={styles.overlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.sheetWrapper}
+        >
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.card,
+                paddingBottom: insets.bottom + 24,
+              },
+            ]}
           >
-            <View
-              style={[
-                styles.sheet,
-                {
-                  backgroundColor: colors.card,
-                  paddingBottom: insets.bottom + 24,
-                },
-              ]}
-            >
-              <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                style={{ flex: 1 }}
-                contentContainerStyle={{ paddingBottom: 8 }}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 8 }}
+            >
+              {/* Header */}
+              <View style={styles.titleRow}>
+                <View style={[styles.titleIcon, { backgroundColor: colors.accent }]}>
+                  <Feather name="flag" size={22} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.title, { color: colors.foreground }]}>
+                    Fahrt beenden
+                  </Text>
+                  <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+                    Adressen tippen zum Bearbeiten
+                  </Text>
+                </View>
+              </View>
+
+              {/* Trip summary card */}
+              <View
+                style={[
+                  styles.infoCard,
+                  { backgroundColor: colors.secondary, borderColor: colors.border },
+                ]}
               >
-                {/* Header */}
-                <View style={styles.titleRow}>
-                  <View style={[styles.titleIcon, { backgroundColor: colors.accent }]}>
-                    <Feather name="flag" size={22} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.title, { color: colors.foreground }]}>
-                      Fahrt beenden
+                {/* Start address (read-only) */}
+                <View style={styles.addrRow}>
+                  <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
+                  <Text
+                    style={[styles.addrText, { color: colors.foreground }]}
+                    numberOfLines={1}
+                  >
+                    {draftTrip?.startAddr || "—"}
+                  </Text>
+                </View>
+
+                {/* Waypoints (editable) */}
+                {(draftTrip?.waypoints ?? []).map((wp, idx) => (
+                  <React.Fragment key={wp.timestamp}>
+                    <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
+                    <View style={styles.addrRow}>
+                      <Feather name="map-pin" size={10} color={colors.primary} style={styles.waypointIcon} />
+                      <Text style={[styles.addrLabelText, { color: colors.mutedForeground }]}>
+                        {`${t("waypoint.label")} ${idx + 1}: `}
+                      </Text>
+                      {editingField === idx ? (
+                        <TextInput
+                          style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
+                          value={fieldDraftValue}
+                          onChangeText={setFieldDraftValue}
+                          onSubmitEditing={confirmFieldEdit}
+                          onBlur={confirmFieldEdit}
+                          autoFocus
+                          returnKeyType="done"
+                          blurOnSubmit
+                        />
+                      ) : (
+                        <>
+                          <Text
+                            style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
+                            numberOfLines={1}
+                          >
+                            {wp.addr}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => startFieldEdit(idx, wp.addr)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Feather name="edit-2" size={12} color={colors.mutedForeground} />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </React.Fragment>
+                ))}
+
+                <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
+
+                {/* End address (editable) */}
+                <View style={styles.addrRow}>
+                  <View
+                    style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]}
+                  />
+                  {editingField === "end" ? (
+                    <TextInput
+                      style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
+                      value={fieldDraftValue}
+                      onChangeText={setFieldDraftValue}
+                      onSubmitEditing={confirmFieldEdit}
+                      onBlur={confirmFieldEdit}
+                      autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit
+                    />
+                  ) : (
+                    <>
+                      <Text
+                        style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
+                        numberOfLines={1}
+                      >
+                        {draftTrip?.endAddr || "Wird ermittelt …"}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => startFieldEdit("end", draftTrip?.endAddr ?? "")}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Feather name="edit-2" size={12} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+
+                <View style={[styles.infoChipRow, { borderTopColor: colors.border }]}>
+                  <View style={styles.infoChip}>
+                    <Feather name="clock" size={12} color={colors.mutedForeground} />
+                    <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
+                      {fmtDur(draftTrip?.dur ?? 0)}
                     </Text>
-                    <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                      Fahrt bearbeiten und speichern
+                  </View>
+                  <View style={styles.infoChip}>
+                    <Feather
+                      name={draftTrip?.type === "business" ? "briefcase" : "user"}
+                      size={12}
+                      color={colors.mutedForeground}
+                    />
+                    <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
+                      {draftTrip?.type === "business" ? "Geschäftlich" : "Privat"}
                     </Text>
                   </View>
                 </View>
+              </View>
 
-                {/* Trip summary card */}
+              {/* Route map */}
+              {draftTrip && (
+                <View style={styles.mapWrapper}>
+                  <TripRouteMap
+                    trip={draftTrip}
+                    coords={pendingTripCoords ?? undefined}
+                    path={pendingTripPath ?? undefined}
+                  />
+                </View>
+              )}
+
+              {/* Section label */}
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                KILOMETERSTAND WÄHLEN
+              </Text>
+
+              {/* Actual GPS km */}
+              <TouchableOpacity
+                style={[
+                  styles.routeCard,
+                  {
+                    backgroundColor: gpsChecked ? colors.accent : colors.secondary,
+                    borderColor: gpsChecked ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setGpsChecked(!gpsChecked)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.routeLeft}>
+                  <View
+                    style={[
+                      styles.checkOuter,
+                      { borderColor: gpsChecked ? colors.primary : colors.border, backgroundColor: gpsChecked ? colors.primary : "transparent" },
+                    ]}
+                  >
+                    {gpsChecked && <Feather name="check" size={12} color="#FFF" />}
+                  </View>
+                  <View>
+                    <Text style={[styles.routeName, { color: colors.foreground }]}>
+                      Gefahrene Kilometer
+                    </Text>
+                    <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
+                      GPS-aufgezeichnete Strecke
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.routeKm, { color: colors.primary }]}>
+                  {(draftTrip?.km ?? 0).toFixed(1)} km
+                </Text>
+              </TouchableOpacity>
+
+              {/* Loading indicator */}
+              {loadingRoutes && (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+                    Routen werden berechnet …
+                  </Text>
+                </View>
+              )}
+
+              {/* Route error */}
+              {routeError && (
                 <View
                   style={[
-                    styles.infoCard,
-                    { backgroundColor: colors.secondary, borderColor: colors.border },
+                    styles.errorBanner,
+                    {
+                      backgroundColor: colors.warningLight ?? "#FFF8E7",
+                      borderColor: colors.warning ?? "#FFB703",
+                    },
                   ]}
                 >
-                  <View style={styles.addrRow}>
-                    <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
-                    <Text
-                      style={[styles.addrText, { color: colors.foreground }]}
-                      numberOfLines={1}
-                    >
-                      {draftTrip?.startAddr || "—"}
-                    </Text>
-                  </View>
-                  {(draftTrip?.waypoints ?? []).map((wp, idx) => (
-                    <React.Fragment key={wp.timestamp}>
-                      <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
-                      <View style={styles.addrRow}>
-                        <Feather name="map-pin" size={10} color={colors.primary} style={styles.waypointIcon} />
-                        <Text
-                          style={[styles.addrLabelText, { color: colors.mutedForeground }]}
-                        >
-                          {`${t("waypoint.label")} ${idx + 1}: `}
-                        </Text>
-                        <Text
-                          style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
-                          numberOfLines={1}
-                        >
-                          {wp.addr}
-                        </Text>
-                      </View>
-                    </React.Fragment>
-                  ))}
-                  <View style={[styles.addrConnector, { backgroundColor: colors.border }]} />
-                  <View style={styles.addrRow}>
-                    <View
-                      style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]}
-                    />
-                    <Text
-                      style={[styles.addrText, { color: colors.foreground }]}
-                      numberOfLines={1}
-                    >
-                      {draftTrip?.endAddr || "Wird ermittelt …"}
-                    </Text>
-                  </View>
-                  <View style={[styles.infoChipRow, { borderTopColor: colors.border }]}>
-                    <View style={styles.infoChip}>
-                      <Feather name="clock" size={12} color={colors.mutedForeground} />
-                      <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
-                        {fmtDur(draftTrip?.dur ?? 0)}
-                      </Text>
-                    </View>
-                    <View style={styles.infoChip}>
-                      <Feather
-                        name={draftTrip?.type === "business" ? "briefcase" : "user"}
-                        size={12}
-                        color={colors.mutedForeground}
-                      />
-                      <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
-                        {draftTrip?.type === "business" ? "Geschäftlich" : "Privat"}
-                      </Text>
-                    </View>
-                  </View>
+                  <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
+                  <Text style={[styles.errorText, { color: colors.warning ?? "#FFB703" }]}>
+                    {routeError}
+                  </Text>
                 </View>
+              )}
 
-                {/* Route map */}
-                {draftTrip && (
-                  <View style={styles.mapWrapper}>
-                    <TripRouteMap
-                      trip={draftTrip}
-                      coords={pendingTripCoords ?? undefined}
-                      path={pendingTripPath ?? undefined}
-                    />
-                  </View>
-                )}
-
-                {/* Section label */}
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-                  KILOMETERSTAND WÄHLEN
-                </Text>
-
-                {/* Actual GPS km */}
+              {/* OSRM route options */}
+              {routes.map((route) => (
                 <TouchableOpacity
+                  key={route.id}
                   style={[
                     styles.routeCard,
                     {
-                      backgroundColor: gpsChecked ? colors.accent : colors.secondary,
-                      borderColor: gpsChecked ? colors.primary : colors.border,
+                      backgroundColor: routeCheckedId === route.id ? colors.accent : colors.secondary,
+                      borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
                     },
                   ]}
-                  onPress={() => setGpsChecked(!gpsChecked)}
+                  onPress={() => setRouteCheckedId(routeCheckedId === route.id ? null : route.id)}
                   activeOpacity={0.75}
                 >
                   <View style={styles.routeLeft}>
                     <View
                       style={[
                         styles.checkOuter,
-                        { borderColor: gpsChecked ? colors.primary : colors.border, backgroundColor: gpsChecked ? colors.primary : "transparent" },
+                        {
+                          borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
+                          backgroundColor: routeCheckedId === route.id ? colors.primary : "transparent",
+                        },
                       ]}
                     >
-                      {gpsChecked && <Feather name="check" size={12} color="#FFF" />}
+                      {routeCheckedId === route.id && <Feather name="check" size={12} color="#FFF" />}
                     </View>
-                    <View>
-                      <Text style={[styles.routeName, { color: colors.foreground }]}>
-                        Gefahrene Kilometer
-                      </Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.routeNameRow}>
+                        <Text style={[styles.routeName, { color: colors.foreground }]}>
+                          {route.label}
+                        </Text>
+                        {route.isShortest && !route.isFastest && (
+                          <View style={[styles.badge, { backgroundColor: colors.successLight }]}>
+                            <Text style={[styles.badgeText, { color: colors.success }]}>Kürzeste</Text>
+                          </View>
+                        )}
+                        {route.isFastest && !route.isShortest && (
+                          <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+                            <Text style={[styles.badgeText, { color: colors.primary }]}>Schnellste</Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
-                        GPS-aufgezeichnete Strecke
+                        ca. {route.durationMin} min Fahrzeit
                       </Text>
                     </View>
                   </View>
                   <Text style={[styles.routeKm, { color: colors.primary }]}>
-                    {(draftTrip?.km ?? 0).toFixed(1)} km
+                    {route.km.toFixed(1)} km
                   </Text>
                 </TouchableOpacity>
+              ))}
 
-                {/* Loading indicator */}
-                {loadingRoutes && (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-                      Routen werden berechnet …
-                    </Text>
-                  </View>
-                )}
-
-                {/* Route error */}
-                {routeError && (
-                  <View
-                    style={[
-                      styles.errorBanner,
-                      {
-                        backgroundColor: colors.warningLight ?? "#FFF8E7",
-                        borderColor: colors.warning ?? "#FFB703",
-                      },
-                    ]}
-                  >
-                    <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
-                    <Text
-                      style={[styles.errorText, { color: colors.warning ?? "#FFB703" }]}
-                    >
-                      {routeError}
-                    </Text>
-                  </View>
-                )}
-
-                {/* OSRM route options */}
-                {routes.map((route) => (
-                  <TouchableOpacity
-                    key={route.id}
-                    style={[
-                      styles.routeCard,
-                      {
-                        backgroundColor: routeCheckedId === route.id ? colors.accent : colors.secondary,
-                        borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => setRouteCheckedId(routeCheckedId === route.id ? null : route.id)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={styles.routeLeft}>
-                      <View
-                        style={[
-                          styles.checkOuter,
-                          {
-                            borderColor: routeCheckedId === route.id ? colors.primary : colors.border,
-                            backgroundColor: routeCheckedId === route.id ? colors.primary : "transparent",
-                          },
-                        ]}
-                      >
-                        {routeCheckedId === route.id && <Feather name="check" size={12} color="#FFF" />}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={styles.routeNameRow}>
-                          <Text style={[styles.routeName, { color: colors.foreground }]}>
-                            {route.label}
-                          </Text>
-                          {route.isShortest && !route.isFastest && (
-                            <View
-                              style={[
-                                styles.badge,
-                                { backgroundColor: colors.successLight },
-                              ]}
-                            >
-                              <Text
-                                style={[styles.badgeText, { color: colors.success }]}
-                              >
-                                Kürzeste
-                              </Text>
-                            </View>
-                          )}
-                          {route.isFastest && !route.isShortest && (
-                            <View
-                              style={[styles.badge, { backgroundColor: colors.accent }]}
-                            >
-                              <Text
-                                style={[styles.badgeText, { color: colors.primary }]}
-                              >
-                                Schnellste
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
-                          ca. {route.durationMin} min Fahrzeit
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.routeKm, { color: colors.primary }]}>
-                      {route.km.toFixed(1)} km
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-
-                {/* Action buttons */}
-                <TouchableOpacity
-                  style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    if (Platform.OS === "web") {
-                      if (window.confirm("Fahrt speichern?\n\nDie Fahrt wird mit den gewählten Kilometern gespeichert.")) {
-                        handleSave();
-                      }
-                    } else {
-                      Alert.alert(
-                        "Fahrt speichern?",
-                        "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
-                        [
-                          { text: "Abbrechen", style: "cancel" },
-                          { text: "Speichern", onPress: handleSave },
-                        ]
-                      );
+              {/* Action buttons */}
+              <TouchableOpacity
+                style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  if (Platform.OS === "web") {
+                    if (window.confirm("Fahrt speichern?\n\nDie Fahrt wird mit den gewählten Kilometern gespeichert.")) {
+                      handleSave();
                     }
-                  }}
-                  testID="save-trip-confirm"
-                >
-                  <Feather name="check" size={15} color="#FFF" />
-                  <Text style={styles.saveBtnText}>Speichern</Text>
-                </TouchableOpacity>
+                  } else {
+                    Alert.alert(
+                      "Fahrt speichern?",
+                      "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
+                      [
+                        { text: "Abbrechen", style: "cancel" },
+                        { text: "Speichern", onPress: handleSave },
+                      ]
+                    );
+                  }
+                }}
+                testID="save-trip-confirm"
+              >
+                <Feather name="check" size={15} color="#FFF" />
+                <Text style={styles.saveBtnText}>Speichern</Text>
+              </TouchableOpacity>
 
-                <View style={styles.btnRow}>
-                  <TouchableOpacity
-                    style={[styles.editBtn, { borderColor: colors.border, backgroundColor: colors.secondary }]}
-                    onPress={() => setShowEditModal(true)}
-                    testID="save-trip-edit"
-                  >
-                    <Feather name="edit-2" size={14} color={colors.foreground} />
-                    <Text style={[styles.editBtnText, { color: colors.foreground }]}>Bearbeiten</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.editBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
-                    onPress={() => {
-                      if (Platform.OS === "web") {
-                        if (window.confirm("Fahrt verwerfen?\n\nDie aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.")) {
-                          discardPendingTrip();
-                        }
-                      } else {
-                        Alert.alert(
-                          "Fahrt verwerfen?",
-                          "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
-                          [
-                            { text: "Zurück", style: "cancel" },
-                            {
-                              text: "Verwerfen",
-                              style: "destructive",
-                              onPress: () => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                discardPendingTrip();
-                              },
-                            },
-                          ]
-                        );
-                      }
-                    }}
-                    testID="save-trip-cancel"
-                  >
-                    <Feather name="x" size={14} color={colors.destructive} />
-                    <Text style={[styles.editBtnText, { color: colors.destructive }]}>Abbrechen</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      <EditTripModal
-        trip={draftTrip}
-        visible={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        onSave={handleEditSave}
-      />
-    </>
+              <TouchableOpacity
+                style={[styles.discardBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
+                onPress={() => {
+                  if (Platform.OS === "web") {
+                    if (window.confirm("Fahrt verwerfen?\n\nDie aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.")) {
+                      discardPendingTrip();
+                    }
+                  } else {
+                    Alert.alert(
+                      "Fahrt verwerfen?",
+                      "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
+                      [
+                        { text: "Zurück", style: "cancel" },
+                        {
+                          text: "Verwerfen",
+                          style: "destructive",
+                          onPress: () => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            discardPendingTrip();
+                          },
+                        },
+                      ]
+                    );
+                  }
+                }}
+                testID="save-trip-cancel"
+              >
+                <Feather name="x" size={14} color={colors.destructive} />
+                <Text style={[styles.discardBtnText, { color: colors.destructive }]}>Abbrechen</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -506,7 +582,15 @@ const styles = StyleSheet.create({
   },
   addrConnector: { width: 2, height: 12, marginLeft: 4 },
   addrText: { fontSize: 13, fontWeight: "600" },
-  addrLabelText: { fontSize: 11, fontWeight: "600" },
+  addrLabelText: { fontSize: 11, fontWeight: "600", flexShrink: 0 },
+  addrInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    borderBottomWidth: 1.5,
+    paddingVertical: 3,
+    paddingHorizontal: 0,
+  },
   waypointIcon: { flexShrink: 0 },
   infoChipRow: {
     flexDirection: "row",
@@ -575,23 +659,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   errorText: { fontSize: 13, flex: 1 },
-  btnRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  editBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingVertical: 14,
-  },
-  editBtnText: { fontSize: 14, fontWeight: "700" },
   saveBtnFull: {
     flex: 0,
     alignSelf: "stretch",
@@ -607,4 +674,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   saveBtnText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
+  discardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 14,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  discardBtnText: { fontSize: 14, fontWeight: "700" },
 });

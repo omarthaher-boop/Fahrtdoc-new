@@ -60,11 +60,13 @@ export default function ActiveTripBanner() {
   const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const [showPauseDialog, setShowPauseDialog] = useState(false);
-  const [showNoteInput, setShowNoteInput] = useState(false);
-  const [noteText, setNoteText] = useState("");
+  const [showCombinedPauseSheet, setShowCombinedPauseSheet] = useState(false);
+  const [pauseLocation, setPauseLocation] = useState("");
+  const [pauseLocationLoading, setPauseLocationLoading] = useState(false);
+  const [pauseNote, setPauseNote] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [driveTaskRunning, setDriveTaskRunning] = useState(true);
+  const noteInputRef = useRef<TextInput>(null);
 
   const refreshDriveTaskStatus = useCallback(async () => {
     if (Platform.OS === "web") return;
@@ -106,7 +108,7 @@ export default function ActiveTripBanner() {
   if (!activeTrip) return null;
 
   const handleStop = () => {
-    if (geocoding) return; // Block stop while geocoding to avoid race; user can stop after dialog resolves
+    if (geocoding) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     stopTrip();
   };
@@ -115,36 +117,45 @@ export default function ActiveTripBanner() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (paused) {
       togglePause();
-    } else {
-      setShowPauseDialog(true);
+      return;
     }
+    setPauseNote("");
+    setPauseLocation("");
+    setPauseLocationLoading(true);
+    setShowCombinedPauseSheet(true);
+
+    (async () => {
+      let pos = livePos;
+      if (!pos && activeTrip && activeTrip.positions.length > 0) {
+        pos = activeTrip.positions[activeTrip.positions.length - 1];
+      }
+      if (pos) {
+        try {
+          const addr = await reverseGeocodeLocal(pos.lat, pos.lon);
+          setPauseLocation(addr || "");
+        } catch {
+          setPauseLocation("");
+        }
+      }
+      setPauseLocationLoading(false);
+    })();
   };
 
-  const handlePauseWithWaypoint = () => {
-    setShowPauseDialog(false);
-    setNoteText("");
-    setShowNoteInput(true);
-  };
-
-  const handleNoteConfirm = async (note: string) => {
-    setShowNoteInput(false);
+  const handleSaveWaypoint = async () => {
+    setShowCombinedPauseSheet(false);
     setGeocoding(true);
-    // Capture trip ID before the async gap to detect if trip was stopped while geocoding
     const capturedTripId = activeTrip?.id;
-    // Try live position first, then fall back to last recorded position in the trip
     let pos = livePos;
     if (!pos && activeTrip && activeTrip.positions.length > 0) {
       pos = activeTrip.positions[activeTrip.positions.length - 1];
     }
     if (!pos) {
-      // No coordinate at all — pause without recording waypoint
       togglePause();
       setGeocoding(false);
       return;
     }
     try {
-      let addr = await reverseGeocodeLocal(pos.lat, pos.lon);
-      // Stale check: if the trip was stopped while geocoding was in flight, abort
+      let addr = pauseLocation || await reverseGeocodeLocal(pos.lat, pos.lon);
       if (activeTrip?.id !== capturedTripId) {
         setGeocoding(false);
         return;
@@ -155,18 +166,17 @@ export default function ActiveTripBanner() {
         lat: pos.lat,
         lon: pos.lon,
         timestamp: Date.now(),
-        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(pauseNote.trim() ? { note: pauseNote.trim() } : {}),
       };
       togglePause(waypoint);
     } catch {
-      // Still record waypoint with coords even if geocoding failed
       if (activeTrip?.id === capturedTripId) {
         const waypoint: Waypoint = {
-          addr: t("waypoint.addressUnavailable"),
+          addr: pauseLocation || t("waypoint.addressUnavailable"),
           lat: pos.lat,
           lon: pos.lon,
           timestamp: Date.now(),
-          ...(note.trim() ? { note: note.trim() } : {}),
+          ...(pauseNote.trim() ? { note: pauseNote.trim() } : {}),
         };
         togglePause(waypoint);
       }
@@ -175,8 +185,8 @@ export default function ActiveTripBanner() {
     }
   };
 
-  const handlePauseWithoutWaypoint = () => {
-    setShowPauseDialog(false);
+  const handlePauseOnly = () => {
+    setShowCombinedPauseSheet(false);
     togglePause();
   };
 
@@ -277,46 +287,50 @@ export default function ActiveTripBanner() {
         </View>
       </View>
 
-      <Modal visible={showPauseDialog} transparent animationType="fade" onRequestClose={() => setShowPauseDialog(false)}>
-        <View style={styles.dialogOverlay}>
-          <View style={[styles.dialogBox, { backgroundColor: colors.card }]}>
-            <View style={[styles.dialogIconWrap, { backgroundColor: colors.accent }]}>
+      {/* Combined Pause Bottom Sheet */}
+      <Modal
+        visible={showCombinedPauseSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCombinedPauseSheet(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.sheetOverlay}
+        >
+          <View style={[styles.combinedSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+            <View style={[styles.sheetIconWrap, { backgroundColor: colors.accent }]}>
               <Feather name="map-pin" size={22} color={colors.primary} />
             </View>
-            <Text style={[styles.dialogTitle, { color: colors.foreground }]}>
-              {t("pause.dialog.title")}
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
+              Zwischenstopp erfassen?
             </Text>
-            <Text style={[styles.dialogMessage, { color: colors.mutedForeground }]}>
-              {t("pause.dialog.message")}
+            <Text style={[styles.sheetSubtitle, { color: colors.mutedForeground }]}>
+              Aktuellen Standort als Zwischenstopp speichern?
             </Text>
-            <TouchableOpacity
-              style={[styles.dialogBtnPrimary, { backgroundColor: colors.primary }]}
-              onPress={handlePauseWithWaypoint}
-            >
-              <Feather name="map-pin" size={15} color="#FFF" />
-              <Text style={styles.dialogBtnPrimaryText}>{t("pause.withWaypoint")}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dialogBtnSecondary, { borderColor: colors.border, backgroundColor: colors.secondary }]}
-              onPress={handlePauseWithoutWaypoint}
-            >
-              <Feather name="pause" size={15} color={colors.foreground} />
-              <Text style={[styles.dialogBtnSecondaryText, { color: colors.foreground }]}>{t("pause.withoutWaypoint")}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal visible={showNoteInput} transparent animationType="fade" onRequestClose={() => setShowNoteInput(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.dialogOverlay}>
-          <View style={[styles.dialogBox, { backgroundColor: colors.card }]}>
-            <View style={[styles.dialogIconWrap, { backgroundColor: colors.accent }]}>
-              <Feather name="edit-3" size={22} color={colors.primary} />
+            {/* Location chip */}
+            <View style={[styles.locationRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Feather name="navigation" size={13} color={colors.primary} />
+              {pauseLocationLoading ? (
+                <View style={styles.locationLoading}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.locationLoadingText, { color: colors.mutedForeground }]}>
+                    Standort wird ermittelt …
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={2}>
+                  {pauseLocation || "Standort nicht verfügbar"}
+                </Text>
+              )}
             </View>
-            <Text style={[styles.dialogTitle, { color: colors.foreground }]}>
-              {t("waypoint.note.title")}
-            </Text>
+
+            {/* Note input */}
             <TextInput
+              ref={noteInputRef}
               style={[
                 styles.noteInput,
                 {
@@ -325,33 +339,31 @@ export default function ActiveTripBanner() {
                   color: colors.foreground,
                 },
               ]}
-              placeholder={t("waypoint.note.placeholder")}
+              placeholder="z. B. Kundenbesuch, Ladestation …"
               placeholderTextColor={colors.mutedForeground}
-              value={noteText}
-              onChangeText={setNoteText}
+              value={pauseNote}
+              onChangeText={setPauseNote}
               multiline
               numberOfLines={3}
               maxLength={200}
-              autoFocus
               returnKeyType="done"
+              blurOnSubmit
             />
+
+            {/* Buttons */}
             <TouchableOpacity
-              style={[styles.dialogBtnPrimary, { backgroundColor: colors.primary }]}
-              onPress={() => handleNoteConfirm(noteText)}
+              style={[styles.sheetBtnPrimary, { backgroundColor: colors.primary }]}
+              onPress={handleSaveWaypoint}
             >
-              <Feather name="check" size={15} color="#FFF" />
-              <Text style={styles.dialogBtnPrimaryText}>{t("waypoint.note.confirm")}</Text>
+              <Feather name="map-pin" size={15} color="#FFF" />
+              <Text style={styles.sheetBtnPrimaryText}>{t("pause.withWaypoint")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.dialogBtnSecondary, { borderColor: colors.border, backgroundColor: colors.secondary }]}
-              onPress={() => handleNoteConfirm("")}
+              style={[styles.sheetBtnSecondary, { borderColor: colors.border, backgroundColor: colors.secondary }]}
+              onPress={handlePauseOnly}
             >
-              <Text style={[styles.dialogBtnSecondaryText, { color: colors.mutedForeground }]}>{t("waypoint.note.skip")}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowNoteInput(false)}
-            >
-              <Text style={[styles.dialogCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+              <Feather name="pause" size={15} color={colors.foreground} />
+              <Text style={[styles.sheetBtnSecondaryText, { color: colors.foreground }]}>{t("pause.withoutWaypoint")}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -416,22 +428,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dialogOverlay: {
+  sheetOverlay: {
     flex: 1,
+    justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
   },
-  dialogBox: {
-    width: "100%",
-    maxWidth: 360,
-    borderRadius: 20,
-    padding: 24,
+  combinedSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
     alignItems: "center",
     gap: 12,
   },
-  dialogIconWrap: {
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  sheetIconWrap: {
     width: 52,
     height: 52,
     borderRadius: 16,
@@ -439,31 +457,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 4,
   },
-  dialogTitle: { fontSize: 17, fontWeight: "800", textAlign: "center" },
-  dialogMessage: { fontSize: 13, textAlign: "center", lineHeight: 19, marginBottom: 4 },
-  dialogBtnPrimary: {
-    width: "100%",
+  sheetTitle: { fontSize: 17, fontWeight: "800", textAlign: "center" },
+  sheetSubtitle: { fontSize: 13, textAlign: "center", lineHeight: 19, marginBottom: 4 },
+  locationRow: {
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 44,
   },
-  dialogBtnPrimaryText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
-  dialogBtnSecondary: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 14,
-    borderWidth: 1.5,
-  },
-  dialogBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
+  locationLoading: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  locationLoadingText: { fontSize: 13, flex: 1 },
+  locationText: { fontSize: 13, flex: 1, lineHeight: 18 },
   noteInput: {
-    width: "100%",
+    alignSelf: "stretch",
     borderWidth: 1.5,
     borderRadius: 12,
     paddingHorizontal: 14,
@@ -473,5 +484,25 @@ const styles = StyleSheet.create({
     minHeight: 72,
     textAlignVertical: "top",
   },
-  dialogCancelText: { fontSize: 13, fontWeight: "500", paddingVertical: 4 },
+  sheetBtnPrimary: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  sheetBtnPrimaryText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
+  sheetBtnSecondary: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+  },
+  sheetBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
 });

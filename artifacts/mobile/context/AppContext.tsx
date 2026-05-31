@@ -55,6 +55,7 @@ export interface Trip {
   dur: number;
   type: "business" | "private";
   edited?: boolean;
+  note?: string;
   waypoints?: Waypoint[];
   path?: { lat: number; lon: number }[];
   waypointSyncPending?: boolean;

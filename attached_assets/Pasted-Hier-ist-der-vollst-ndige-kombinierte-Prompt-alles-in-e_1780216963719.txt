@@ -1,0 +1,83 @@
+Hier ist der vollständige kombinierte Prompt – alles in einer Copy-Paste-Version für Replit:
+
+---
+
+**REPLIT ÄNDERUNGEN – FahrtDoc App**
+
+Bitte führe folgende Änderungen durch:
+
+---
+
+**1. Pause-Flow zusammenführen (Screens 1–3)**
+
+Wenn der Nutzer auf „Pause" drückt, zeige einen einzigen kombinierten Bottom Sheet mit:
+- Aktuellem Standort (automatisch ermittelt, als Text angezeigt)
+- Einem Notizfeld (Placeholder: „z. B. Kundenbesuch, Ladestation …")
+- Button: **„Ja, als Zwischenstopp speichern"** (blau) → speichert Standort + Notiz und pausiert
+- Button: **„Nein, nur pausieren"** (grau) → pausiert ohne Speicherung
+
+Die bisherigen drei separaten Dialoge (Zwischenstopp erfassen → Notiz → Bestätigung) werden durch diesen einen Screen ersetzt. Die ursprüngliche Logik dahinter bleibt erhalten, nur der Flow wird zusammengefasst.
+
+---
+
+**2. Premium-Screen pausieren (Screen 4)**
+
+Die FahrtDoc Premium / Paywall-Anzeige soll vorübergehend deaktiviert werden (auskommentieren, nicht löschen), damit die App vollständig testbar ist. Speichere den gesamten Paywall-Code in einer separaten Datei: `finanzen/paywall_backup.dart` (oder `.tsx` / `.jsx` je nach Framework). Mit einem einzigen Import kann sie später wieder eingebunden werden.
+
+---
+
+**3. „Speichern" & „Abbrechen" nach unten (Screen 5 – Fahrzeugprofil)**
+
+Im Screen „Fahrprofil & Fahrzeugdaten":
+- Die Buttons „Abbrechen" und „Speichern" oben in der Navigation entfernen
+- Stattdessen unten im Screen (fixed am unteren Rand) zwei Buttons einfügen:
+  - **„Abbrechen"** (grau/outline)
+  - **„Speichern"** (blau, primary)
+
+---
+
+**4. Bearbeiten-Button entfernen & Inline-Bearbeitung (Screen 6 – Fahrtabschluss)**
+
+Im Fahrt-Abschluss-Screen folgende Änderungen vornehmen:
+
+**Button entfernen:**
+- Den „Bearbeiten"-Button komplett entfernen
+
+**Inline-Adressbearbeitung:**
+- Die Adressfelder (Zwischenstopp, Ziel) direkt tippbar machen → bei Tippen öffnet sich ein Textfeld inline im selben Feld
+- Nach Eingabe/Bestätigung der neuen Adresse wird diese gespeichert
+
+**Routenberechnung – „Kürzeste & schnellste Strecke":**
+- Nach jeder Adressänderung wird die **kürzeste & schnellste Strecke** automatisch neu berechnet
+- Dafür die bereits verwendete Karten-API nutzen (Apple Maps auf iOS / Google Maps auf Android)
+- Der berechnete Kilometerwert unter „Kürzeste & schnellste Strecke" aktualisiert sich automatisch
+
+**⚠️ WICHTIG – GPS-Strecke ist schreibgeschützt:**
+- Der Wert unter **„Gefahrene Kilometer (GPS-aufgezeichnete Strecke)"** darf unter **keinen Umständen** verändert werden
+- Dieser Wert ist read-only und wird von der Adressbearbeitung vollständig unberührt gelassen
+- Keine Verbindung zwischen Adressänderung und GPS-Track herstellen – beide Werte sind völlig unabhängig voneinander
+- Der GPS-Track selbst (rohe Koordinaten/Polyline) bleibt ebenfalls unverändert gespeichert
+
+---
+
+**5. Notizen nach jeder Fahrt ergänzen (Fahrtdokumentation)**
+
+In der Fahrtdokumentation / Fahrtenhistorie soll nach Abschluss jeder Fahrt eine Notizfunktion verfügbar sein:
+
+**In der Fahrtliste (Übersicht):**
+- Jede Fahrt zeigt ein **Notiz-Icon** (z. B. Stift oder „📝") neben den bestehenden Aktions-Icons (Karte, Bearbeiten, Löschen)
+- Bei Tippen auf das Icon öffnet sich ein Textfeld / Bottom Sheet zur Eingabe oder Bearbeitung der Notiz
+- Bereits vorhandene Notizen werden als Vorschau-Text unter der Fahrt angezeigt (z. B. max. 1 Zeile, gekürzt mit „…")
+
+**Im Fahrtdetail-Screen:**
+- Ein dediziertes **Notizfeld** ist sichtbar und direkt bearbeitbar
+- Placeholder-Text: „Notiz zur Fahrt hinzufügen …"
+- Änderungen werden mit einem „Speichern"-Button oder automatisch beim Verlassen des Feldes gespeichert
+
+**Datenspeicherung:**
+- Die Notiz wird zusammen mit den Fahrtdaten gespeichert (gleiche Datenstruktur, neues Feld `notiz` oder `note`)
+- Bestehende Fahrten ohne Notiz bleiben unverändert (leeres Feld, kein Fehler)
+
+---
+
+Alles bereit zum direkten Einfügen in Replit. Soll ich noch etwas anpassen?

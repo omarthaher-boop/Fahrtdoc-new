@@ -1,17 +1,18 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TripRouteMap from "@/components/TripRouteMap";
-import { Trip } from "@/context/AppContext";
+import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -47,6 +48,15 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
+  const { editTrip } = useApp();
+
+  const [noteText, setNoteText] = useState(trip?.note ?? "");
+  const [noteSaved, setNoteSaved] = useState(false);
+
+  useEffect(() => {
+    setNoteText(trip?.note ?? "");
+    setNoteSaved(false);
+  }, [trip?.id]);
 
   if (!trip) return null;
 
@@ -56,6 +66,14 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
   const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
   const dur = fmtDurMin(trip.dur);
   const waypoints = trip.waypoints ?? [];
+
+  const handleSaveNote = () => {
+    editTrip(trip.id, { note: noteText.trim() });
+    setNoteSaved(true);
+    setTimeout(() => setNoteSaved(false), 2000);
+  };
+
+  const noteChanged = noteText.trim() !== (trip.note ?? "").trim();
 
   return (
     <Modal
@@ -105,6 +123,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Map */}
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
@@ -185,6 +204,11 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                       >
                         {wp.addr || t("waypoint.addressUnavailable")}
                       </Text>
+                      {!!wp.note && (
+                        <Text style={[styles.wpNoteText, { color: colors.mutedForeground }]}>
+                          {wp.note}
+                        </Text>
+                      )}
                     </View>
                   </View>
                 </React.Fragment>
@@ -288,6 +312,41 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                     </Text>
                   </View>
                 </>
+              )}
+            </View>
+
+            {/* Note section */}
+            <Text
+              style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: 20 }]}
+            >
+              NOTIZ
+            </Text>
+            <View style={[styles.noteCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.noteInput, { color: colors.foreground }]}
+                value={noteText}
+                onChangeText={(v) => { setNoteText(v); setNoteSaved(false); }}
+                placeholder="Notiz zur Fahrt hinzufügen …"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+                textAlignVertical="top"
+              />
+              {noteChanged && (
+                <TouchableOpacity
+                  style={[styles.noteSaveBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleSaveNote}
+                >
+                  <Feather name="check" size={13} color="#FFF" />
+                  <Text style={styles.noteSaveBtnText}>Speichern</Text>
+                </TouchableOpacity>
+              )}
+              {noteSaved && !noteChanged && (
+                <View style={[styles.noteSavedRow]}>
+                  <Feather name="check-circle" size={13} color={colors.success} />
+                  <Text style={[styles.noteSavedText, { color: colors.success }]}>Gespeichert</Text>
+                </View>
               )}
             </View>
 
@@ -428,6 +487,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 18,
   },
+  wpNoteText: {
+    fontSize: 11,
+    fontStyle: "italic",
+    marginTop: 2,
+    opacity: 0.8,
+  },
   statsRow: {
     flexDirection: "row",
     borderRadius: 14,
@@ -455,6 +520,42 @@ const styles = StyleSheet.create({
     width: 1,
     height: 36,
     flexShrink: 0,
+  },
+  noteCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  noteInput: {
+    fontSize: 14,
+    lineHeight: 20,
+    minHeight: 60,
+    padding: 0,
+  },
+  noteSaveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignSelf: "flex-end",
+  },
+  noteSaveBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  noteSavedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-end",
+  },
+  noteSavedText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   closeFullBtn: {
     borderRadius: 14,

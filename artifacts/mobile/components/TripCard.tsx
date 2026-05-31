@@ -4,9 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   Pressable,
@@ -56,7 +59,7 @@ export default function TripCard({
 }: Props) {
   const colors = useColors();
   const { t } = useLanguage();
-  const { syncRetryingIds } = useApp();
+  const { syncRetryingIds, editTrip } = useApp();
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
@@ -65,6 +68,9 @@ export default function TripCard({
   const [expanded, setExpanded] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
   const mountedRef = useRef(true);
+
+  const [showNoteSheet, setShowNoteSheet] = useState(false);
+  const [noteText, setNoteText] = useState(trip.note ?? "");
 
   const mapHeight = useSharedValue(0);
   const mapOpacity = useSharedValue(0);
@@ -82,6 +88,11 @@ export default function TripCard({
       if (syncErrorTimerRef.current) clearTimeout(syncErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showNoteSheet) setNoteText(trip.note ?? "");
+  }, [trip.note, showNoteSheet]);
+
   const accentColor = isBusiness ? colors.primary : colors.success;
   const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
   const dur = fmtDurMin(trip.dur);
@@ -134,225 +145,337 @@ export default function TripCard({
     }
   };
 
+  const handleNoteOpen = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setNoteText(trip.note ?? "");
+    setShowNoteSheet(true);
+  };
+
+  const handleNoteSave = () => {
+    editTrip(trip.id, { note: noteText.trim() });
+    setShowNoteSheet(false);
+  };
+
   return (
-    <Pressable
-      onPress={selectionMode ? undefined : handleToggleExpand}
-      style={[
-        styles.card,
-        {
-          backgroundColor: selected ? "#EEF3FF" : colors.card,
-          borderColor: selected ? colors.primary : colors.border,
-          borderWidth: selected ? 1.5 : 1,
-        },
-      ]}
-    >
-      {/* Transparent tap-overlay — only active in selection mode so it
-          never blocks the edit/delete/view buttons when browsing */}
-      {selectionMode && (
-        <Pressable
-          onPress={handleCardPress}
-          style={[StyleSheet.absoluteFillObject, styles.selectionOverlay]}
-        />
-      )}
+    <>
+      <Pressable
+        onPress={selectionMode ? undefined : handleToggleExpand}
+        style={[
+          styles.card,
+          {
+            backgroundColor: selected ? "#EEF3FF" : colors.card,
+            borderColor: selected ? colors.primary : colors.border,
+            borderWidth: selected ? 1.5 : 1,
+          },
+        ]}
+      >
+        {selectionMode && (
+          <Pressable
+            onPress={handleCardPress}
+            style={[StyleSheet.absoluteFillObject, styles.selectionOverlay]}
+          />
+        )}
 
-      {/* Selection checkbox */}
-      {selectionMode && (
-        <View style={styles.checkboxWrap}>
-          <View
-            style={[
-              styles.checkbox,
-              {
-                backgroundColor: selected ? colors.primary : "transparent",
-                borderColor: selected ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            {selected && <Feather name="check" size={11} color="#fff" />}
+        {selectionMode && (
+          <View style={styles.checkboxWrap}>
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  backgroundColor: selected ? colors.primary : "transparent",
+                  borderColor: selected ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              {selected && <Feather name="check" size={11} color="#fff" />}
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Left blue accent bar */}
-      <View style={[styles.leftBar, { backgroundColor: selected ? colors.primary : colors.primary }]} />
+        <View style={[styles.leftBar, { backgroundColor: colors.primary }]} />
 
-      <View style={styles.inner}>
-        {/* Top row: type badge + time + edit + delete */}
-        <View style={styles.topRow}>
-          <View style={[styles.typeBadge, { backgroundColor: accentBg }]}>
-            <Feather
-              name={isBusiness ? "briefcase" : "user"}
-              size={13}
-              color={accentColor}
-            />
-            <Text style={[styles.typeText, { color: accentColor }]}>
-              {isBusiness ? "Geschäftlich" : "Privat"}
-            </Text>
-          </View>
-
-          <View style={styles.topActions}>
-            <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-              {fmtTime(trip.date)}
-            </Text>
-            {!selectionMode && (
-              <>
-                {onView && (
-                  <TouchableOpacity
-                    onPress={handleView}
-                    style={[styles.actionBtn, { borderColor: colors.border }]}
-                    testID={`view-${trip.id}`}
-                  >
-                    <Feather name="map" size={13} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={handleEdit}
-                  style={[styles.actionBtn, { borderColor: colors.border }]}
-                  testID={`edit-${trip.id}`}
-                >
-                  <Feather name="edit-2" size={13} color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleDelete}
-                  style={[styles.actionBtn, { borderColor: colors.border }]}
-                  testID={`delete-${trip.id}`}
-                >
-                  <Feather name="trash-2" size={13} color={colors.destructive} />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Addresses */}
-        <View style={styles.addrSection}>
-          <View style={styles.addrRow}>
-            <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
-              {trip.startAddr || "Startpunkt unbekannt"}
-            </Text>
-          </View>
-          {(trip.waypoints ?? []).map((wp, idx) => (
-            <React.Fragment key={wp.timestamp}>
-              <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
-              <View style={styles.addrRow}>
-                <Feather name="map-pin" size={9} color={colors.primary} style={{ flexShrink: 0, opacity: 0.7 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.addrWaypointText, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {`${t("waypoint.label")} ${idx + 1}: ${wp.addr}`}
-                  </Text>
-                  {!!wp.note && (
-                    <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      {wp.note}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </React.Fragment>
-          ))}
-          <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
-          <View style={styles.addrRow}>
-            <View style={[styles.dotHollow, { borderColor: colors.mutedForeground }]} />
-            <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
-              {trip.endAddr || "Zielpunkt unbekannt"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Bottom row: km + duration + badges + expand toggle */}
-        <View style={styles.bottomRow}>
-          <View style={styles.metaLeft}>
-            <View style={styles.metaItem}>
-              <Feather name="navigation" size={12} color={colors.primary} />
-              <Text style={[styles.metaText, { color: colors.foreground }]}>
-                {trip.km.toFixed(1)} km
+        <View style={styles.inner}>
+          {/* Top row: type badge + time + actions */}
+          <View style={styles.topRow}>
+            <View style={[styles.typeBadge, { backgroundColor: accentBg }]}>
+              <Feather
+                name={isBusiness ? "briefcase" : "user"}
+                size={13}
+                color={accentColor}
+              />
+              <Text style={[styles.typeText, { color: accentColor }]}>
+                {isBusiness ? "Geschäftlich" : "Privat"}
               </Text>
             </View>
-            {dur && (
+
+            <View style={styles.topActions}>
+              <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
+                {fmtTime(trip.date)}
+              </Text>
+              {!selectionMode && (
+                <>
+                  {onView && (
+                    <TouchableOpacity
+                      onPress={handleView}
+                      style={[styles.actionBtn, { borderColor: colors.border }]}
+                      testID={`view-${trip.id}`}
+                    >
+                      <Feather name="map" size={13} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={handleEdit}
+                    style={[styles.actionBtn, { borderColor: colors.border }]}
+                    testID={`edit-${trip.id}`}
+                  >
+                    <Feather name="edit-2" size={13} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleNoteOpen}
+                    style={[
+                      styles.actionBtn,
+                      {
+                        borderColor: trip.note ? colors.primary : colors.border,
+                        backgroundColor: trip.note ? colors.accent : "transparent",
+                      },
+                    ]}
+                    testID={`note-${trip.id}`}
+                  >
+                    <Feather
+                      name="file-text"
+                      size={13}
+                      color={trip.note ? colors.primary : colors.mutedForeground}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleDelete}
+                    style={[styles.actionBtn, { borderColor: colors.border }]}
+                    testID={`delete-${trip.id}`}
+                  >
+                    <Feather name="trash-2" size={13} color={colors.destructive} />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+
+          {/* Addresses */}
+          <View style={styles.addrSection}>
+            <View style={styles.addrRow}>
+              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
+                {trip.startAddr || "Startpunkt unbekannt"}
+              </Text>
+            </View>
+            {(trip.waypoints ?? []).map((wp, idx) => (
+              <React.Fragment key={wp.timestamp}>
+                <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
+                <View style={styles.addrRow}>
+                  <Feather name="map-pin" size={9} color={colors.primary} style={{ flexShrink: 0, opacity: 0.7 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.addrWaypointText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {`${t("waypoint.label")} ${idx + 1}: ${wp.addr}`}
+                    </Text>
+                    {!!wp.note && (
+                      <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        {wp.note}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
+            <View style={[styles.addrConnector, { borderLeftColor: colors.border }]} />
+            <View style={styles.addrRow}>
+              <View style={[styles.dotHollow, { borderColor: colors.mutedForeground }]} />
+              <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
+                {trip.endAddr || "Zielpunkt unbekannt"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Note preview */}
+          {!!trip.note && (
+            <TouchableOpacity
+              style={[styles.notePreviewRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+              onPress={handleNoteOpen}
+              activeOpacity={0.7}
+            >
+              <Feather name="file-text" size={11} color={colors.mutedForeground} />
+              <Text style={[styles.notePreviewText, { color: colors.mutedForeground }]} numberOfLines={2}>
+                {trip.note}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Bottom row: km + duration + badges + expand toggle */}
+          <View style={styles.bottomRow}>
+            <View style={styles.metaLeft}>
               <View style={styles.metaItem}>
-                <Feather name="clock" size={12} color={colors.mutedForeground} />
-                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                  {dur}
+                <Feather name="navigation" size={12} color={colors.primary} />
+                <Text style={[styles.metaText, { color: colors.foreground }]}>
+                  {trip.km.toFixed(1)} km
                 </Text>
               </View>
-            )}
-          </View>
-          <View style={styles.badgeRow}>
-            {trip.waypointSyncPending && (
-              onRetrySync ? (
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (isSyncing || isBackgroundSyncing) return;
-                    if (Platform.OS !== "web") Haptics.selectionAsync();
-                    setIsSyncing(true);
-                    setSyncError(false);
-                    if (syncErrorTimerRef.current) clearTimeout(syncErrorTimerRef.current);
-                    try {
-                      const succeeded = await onRetrySync(trip.id);
-                      if (!succeeded && mountedRef.current) {
-                        setSyncError(true);
-                        syncErrorTimerRef.current = setTimeout(() => {
-                          if (mountedRef.current) setSyncError(false);
-                        }, 4000);
-                      }
-                    } finally {
-                      if (mountedRef.current) setIsSyncing(false);
-                    }
-                  }}
-                  style={[
-                    styles.syncBadge,
-                    (isSyncing || isBackgroundSyncing)
-                      ? { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }
-                      : { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" },
-                  ]}
-                  activeOpacity={(isSyncing || isBackgroundSyncing) ? 1 : 0.7}
-                  disabled={isSyncing || isBackgroundSyncing}
-                >
-                  {(isSyncing || isBackgroundSyncing) ? (
-                    <ActivityIndicator size={11} color="#E65100" />
-                  ) : (
-                    <Feather name="upload-cloud" size={11} color="#E65100" />
-                  )}
-                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>
-                    {(isSyncing || isBackgroundSyncing) ? t("trip.syncRetrying") : t("trip.syncPending")}
+              {dur && (
+                <View style={styles.metaItem}>
+                  <Feather name="clock" size={12} color={colors.mutedForeground} />
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                    {dur}
                   </Text>
-                </TouchableOpacity>
-              ) : isBackgroundSyncing ? (
-                <View style={[styles.syncBadge, { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }]}>
-                  <ActivityIndicator size={11} color="#E65100" />
-                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncRetrying")}</Text>
                 </View>
-              ) : (
-                <View style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}>
-                  <Feather name="upload-cloud" size={11} color="#E65100" />
-                  <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncPending")}</Text>
+              )}
+            </View>
+            <View style={styles.badgeRow}>
+              {trip.waypointSyncPending && (
+                onRetrySync ? (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (isSyncing || isBackgroundSyncing) return;
+                      if (Platform.OS !== "web") Haptics.selectionAsync();
+                      setIsSyncing(true);
+                      setSyncError(false);
+                      if (syncErrorTimerRef.current) clearTimeout(syncErrorTimerRef.current);
+                      try {
+                        const succeeded = await onRetrySync(trip.id);
+                        if (!succeeded && mountedRef.current) {
+                          setSyncError(true);
+                          syncErrorTimerRef.current = setTimeout(() => {
+                            if (mountedRef.current) setSyncError(false);
+                          }, 4000);
+                        }
+                      } finally {
+                        if (mountedRef.current) setIsSyncing(false);
+                      }
+                    }}
+                    style={[
+                      styles.syncBadge,
+                      (isSyncing || isBackgroundSyncing)
+                        ? { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }
+                        : { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" },
+                    ]}
+                    activeOpacity={(isSyncing || isBackgroundSyncing) ? 1 : 0.7}
+                    disabled={isSyncing || isBackgroundSyncing}
+                  >
+                    {(isSyncing || isBackgroundSyncing) ? (
+                      <ActivityIndicator size={11} color="#E65100" />
+                    ) : (
+                      <Feather name="upload-cloud" size={11} color="#E65100" />
+                    )}
+                    <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>
+                      {(isSyncing || isBackgroundSyncing) ? t("trip.syncRetrying") : t("trip.syncPending")}
+                    </Text>
+                  </TouchableOpacity>
+                ) : isBackgroundSyncing ? (
+                  <View style={[styles.syncBadge, { backgroundColor: "#FFF8F0", borderColor: "#FFA040" }]}>
+                    <ActivityIndicator size={11} color="#E65100" />
+                    <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncRetrying")}</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.syncBadge, { backgroundColor: "#FFF3E0", borderColor: "#FB8C00" }]}>
+                    <Feather name="upload-cloud" size={11} color="#E65100" />
+                    <Text style={[styles.syncBadgeText, { color: "#E65100" }]}>{t("trip.syncPending")}</Text>
+                  </View>
+                )
+              )}
+              {trip.edited && (
+                <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
+                  <Feather name="edit" size={11} color="#C98A00" />
+                  <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
                 </View>
-              )
-            )}
-            {trip.edited && (
-              <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
-                <Feather name="edit" size={11} color="#C98A00" />
-                <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
-              </View>
-            )}
+              )}
+            </View>
           </View>
+
+          {syncError && (
+            <View style={styles.syncErrorRow}>
+              <Feather name="alert-circle" size={12} color="#C62828" />
+              <Text style={styles.syncErrorText}>{t("trip.syncFailed")}</Text>
+            </View>
+          )}
+
+          {!selectionMode && (
+            <Animated.View style={[styles.mapSection, mapAnimStyle]}>
+              {mapMounted && <TripRouteMap trip={trip} />}
+            </Animated.View>
+          )}
         </View>
+      </Pressable>
 
-        {/* Sync error message */}
-        {syncError && (
-          <View style={styles.syncErrorRow}>
-            <Feather name="alert-circle" size={12} color="#C62828" />
-            <Text style={styles.syncErrorText}>{t("trip.syncFailed")}</Text>
+      {/* Note editing sheet */}
+      <Modal
+        visible={showNoteSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowNoteSheet(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.noteSheetOverlay}
+        >
+          <View style={[styles.noteSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.noteSheetHandle, { backgroundColor: colors.border }]} />
+
+            <View style={styles.noteSheetHeader}>
+              <View style={[styles.noteSheetIconWrap, { backgroundColor: colors.accent }]}>
+                <Feather name="file-text" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.noteSheetTitle, { color: colors.foreground }]}>Notiz</Text>
+                <Text style={[styles.noteSheetSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {trip.startAddr ? `${trip.startAddr.substring(0, 28)}…` : trip.date}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowNoteSheet(false)} style={[styles.noteSheetClose, { borderColor: colors.border }]}>
+                <Feather name="x" size={16} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={[
+                styles.noteSheetInput,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: colors.border,
+                  color: colors.foreground,
+                },
+              ]}
+              value={noteText}
+              onChangeText={setNoteText}
+              placeholder="Notiz zur Fahrt hinzufügen …"
+              placeholderTextColor={colors.mutedForeground}
+              multiline
+              numberOfLines={5}
+              maxLength={500}
+              textAlignVertical="top"
+              autoFocus
+            />
+
+            <TouchableOpacity
+              style={[styles.noteSheetSaveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleNoteSave}
+            >
+              <Feather name="check" size={15} color="#FFF" />
+              <Text style={styles.noteSheetSaveBtnText}>Speichern</Text>
+            </TouchableOpacity>
+
+            {!!trip.note && (
+              <TouchableOpacity
+                style={[styles.noteSheetDeleteBtn]}
+                onPress={() => {
+                  editTrip(trip.id, { note: "" });
+                  setShowNoteSheet(false);
+                }}
+              >
+                <Text style={[styles.noteSheetDeleteText, { color: colors.destructive }]}>
+                  Notiz löschen
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-
-        {/* Expandable map section — always rendered when mounted, height animates */}
-        {!selectionMode && (
-          <Animated.View style={[styles.mapSection, mapAnimStyle]}>
-            {mapMounted && <TripRouteMap trip={trip} />}
-          </Animated.View>
-        )}
-      </View>
-    </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+    </>
   );
 }
 
@@ -412,7 +535,7 @@ const styles = StyleSheet.create({
   topActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
   },
   timeText: {
     fontSize: 13,
@@ -471,6 +594,22 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     opacity: 0.75,
     marginTop: 1,
+  },
+  notePreviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: -2,
+  },
+  notePreviewText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+    fontStyle: "italic",
   },
   bottomRow: {
     flexDirection: "row",
@@ -536,5 +675,86 @@ const styles = StyleSheet.create({
     color: "#C62828",
     fontWeight: "500",
     flexShrink: 1,
+  },
+  noteSheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  noteSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    gap: 14,
+  },
+  noteSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  noteSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  noteSheetIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  noteSheetTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  noteSheetSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  noteSheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  noteSheetInput: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    lineHeight: 20,
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  noteSheetSaveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  noteSheetSaveBtnText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  noteSheetDeleteBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  noteSheetDeleteText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

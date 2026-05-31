@@ -1105,15 +1105,13 @@ export default function ProfileScreen() {
       <Modal visible={vehicleModalVisible} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setVehicleModalVisible(false)}>
-              <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
-            </TouchableOpacity>
+            <View style={{ width: 40 }} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("vehicle.title")}</Text>
-            <TouchableOpacity onPress={handleSaveVehicle}>
-              <Text style={[styles.modalSave, { color: colors.primary }]}>{t("common.save")}</Text>
+            <TouchableOpacity onPress={() => setVehicleModalVisible(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={20} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.modalContent}>
+          <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 16 }]}>
             <ModalField label={t("vehicle.brand")} value={editVehicleBrand} onChangeText={setEditVehicleBrand} icon="truck" placeholder={t("vehicle.brandPlaceholder")} colors={colors} />
             <ModalField label={t("vehicle.model")} value={editVehicleModel} onChangeText={setEditVehicleModel} icon="tag" placeholder={t("vehicle.modelPlaceholder")} colors={colors} />
             <ModalField label={t("vehicle.year")} value={editVehicleYear} onChangeText={setEditVehicleYear} icon="calendar" placeholder={t("vehicle.yearPlaceholder")} keyboardType="numeric" colors={colors} />
@@ -1128,6 +1126,20 @@ export default function ProfileScreen() {
                 : "Change the license plate under Personal Data."}
             </Text>
           </ScrollView>
+          <View style={[styles.vehicleModalBtns, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <TouchableOpacity
+              style={[styles.vehicleModalCancelBtn, { borderColor: colors.border }]}
+              onPress={() => setVehicleModalVisible(false)}
+            >
+              <Text style={[styles.vehicleModalBtnText, { color: colors.foreground }]}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.vehicleModalSaveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSaveVehicle}
+            >
+              <Text style={styles.vehicleModalSaveBtnText}>{t("common.save")}</Text>
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1450,6 +1462,28 @@ const styles = StyleSheet.create({
   infoNote: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, padding: 12 },
   infoNoteText: { fontSize: 13, fontWeight: "500", flex: 1 },
   vehicleHint: { fontSize: 12, marginTop: 8, textAlign: "center" },
+  vehicleModalBtns: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  vehicleModalCancelBtn: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  vehicleModalSaveBtn: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  vehicleModalBtnText: { fontSize: 14, fontWeight: "700" as const },
+  vehicleModalSaveBtnText: { color: "#FFF", fontSize: 14, fontWeight: "700" as const },
   notifHint: { fontSize: 12, marginTop: 12, textAlign: "center", paddingHorizontal: 8 },
   privacyText: { fontSize: 13.5, lineHeight: 22, letterSpacing: 0.1 },
   faqItem: { borderRadius: 14, borderWidth: 1, marginBottom: 8, overflow: "hidden" },
