@@ -79,14 +79,35 @@ The script:
 
 | File | Purpose |
 |------|---------|
-| `CarPlaySceneDelegate.swift` | Renders CarPlay UI; shows Start / Stop / Pause buttons; receives state updates from JS via `FahrtDocCarPlayModule` |
+| `CarPlaySceneDelegate.swift` | Three-state CarPlay UI (idle → confirming → active); shows trip-type selection, confirmation screen with start address, and live trip readout |
 | `FahrtDocCarPlayModule.swift` | `RCTEventEmitter` NativeModule — receives `updateTripState` from JS; emits `FahrtDocCarPlayAction` events to JS |
 | `FahrtDocCarPlayModule.m` | ObjC bridge header — required for RN to discover the Swift NativeModule |
+
+### CarPlay screen states
+
+| State | Description |
+|-------|-------------|
+| **Idle** | Two buttons: "Geschäftlich" / "Privat" |
+| **Confirming** | `CPInformationTemplate` showing trip type and resolved start address ("Adresse wird ermittelt…" until GPS resolves). Buttons: "Bestätigen" / "Abbrechen" |
+| **Active** | Live elapsed time and distance. Buttons: "Pause" (or "Fortsetzen") / "Stopp" |
 
 ### How the data flows
 
 ```
-AppContext (JS)
+Idle → user taps "Geschäftlich" or "Privat"
+  → CarPlaySceneDelegate transitions to confirming state
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "selectTripType", tripType })
+  → useCarPlay: resolves current GPS position → reverseGeocode()
+  → updateCarPlayTripState({ startAddress: "Musterstr. 4, Berlin" })
+  → CarPlaySceneDelegate.applyTripState() refreshes confirming template
+
+User taps "Bestätigen"
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "startTrip", tripType })
+  → useCarPlay handler → AppContext.startTrip()
+  → AppContext emits updated state (isActive: true)
+  → updateCarPlayTripState() → CarPlaySceneDelegate transitions to active
+
+AppContext (JS) — live trip updates
   → useCarPlay hook
   → updateCarPlayTripState()                         [carplayBridge.ts]
   → NativeModules.FahrtDocCarPlay.updateTripState()  [native call]
@@ -94,13 +115,12 @@ AppContext (JS)
   → CarPlaySceneDelegate.applyTripState()
   → CPInformationTemplate re-rendered in car display
 
-User taps CarPlay button
-  → CarPlaySceneDelegate.send()
-  → FahrtDocCarPlayModule.dispatchToJS()
+User taps "Stopp" or "Pause"
+  → CarPlaySceneDelegate → FahrtDocCarPlayModule.dispatchToJS()
   → RCTEventEmitter.sendEvent("FahrtDocCarPlayAction")
   → NativeEventEmitter listener in carplayBridge.ts
   → dispatchCarPlayAction(action)
-  → useCarPlay handler → AppContext.startTrip / stopTrip / togglePause
+  → useCarPlay handler → AppContext.stopTrip / togglePause
 ```
 
 ### Testing (iOS) — Xcode CarPlay Simulator Checklist
@@ -199,15 +219,37 @@ The script automatically:
 |------|---------|
 | `FahrtDocCarAppService.kt` | `CarAppService` entry point — registered in AndroidManifest.xml |
 | `FahrtDocCarSession.kt` | Creates `FahrtDocCarScreen`; registers it with `FahrtDocCarPlayModule` |
-| `FahrtDocCarScreen.kt` | Renders the Android Auto template; dispatches button taps to JS |
+| `FahrtDocCarScreen.kt` | Three-state Android Auto screen (idle → confirming → active); mirrors iOS state machine |
 | `FahrtDocCarPlayModule.kt` | RN NativeModule — receives `updateTripState` from JS; emits `FahrtDocCarPlayAction` |
 | `FahrtDocCarPlayPackage.kt` | `ReactPackage` that registers `FahrtDocCarPlayModule` with the RN bridge |
 | `automotive_app_desc.xml` | Android Auto capability descriptor (must be in `res/xml/`) |
 
+### Android Auto screen states
+
+| State | Description |
+|-------|-------------|
+| **IDLE** | Two action buttons: "Geschäftlich" / "Privat" |
+| **CONFIRMING** | `PaneTemplate` with trip type + start address rows. Actions: "Bestätigen" / "Abbrechen" |
+| **ACTIVE** | Live elapsed time, distance, status rows. Actions: "Pause" / "Stopp" |
+
 ### How the data flows
 
 ```
-AppContext (JS)
+Idle → user taps "Geschäftlich" or "Privat"
+  → FahrtDocCarScreen transitions to CONFIRMING
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "selectTripType", tripType })
+  → useCarPlay: resolves GPS → reverseGeocode()
+  → updateCarPlayTripState({ startAddress: "..." })
+  → FahrtDocCarPlayModule.updateTripState()
+  → FahrtDocCarScreen.applyTripState() → invalidate() → address shown
+
+User taps "Bestätigen"
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "startTrip", tripType })
+  → useCarPlay → AppContext.startTrip()
+  → AppContext state: isActive: true
+  → updateCarPlayTripState() → FahrtDocCarScreen transitions to ACTIVE
+
+Live trip updates
   → useCarPlay hook
   → updateCarPlayTripState()                         [carplayBridge.ts]
   → NativeModules.FahrtDocCarPlay.updateTripState()  [native call]
@@ -215,13 +257,12 @@ AppContext (JS)
   → FahrtDocCarScreen.applyTripState()
   → Screen.invalidate() → onGetTemplate() re-renders
 
-User taps Android Auto button
-  → FahrtDocCarScreen.dispatch()
-  → FahrtDocCarPlayModule.dispatchToJS()
+User taps "Stopp" or "Pause"
+  → FahrtDocCarScreen → FahrtDocCarPlayModule.dispatchToJS()
   → DeviceEventManagerModule.emit("FahrtDocCarPlayAction")
   → NativeEventEmitter listener in carplayBridge.ts
   → dispatchCarPlayAction(action)
-  → useCarPlay handler → AppContext.startTrip / stopTrip / togglePause
+  → useCarPlay handler → AppContext.stopTrip / togglePause
 ```
 
 ### Testing (Android Auto)

@@ -36,7 +36,8 @@ import { useEffect, useState } from "react";
 export type CarPlayAction =
   | { type: "startTrip"; tripType: "business" | "private" }
   | { type: "stopTrip" }
-  | { type: "pauseTrip" };
+  | { type: "pauseTrip" }
+  | { type: "selectTripType"; tripType: "business" | "private" };
 
 // ---------------------------------------------------------------------------
 // Trip state — JS → native CarPlay / Android Auto UI
@@ -48,6 +49,13 @@ export interface CarPlayTripState {
   tripType?: "business" | "private";
   elapsedSeconds?: number;
   distanceKm?: number;
+  /**
+   * Resolved start address to show on the CarPlay / Android Auto confirmation
+   * screen before the trip begins recording. Sent from useCarPlay when the
+   * native side dispatches a `selectTripType` action and the GPS address has
+   * been resolved. Shown as "Startadresse" on the native confirmation template.
+   */
+  startAddress?: string;
 }
 
 // ---------------------------------------------------------------------------
