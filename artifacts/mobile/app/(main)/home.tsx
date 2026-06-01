@@ -73,6 +73,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       checkDriveTask();
+      const interval = setInterval(checkDriveTask, 12_000);
+      return () => clearInterval(interval);
     }, [checkDriveTask])
   );
 
