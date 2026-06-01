@@ -20,6 +20,7 @@ import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
 import { fetchRoutes, RouteOption } from "@/utils/routeService";
+import { useCarPlayStopped, setCarPlayStopped } from "@/utils/carplayBridge";
 
 const fmtDur = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -52,6 +53,7 @@ export default function SaveTripSheet() {
   const insets = useSafeAreaInsets();
   const { pendingTrip, pendingTripCoords, pendingTripPath, finalizeTrip, discardPendingTrip } = useApp();
   const { t } = useLanguage();
+  const stoppedViaCarPlay = useCarPlayStopped();
 
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
@@ -74,6 +76,7 @@ export default function SaveTripSheet() {
       setEditingField(null);
       setFieldDraftValue("");
       setRouteOverrideEnd(null);
+      setCarPlayStopped(false);
       return;
     }
     setDraftTrip(pendingTrip);
@@ -328,6 +331,14 @@ export default function SaveTripSheet() {
                       {draftTrip?.type === "business" ? "Geschäftlich" : "Privat"}
                     </Text>
                   </View>
+                  {stoppedViaCarPlay && (
+                    <View style={[styles.infoChip, styles.carplayChip, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+                      <Feather name="monitor" size={12} color={colors.primary} />
+                      <Text style={[styles.infoChipText, { color: colors.primary, fontWeight: "700" }]}>
+                        {t("tracking.carplayStopSource")}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -601,6 +612,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   infoChip: { flexDirection: "row", alignItems: "center", gap: 5 },
+  carplayChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
   infoChipText: { fontSize: 12 },
   mapWrapper: {
     marginBottom: 20,

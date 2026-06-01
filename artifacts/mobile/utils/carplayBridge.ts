@@ -94,6 +94,9 @@ if (typeof global !== "undefined") {
 //
 // `carplayStarted` is true when the most recent startTrip was triggered by
 // the CarPlay / Android Auto native UI, and false once the trip ends.
+//
+// `carplayStopped` is true when the most recent stopTrip was triggered by
+// the CarPlay / Android Auto native UI, and false once the save sheet closes.
 // ---------------------------------------------------------------------------
 
 let carplayStarted = false;
@@ -126,6 +129,48 @@ export function useCarPlayStarted(): boolean {
     carplayStartedListeners.add(setValue);
     return () => {
       carplayStartedListeners.delete(setValue);
+    };
+  }, []);
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// Stop-source tracking
+// ---------------------------------------------------------------------------
+
+let carplayStopped = false;
+const carplayStoppedListeners = new Set<(v: boolean) => void>();
+
+/**
+ * Set whether the most recent stopTrip was triggered via CarPlay / Android Auto.
+ * Call with `true` when the native stop action fires; call with `false` after
+ * the save sheet has been confirmed or discarded.
+ */
+export function setCarPlayStopped(value: boolean): void {
+  if (carplayStopped === value) return;
+  carplayStopped = value;
+  carplayStoppedListeners.forEach((l) => {
+    try {
+      l(value);
+    } catch {
+      // listener error must not block others
+    }
+  });
+}
+
+/**
+ * React hook — returns `true` when the most recent trip was stopped from the
+ * CarPlay / Android Auto screen, `false` otherwise.
+ *
+ * Automatically updates whenever the value changes anywhere in the app.
+ */
+export function useCarPlayStopped(): boolean {
+  const [value, setValue] = useState(carplayStopped);
+  useEffect(() => {
+    setValue(carplayStopped);
+    carplayStoppedListeners.add(setValue);
+    return () => {
+      carplayStoppedListeners.delete(setValue);
     };
   }, []);
   return value;

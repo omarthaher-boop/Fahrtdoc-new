@@ -250,6 +250,7 @@ const de: Record<string, string> = {
   "tracking.restartDetect": "Neu starten",
   "tracking.carplaySource": "Gestartet über CarPlay",
   "tracking.androidAutoSource": "Gestartet über Android Auto",
+  "tracking.carplayStopSource": "Gestoppt über CarPlay",
   "watchdog.title": "FahrtDoc – Fahrterkennung gestoppt",
   "watchdog.body": "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
   "driveNotif.startTitle": "FahrtDoc – Fahrt dokumentieren?",
@@ -517,14 +518,13 @@ const en: Record<string, string> = {
   "tracking.restartDetect": "Restart",
   "tracking.carplaySource": "Started via CarPlay",
   "tracking.androidAutoSource": "Started via Android Auto",
+  "tracking.carplayStopSource": "Stopped via CarPlay",
   "watchdog.title": "FahrtDoc – Drive detection stopped",
   "watchdog.body": "Automatic drive detection was interrupted. Please open the app to save your trip.",
-<<<<<<< HEAD
   "driveNotif.startTitle": "FahrtDoc – Record trip?",
   "driveNotif.startBody": "You're driving — would you like to record this trip?",
   "driveNotif.stopTitle": "FahrtDoc – End trip?",
   "driveNotif.stopBody": "Looks like you've parked — end the trip now?",
-=======
   "tracking.screen.title": "Trip in progress",
   "tracking.screen.elapsed": "Drive time",
   "tracking.screen.distance": "Distance",
@@ -538,7 +538,6 @@ const en: Record<string, string> = {
   "tracking.screen.waitingGpsSub": "Map will appear once a position is available.",
   "tracking.screen.gpsOff": "GPS disabled",
   "tracking.screen.gpsOffSub": "Distance is estimated based on drive time and speed.",
->>>>>>> 2b0d7d3 (feat(mobile): Add dedicated full-screen tracking screen for active trips)
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

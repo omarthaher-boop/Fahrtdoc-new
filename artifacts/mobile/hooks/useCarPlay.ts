@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import {
   addCarPlayActionListener,
   setCarPlayStarted,
+  setCarPlayStopped,
   updateCarPlayTripState,
 } from "@/utils/carplayBridge";
 import { useApp } from "@/context/AppContext";
@@ -43,6 +44,7 @@ export function useCarPlay(): void {
           break;
         case "stopTrip":
           setCarPlayStarted(false);
+          setCarPlayStopped(true);
           stopTrip();
           break;
         case "pauseTrip":
