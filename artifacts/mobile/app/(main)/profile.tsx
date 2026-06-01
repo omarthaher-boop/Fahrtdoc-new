@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   isBiometricAvailable,
@@ -12,6 +13,7 @@ import {
 import {
   Alert,
   AppState,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -330,6 +332,27 @@ function haptic() {
   }
 }
 
+function LogoPreview({ uri }: { uri: string }) {
+  const [error, setError] = useState(false);
+  if (error) {
+    return (
+      <View style={{ alignItems: "center", padding: 12 }}>
+        <Feather name="image" size={32} color="#aaa" />
+      </View>
+    );
+  }
+  return (
+    <View style={{ borderRadius: 8, overflow: "hidden" }}>
+      <Image
+        source={{ uri }}
+        style={{ width: "100%", height: 80 }}
+        resizeMode="contain"
+        onError={() => setError(true)}
+      />
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -359,6 +382,9 @@ export default function ProfileScreen() {
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [emModalVisible, setEmModalVisible] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [companyModalVisible, setCompanyModalVisible] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState(user?.companyName ?? "");
+  const [editLogoUri, setEditLogoUri] = useState(user?.logoUri ?? "");
 
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPlate, setEditPlate] = useState(user?.plate ?? "");
@@ -465,6 +491,8 @@ export default function ProfileScreen() {
       setEditVehicleYear(user.vehicleYear ?? "");
       setEditVehicleColor(user.vehicleColor ?? "");
       setSignatureBlockState(user.signatureBlock ?? false);
+      setEditCompanyName(user.companyName ?? "");
+      setEditLogoUri(user.logoUri ?? "");
     }
   }, [user]);
 
@@ -692,6 +720,35 @@ export default function ProfileScreen() {
     haptic();
   }, [editVehicleBrand, editVehicleModel, editVehicleYear, editVehicleColor, updateVehicleData]);
 
+  const handleOpenCompany = useCallback(() => {
+    setEditCompanyName(user?.companyName ?? "");
+    setEditLogoUri(user?.logoUri ?? "");
+    setCompanyModalVisible(true);
+  }, [user]);
+
+  const handlePickLogo = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 2],
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      const ext = (asset.uri.split(".").pop() ?? "png").toLowerCase();
+      const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+      const dataUri = `data:${mime};base64,${asset.base64}`;
+      setEditLogoUri(dataUri);
+    }
+  }, []);
+
+  const handleSaveCompany = useCallback(async () => {
+    await updateCompanyInfo(editCompanyName.trim(), editLogoUri, user?.signatureBlock);
+    setCompanyModalVisible(false);
+    haptic();
+  }, [editCompanyName, editLogoUri, updateCompanyInfo, user]);
+
   const handleLanguageSelect = useCallback(async (lang: Language) => {
     await setLanguage(lang);
     haptic();
@@ -896,7 +953,14 @@ export default function ProfileScreen() {
           <SectionHeader label={t("section.account")} colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ListRow icon="user" label={t("row.personalData")} onPress={handleOpenEdit} colors={colors} showDivider />
-            <ListRow icon="navigation" label={t("row.vehicleProfile")} onPress={handleOpenVehicle} colors={colors} />
+            <ListRow icon="navigation" label={t("row.vehicleProfile")} onPress={handleOpenVehicle} colors={colors} showDivider />
+            <ListRow
+              icon="briefcase"
+              label={t("row.companyInfo")}
+              value={user?.companyName || undefined}
+              onPress={handleOpenCompany}
+              colors={colors}
+            />
           </View>
 
           <SectionHeader label={t("section.subscription")} colors={colors} />
@@ -1187,6 +1251,81 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.vehicleModalSaveBtn, { backgroundColor: colors.primary }]}
               onPress={handleSaveVehicle}
+            >
+              <Text style={styles.vehicleModalSaveBtnText}>{t("common.save")}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Company Info Modal */}
+      <Modal visible={companyModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={{ width: 40 }} />
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("company.modal.title")}</Text>
+            <TouchableOpacity onPress={() => setCompanyModalVisible(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 16 }]} keyboardShouldPersistTaps="handled">
+            <ModalField
+              label={t("company.name.label")}
+              value={editCompanyName}
+              onChangeText={setEditCompanyName}
+              icon="briefcase"
+              placeholder={t("company.name.placeholder")}
+              colors={colors}
+            />
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 16, marginBottom: 8, marginHorizontal: 4 }]}>{t("company.logo.label")}</Text>
+
+            {editLogoUri ? (
+              <View style={[styles.logoPreviewWrap, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <View style={styles.logoImgContainer}>
+                  {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+                  <View style={styles.logoImgWrap}>
+                    <LogoPreview uri={editLogoUri} />
+                  </View>
+                </View>
+                <View style={styles.logoBtnRow}>
+                  <TouchableOpacity
+                    style={[styles.logoBtn, { backgroundColor: colors.accent, borderColor: colors.border }]}
+                    onPress={handlePickLogo}
+                  >
+                    <Feather name="image" size={15} color={colors.primary} />
+                    <Text style={[styles.logoBtnText, { color: colors.primary }]}>{t("company.logo.change")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.logoBtn, { backgroundColor: colors.accent, borderColor: colors.border }]}
+                    onPress={() => setEditLogoUri("")}
+                  >
+                    <Feather name="trash-2" size={15} color={colors.destructive} />
+                    <Text style={[styles.logoBtnText, { color: colors.destructive }]}>{t("company.logo.remove")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.logoPickBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                onPress={handlePickLogo}
+              >
+                <Feather name="image" size={22} color={colors.mutedForeground} />
+                <Text style={[styles.logoPickBtnText, { color: colors.primary }]}>{t("company.logo.pick")}</Text>
+                <Text style={[styles.logoPickBtnHint, { color: colors.mutedForeground }]}>{t("company.logo.hint")}</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+          <View style={[styles.vehicleModalBtns, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <TouchableOpacity
+              style={[styles.vehicleModalCancelBtn, { borderColor: colors.border }]}
+              onPress={() => setCompanyModalVisible(false)}
+            >
+              <Text style={[styles.vehicleModalBtnText, { color: colors.foreground }]}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.vehicleModalSaveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSaveCompany}
             >
               <Text style={styles.vehicleModalSaveBtnText}>{t("common.save")}</Text>
             </TouchableOpacity>
@@ -1552,4 +1691,13 @@ const styles = StyleSheet.create({
   stepDotText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   stepLabel: { fontSize: 12, fontWeight: "500", textAlign: "center" },
   stepLine: { flex: 1, height: 2, marginHorizontal: 8, marginBottom: 18 },
+  logoPreviewWrap: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
+  logoImgContainer: { marginBottom: 12 },
+  logoImgWrap: { borderRadius: 8, overflow: "hidden" },
+  logoBtnRow: { flexDirection: "row", gap: 10 },
+  logoBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, borderWidth: 1, paddingVertical: 9 },
+  logoBtnText: { fontSize: 13, fontWeight: "600" },
+  logoPickBtn: { borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", padding: 20, alignItems: "center", gap: 6, marginBottom: 8 },
+  logoPickBtnText: { fontSize: 14, fontWeight: "600" },
+  logoPickBtnHint: { fontSize: 12 },
 });
