@@ -24,7 +24,7 @@
  * calls in this module are silent no-ops — the app works normally.
  */
 
-import { NativeModules, Platform } from "react-native";
+import { NativeModules, NativeEventEmitter, Platform } from "react-native";
 import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
@@ -129,6 +129,31 @@ export function useCarPlayStarted(): boolean {
     };
   }, []);
   return value;
+}
+
+// ---------------------------------------------------------------------------
+// Native → JS: subscribe to NativeEventEmitter events from FahrtDocCarPlayModule
+//
+// When the native module is present (custom dev client / bare workflow build),
+// button taps from the CarPlay / Android Auto UI arrive as
+// "FahrtDocCarPlayAction" events. We forward them straight to the handler set
+// so useCarPlay() receives them without any extra wiring.
+// This is a no-op when the native module is absent (Expo Go, web, simulator).
+// ---------------------------------------------------------------------------
+
+if (Platform.OS !== "web") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const carPlayModule = (NativeModules as any).FahrtDocCarPlay;
+    if (carPlayModule) {
+      const emitter = new NativeEventEmitter(carPlayModule);
+      emitter.addListener("FahrtDocCarPlayAction", (action: CarPlayAction) => {
+        dispatchCarPlayAction(action);
+      });
+    }
+  } catch {
+    // Native module not installed — ignore
+  }
 }
 
 // ---------------------------------------------------------------------------
