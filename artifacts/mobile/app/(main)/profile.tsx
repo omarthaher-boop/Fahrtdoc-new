@@ -222,6 +222,7 @@ function ToggleRow({
 }: {
   icon: FeatherName; label: string; description: string; value: boolean; onValueChange: (v: boolean) => void; showDivider?: boolean; warningWhenOn?: boolean; colors: Colors; statusActive?: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <View style={[styles.listRow, showDivider && styles.divider, { borderBottomColor: colors.border, alignItems: "flex-start", paddingVertical: 13 }]}>
       <View style={[styles.listIconWrap, { backgroundColor: warningWhenOn && value ? "#FEF3C7" : colors.accent, marginTop: 2 }]}>
@@ -233,13 +234,13 @@ function ToggleRow({
           {statusActive === true && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" }} />
-              <Text style={{ fontSize: 11, fontWeight: "600", color: "#22C55E", letterSpacing: 0.2 }}>Aktiv</Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#22C55E", letterSpacing: 0.2 }}>{t("driveDetect.statusActive")}</Text>
             </View>
           )}
           {statusActive === false && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#F97316" }} />
-              <Text style={{ fontSize: 11, fontWeight: "600", color: "#F97316", letterSpacing: 0.2 }}>Gestoppt</Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#F97316", letterSpacing: 0.2 }}>{t("driveDetect.statusStopped")}</Text>
             </View>
           )}
         </View>
