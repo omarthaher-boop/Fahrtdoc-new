@@ -16,8 +16,10 @@ export const DRIVE_DETECT_STOPPED_AT_KEY = "fahrtdoc_detect_stopped_at";
 const DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY = "fahrtdoc_detect_stopped_notif";
 /** Written by the background task each time it fires successfully. */
 export const DRIVE_DETECT_HEARTBEAT_KEY = "fahrtdoc_detect_heartbeat";
-/** Fire the "still stopped" notification after the task has been down for this long. */
-const STOPPED_NOTIFICATION_THRESHOLD_MS = 2 * 60 * 1000;
+/** AsyncStorage key for user-configurable stopped-notification threshold (stored as minutes string). */
+export const DRIVE_DETECT_STOPPED_THRESHOLD_KEY = "fahrtdoc_detect_stopped_threshold_min";
+/** Default threshold in minutes. */
+const DEFAULT_STOPPED_THRESHOLD_MIN = 2;
 /** A heartbeat written within this window means the task is still alive. */
 const HEARTBEAT_FRESH_MS = 10 * 60 * 1000;
 
@@ -99,9 +101,9 @@ export async function clearDriveDetectStopped(): Promise<void> {
 }
 
 /**
- * If the drive-detect task has been stopped for ≥ STOPPED_NOTIFICATION_THRESHOLD_MS
- * and the notification has not yet been sent for this outage, fires a local push
- * notification and marks it as sent so it won't repeat.
+ * If the drive-detect task has been stopped for ≥ the user-configured threshold
+ * (default 2 min) and the notification has not yet been sent for this outage,
+ * fires a local push notification and marks it as sent so it won't repeat.
  *
  * A fresh heartbeat (written by the background task itself each time it runs)
  * takes precedence over the stopped-at key — if the task fired recently the
@@ -109,10 +111,11 @@ export async function clearDriveDetectStopped(): Promise<void> {
  */
 export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise<void> {
   try {
-    const [stoppedAtRaw, sentRaw, heartbeatRaw] = await AsyncStorage.multiGet([
+    const [stoppedAtRaw, sentRaw, heartbeatRaw, thresholdRaw] = await AsyncStorage.multiGet([
       DRIVE_DETECT_STOPPED_AT_KEY,
       DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY,
       DRIVE_DETECT_HEARTBEAT_KEY,
+      DRIVE_DETECT_STOPPED_THRESHOLD_KEY,
     ]);
     const stoppedAt = stoppedAtRaw[1] ? parseInt(stoppedAtRaw[1], 10) : null;
     const alreadySent = sentRaw[1] === "true";
@@ -126,7 +129,9 @@ export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise
     }
 
     if (!stoppedAt || alreadySent) return;
-    if (Date.now() - stoppedAt < STOPPED_NOTIFICATION_THRESHOLD_MS) return;
+    const thresholdMin = thresholdRaw[1] ? parseInt(thresholdRaw[1], 10) : DEFAULT_STOPPED_THRESHOLD_MIN;
+    const thresholdMs = thresholdMin * 60 * 1000;
+    if (Date.now() - stoppedAt < thresholdMs) return;
 
     const strings = DETECT_STOPPED_STRINGS[lang] ?? DETECT_STOPPED_STRINGS["en"];
     await Notifications.scheduleNotificationAsync({

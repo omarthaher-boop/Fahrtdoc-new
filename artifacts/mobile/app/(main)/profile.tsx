@@ -28,7 +28,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
+import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY, DRIVE_DETECT_STOPPED_THRESHOLD_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -407,6 +407,7 @@ export default function ProfileScreen() {
   const [notifLogin, setNotifLogin] = useState(true);
   const [notifDatenschutz, setNotifDatenschutz] = useState(true);
   const [notifDriveRemind, setNotifDriveRemind] = useState(false);
+  const [stoppedThresholdMin, setStoppedThresholdMin] = useState<2 | 5 | 10>(2);
 
   const [autoTracking, setAutoTracking] = useState(true);
   const [driveTaskRunning, setDriveTaskRunning] = useState(false);
@@ -451,6 +452,7 @@ export default function ProfileScreen() {
         PREF.notifGeneral, PREF.notifTrips, PREF.notifTracking, PREF.notifGps,
         PREF.notifOffline, PREF.notifSync, PREF.notifLogin, PREF.notifPrivacy,
         PREF.notifDriveRemind, FACE_ID_PREF_KEY,
+        DRIVE_DETECT_STOPPED_THRESHOLD_KEY,
       ]);
       const m = Object.fromEntries(vals);
       if (m[PREF.autoTracking] !== null) setAutoTracking(m[PREF.autoTracking] === "true");
@@ -469,6 +471,10 @@ export default function ProfileScreen() {
       if (m[PREF.notifPrivacy] !== null) setNotifDatenschutz(m[PREF.notifPrivacy] === "true");
       if (m[PREF.notifDriveRemind] !== null) setNotifDriveRemind(m[PREF.notifDriveRemind] === "true");
       if (m[FACE_ID_PREF_KEY] !== null) setFaceIdEnabledState(m[FACE_ID_PREF_KEY] === "true");
+      if (m[DRIVE_DETECT_STOPPED_THRESHOLD_KEY] !== null) {
+        const v = parseInt(m[DRIVE_DETECT_STOPPED_THRESHOLD_KEY], 10);
+        if (v === 2 || v === 5 || v === 10) setStoppedThresholdMin(v);
+      }
       if (Platform.OS !== "web") {
         const available = await isBiometricAvailable();
         setFaceIdAvailable(available);
@@ -586,6 +592,10 @@ export default function ProfileScreen() {
   const handleNotifSync = useCallback((v: boolean) => { setNotifSync(v); savePref(PREF.notifSync, v); }, [savePref]);
   const handleNotifLogin = useCallback((v: boolean) => { setNotifLogin(v); savePref(PREF.notifLogin, v); }, [savePref]);
   const handleNotifDatenschutz = useCallback((v: boolean) => { setNotifDatenschutz(v); savePref(PREF.notifPrivacy, v); }, [savePref]);
+  const handleStoppedThreshold = useCallback(async (v: 2 | 5 | 10) => {
+    setStoppedThresholdMin(v);
+    await AsyncStorage.setItem(DRIVE_DETECT_STOPPED_THRESHOLD_KEY, String(v));
+  }, []);
 
   const handleFaceIdToggle = useCallback(async (v: boolean) => {
     if (v) {
@@ -1390,7 +1400,29 @@ export default function ProfileScreen() {
               <ModalNotifRow icon="refresh-cw" label={t("notif.sync")} desc={t("notif.sync.desc")} value={notifSync} onValueChange={handleNotifSync} showDivider colors={colors} />
               <ModalNotifRow icon="log-in" label={t("notif.login")} desc={t("notif.login.desc")} value={notifLogin} onValueChange={handleNotifLogin} showDivider colors={colors} />
               <ModalNotifRow icon="shield" label={t("notif.datenschutz")} desc={t("notif.datenschutz.desc")} value={notifDatenschutz} onValueChange={handleNotifDatenschutz} showDivider colors={colors} />
-              <ModalNotifRow icon="navigation" label={t("notif.driveRemind")} desc={t("notif.driveRemind.desc")} value={notifDriveRemind} onValueChange={handleNotifDriveRemind} colors={colors} />
+              <ModalNotifRow icon="navigation" label={t("notif.driveRemind")} desc={t("notif.driveRemind.desc")} value={notifDriveRemind} onValueChange={handleNotifDriveRemind} showDivider colors={colors} />
+              <View style={[styles.notifRow, { borderTopWidth: 0 }]}>
+                <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+                  <Feather name="clock" size={15} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("notif.stoppedThreshold")}</Text>
+                  <Text style={[styles.listDesc, { color: colors.mutedForeground }]}>{t("notif.stoppedThreshold.desc")}</Text>
+                </View>
+                <View style={[styles.segmented, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  {([2, 5, 10] as const).map((min) => (
+                    <TouchableOpacity
+                      key={min}
+                      style={[styles.segBtn, stoppedThresholdMin === min && { backgroundColor: colors.primary, borderRadius: 8 }]}
+                      onPress={() => handleStoppedThreshold(min)}
+                    >
+                      <Text style={[styles.segBtnText, { color: stoppedThresholdMin === min ? "#fff" : colors.mutedForeground }]}>
+                        {t(`notif.stoppedThreshold.min${min}` as any)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
             <Text style={[styles.notifHint, { color: colors.mutedForeground }]}>
               {language === "de"
