@@ -27,6 +27,7 @@ import { useSubscription } from "@/lib/revenuecat";
 import { SUBSCRIPTION_ENABLED, FREE_TRIP_LIMIT } from "@/config/subscription";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
+const SELECTION_STORAGE_KEY = "@drivelog_history_selection";
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 type TypeFilter = "all" | "business" | "private";
@@ -92,13 +93,22 @@ export default function HistoryScreen() {
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [filtersLoaded, setFiltersLoaded] = useState(false);
   const skipNextPersistRef = React.useRef(false);
+  const [selectionLoaded, setSelectionLoaded] = useState(false);
+  const skipNextSelectionPersistRef = React.useRef(false);
+
+  // Selection state — declared here so the persist effect below can reference them
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    AsyncStorage.getItem(FILTER_STORAGE_KEY)
-      .then((raw) => {
-        if (raw) {
+    Promise.all([
+      AsyncStorage.getItem(FILTER_STORAGE_KEY),
+      AsyncStorage.getItem(SELECTION_STORAGE_KEY),
+    ])
+      .then(([filterRaw, selectionRaw]) => {
+        if (filterRaw) {
           try {
-            const saved = JSON.parse(raw);
+            const saved = JSON.parse(filterRaw);
             if (saved.periodFilter !== undefined) setPeriodFilter(saved.periodFilter);
             if (saved.typeFilter !== undefined) setTypeFilter(saved.typeFilter);
             if (saved.dateFrom !== undefined) setDateFrom(saved.dateFrom);
@@ -106,9 +116,23 @@ export default function HistoryScreen() {
             if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
           } catch {}
         }
+        if (selectionRaw) {
+          try {
+            const saved = JSON.parse(selectionRaw);
+            if (saved.selectionMode && Array.isArray(saved.selectedIds)) {
+              setSelectionMode(true);
+              setSelectedIds(new Set<string>(saved.selectedIds));
+              skipNextSelectionPersistRef.current = true;
+            }
+          } catch {}
+        }
         setFiltersLoaded(true);
+        setSelectionLoaded(true);
       })
-      .catch(() => setFiltersLoaded(true));
+      .catch(() => {
+        setFiltersLoaded(true);
+        setSelectionLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -122,6 +146,22 @@ export default function HistoryScreen() {
       JSON.stringify({ periodFilter, typeFilter, dateFrom, dateTo, showDateRange })
     ).catch(() => {});
   }, [filtersLoaded, periodFilter, typeFilter, dateFrom, dateTo, showDateRange]);
+
+  useEffect(() => {
+    if (!selectionLoaded) return;
+    if (skipNextSelectionPersistRef.current) {
+      skipNextSelectionPersistRef.current = false;
+      return;
+    }
+    if (selectionMode) {
+      AsyncStorage.setItem(
+        SELECTION_STORAGE_KEY,
+        JSON.stringify({ selectionMode: true, selectedIds: Array.from(selectedIds) })
+      ).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
+    }
+  }, [selectionLoaded, selectionMode, selectedIds]);
 
   const resetFilters = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
@@ -140,10 +180,6 @@ export default function HistoryScreen() {
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
-
-  // Selection state
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const PERIOD_OPTIONS: { label: string; value: PeriodFilter }[] = [
     { label: t("history.all"), value: "all" },
@@ -289,6 +325,7 @@ export default function HistoryScreen() {
     ].join("\n");
     const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     await Linking.openURL(mailto);
+    AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
   };
 
   const handleExportPDF = async () => {
@@ -302,6 +339,7 @@ export default function HistoryScreen() {
     setExportingPDF(true);
     try {
       await exportPDF(displayTrips, user, dateFrom, dateTo, language);
+      AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
     } finally {
       setExportingPDF(false);
     }
@@ -318,6 +356,7 @@ export default function HistoryScreen() {
     setExportingCSV(true);
     try {
       await exportCSV(displayTrips, user, dateFrom, dateTo, language);
+      AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
     } finally {
       setExportingCSV(false);
     }
