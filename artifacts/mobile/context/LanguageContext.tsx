@@ -542,7 +542,7 @@ const en: Record<string, string> = {
   "tracking.screen.gpsOffSub": "Distance is estimated based on drive time and speed.",
 };
 
-const translations: Record<Language, Record<string, string>> = { de, en };
+export const translations: Record<Language, Record<string, string>> = { de, en };
 
 interface LanguageContextType {
   language: Language;

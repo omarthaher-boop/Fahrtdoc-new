@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as TaskManager from "expo-task-manager";
 import * as Notifications from "expo-notifications";
+import { translations } from "../context/LanguageContext";
 
 export const DRIVE_DETECT_TASK = "DRIVELOG_DRIVE_DETECT";
 
@@ -143,17 +144,6 @@ export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise
 }
 
 
-const WATCHDOG_STRINGS: Record<string, { title: string; body: string }> = {
-  de: {
-    title: "FahrtDoc – Fahrterkennung gestoppt",
-    body: "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
-  },
-  en: {
-    title: "FahrtDoc – Drive detection stopped",
-    body: "Automatic drive detection was interrupted. Please open the app to save your trip.",
-  },
-};
-
 /**
  * Schedule (or reschedule) a watchdog notification. The notification fires
  * WATCHDOG_SECONDS in the future. If the background task keeps running it
@@ -168,11 +158,12 @@ async function rescheduleWatchdog(): Promise<void> {
     if (storedId) {
       await Notifications.cancelScheduledNotificationAsync(storedId).catch(() => {});
     }
-    const strings = WATCHDOG_STRINGS[lang ?? "de"] ?? WATCHDOG_STRINGS["de"];
+    const langKey = (lang === "en" ? "en" : "de") as keyof typeof translations;
+    const dict = translations[langKey];
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: strings.title,
-        body: strings.body,
+        title: dict["watchdog.title"],
+        body: dict["watchdog.body"],
         sound: true,
         data: { watchdog: true },
       },
