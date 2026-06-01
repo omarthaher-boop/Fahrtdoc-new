@@ -206,6 +206,12 @@ export default function HistoryScreen() {
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportModalFormat, setExportModalFormat] = useState<"pdf" | "csv">("pdf");
+  const [exportModalDateFrom, setExportModalDateFrom] = useState("");
+  const [exportModalDateTo, setExportModalDateTo] = useState("");
   const [exportingSplit, setExportingSplit] = useState(false);
 
   const PERIOD_OPTIONS: { label: string; value: PeriodFilter }[] = [
@@ -379,39 +385,59 @@ export default function HistoryScreen() {
     AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
   };
 
-  const handleExportPDF = async () => {
+  const openExportModal = (format: "pdf" | "csv") => {
     if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
-    if (exportingPDF) return;
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    setExportingPDF(true);
-    try {
-      await exportPDF(displayTrips, user, dateFrom, dateTo, language);
-      AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
-    } finally {
-      setExportingPDF(false);
+    setExportModalFormat(format);
+    setExportModalDateFrom(dateFrom);
+    setExportModalDateTo(dateTo);
+    setShowExportModal(true);
+  };
+
+  const doExport = async () => {
+    setShowExportModal(false);
+    // Re-apply date range from modal inputs over the currently displayed trips
+    const toExport = displayTrips.filter((trip) => {
+      const d = new Date(trip.date);
+      if (exportModalDateFrom) {
+        const [dd, mm, yyyy] = exportModalDateFrom.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          if (d < new Date(yyyy, mm - 1, dd)) return false;
+        }
+      }
+      if (exportModalDateTo) {
+        const [dd, mm, yyyy] = exportModalDateTo.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          if (d >= new Date(yyyy, mm - 1, dd + 1)) return false;
+        }
+      }
+      return true;
+    });
+    if (exportModalFormat === "pdf") {
+      setExportingPDF(true);
+      try {
+        await exportPDF(toExport, user, exportModalDateFrom, exportModalDateTo, language);
+        AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
+      } finally {
+        setExportingPDF(false);
+      }
+    } else {
+      setExportingCSV(true);
+      try {
+        await exportCSV(toExport, user, exportModalDateFrom, exportModalDateTo, language);
+        AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
+      } finally {
+        setExportingCSV(false);
+      }
     }
   };
 
-  const handleExportCSV = async () => {
-    if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
-    if (exportingCSV) return;
-    if (Platform.OS !== "web") Haptics.selectionAsync();
-    if (selectionMode && selectedIds.size === 0) {
-      Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
-      return;
-    }
-    setExportingCSV(true);
-    try {
-      await exportCSV(displayTrips, user, dateFrom, dateTo, language, t("history.exportCSVEmpty"), t("history.exportCSVEmptyMsg"));
-      AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
-    } finally {
-      setExportingCSV(false);
-    }
-  };
+  const handleExportPDF = () => openExportModal("pdf");
+  const handleExportCSV = () => openExportModal("csv");
 
   const handleSplitExport = () => {
     if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
@@ -958,6 +984,114 @@ export default function HistoryScreen() {
         onClose={() => setViewingTrip(null)}
       />
 
+      {/* Export confirmation modal */}
+      <Modal
+        visible={showExportModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowExportModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.exportModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowExportModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.exportModalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Title */}
+              <Text style={[styles.exportModalTitle, { color: colors.foreground }]}>
+                {language === "de" ? "Exportieren" : "Export"}
+              </Text>
+
+              {/* Format toggle */}
+              <View style={[styles.exportFormatRow, { borderColor: colors.border, backgroundColor: colors.secondary }]}>
+                {(["pdf", "csv"] as const).map((fmt) => (
+                  <TouchableOpacity
+                    key={fmt}
+                    onPress={() => { setExportModalFormat(fmt); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
+                    style={[
+                      styles.exportFormatBtn,
+                      exportModalFormat === fmt && { backgroundColor: colors.primary },
+                    ]}
+                  >
+                    <Feather
+                      name={fmt === "pdf" ? "file-text" : "grid"}
+                      size={14}
+                      color={exportModalFormat === fmt ? "#fff" : colors.mutedForeground}
+                    />
+                    <Text style={[
+                      styles.exportFormatText,
+                      { color: exportModalFormat === fmt ? "#fff" : colors.mutedForeground },
+                    ]}>
+                      {fmt.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Date range */}
+              <Text style={[styles.exportModalLabel, { color: colors.mutedForeground }]}>
+                {language === "de" ? "Zeitraum" : "Date range"}
+              </Text>
+              <View style={styles.exportModalDateRow}>
+                <View style={[styles.exportModalDateField, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                  <TextInput
+                    style={[styles.exportModalDateInput, { color: colors.foreground }]}
+                    value={exportModalDateFrom}
+                    onChangeText={setExportModalDateFrom}
+                    placeholder={language === "de" ? "TT.MM.JJJJ" : "DD.MM.YYYY"}
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                  />
+                </View>
+                <Feather name="arrow-right" size={14} color={colors.mutedForeground} />
+                <View style={[styles.exportModalDateField, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                  <TextInput
+                    style={[styles.exportModalDateInput, { color: colors.foreground }]}
+                    value={exportModalDateTo}
+                    onChangeText={setExportModalDateTo}
+                    placeholder={language === "de" ? "TT.MM.JJJJ" : "DD.MM.YYYY"}
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                  />
+                </View>
+              </View>
+
+              {/* Preview summary */}
+              <View style={[styles.exportModalPreview, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                <Feather name="list" size={14} color={colors.primary} />
+                <Text style={[styles.exportModalPreviewText, { color: colors.primary }]}>
+                  {displayTrips.length} {language === "de" ? "Fahrten" : "trips"} · {statsKm.toFixed(1)} km
+                </Text>
+              </View>
+
+              {/* Action buttons */}
+              <View style={styles.exportModalActions}>
+                <TouchableOpacity
+                  onPress={() => setShowExportModal(false)}
+                  style={[styles.exportModalCancelBtn, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.exportModalCancelText, { color: colors.mutedForeground }]}>
+                    {language === "de" ? "Abbrechen" : "Cancel"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={doExport}
+                  style={[styles.exportModalConfirmBtn, { backgroundColor: colors.primary }]}
+                >
+                  <Feather name="download" size={15} color="#fff" />
+                  <Text style={styles.exportModalConfirmText}>
+                    {exportModalFormat.toUpperCase()} {language === "de" ? "exportieren" : "export"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Paywall modal — shown when non-premium user tries PDF/CSV export */}
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
     </View>
@@ -1216,6 +1350,115 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: "800" },
   emptyText: { fontSize: 14, textAlign: "center" },
+  exportModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  exportModalCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 24,
+    gap: 14,
+  },
+  exportModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  exportFormatRow: {
+    flexDirection: "row",
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+    padding: 3,
+    gap: 3,
+  },
+  exportFormatBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  exportFormatText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  exportModalLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: -6,
+  },
+  exportModalDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  exportModalDateField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 7,
+  },
+  exportModalDateInput: {
+    flex: 1,
+    fontSize: 13,
+  },
+  exportModalPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  exportModalPreviewText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  exportModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  exportModalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exportModalCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  exportModalConfirmBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  exportModalConfirmText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+  },
   monthPickerOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

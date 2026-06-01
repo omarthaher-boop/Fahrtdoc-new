@@ -89,7 +89,7 @@ function buildCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, d
     "",
   ].filter((line, i) => i === 0 || line !== "");
 
-  const dataHeaders = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "Dauer", "Notiz"];
+  const dataHeaders = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "GPS-Route (km)", "Dauer", "Zweck / Notiz"];
   const rows: string[] = [...header.map((h) => csvCell(h)), dataHeaders.join(",")];
 
   for (const t of trips) {
@@ -100,14 +100,14 @@ function buildCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, d
     });
     const type = t.type === "business" ? "Geschäftlich" : "Privat";
     rows.push(
-      [date, type, t.startAddr, t.endAddr, t.km.toFixed(1), fmtDur(t.dur), ""]
+      [date, type, t.startAddr, t.endAddr, t.km.toFixed(1), t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "", fmtDur(t.dur), t.note ?? ""]
         .map(csvCell)
         .join(",")
     );
 
     (t.waypoints ?? []).forEach((wp, i) => {
       rows.push(
-        ["", `Zwischenstopp ${i + 1}`, wp.addr, "", "", "", wp.note ?? ""]
+        ["", `Zwischenstopp ${i + 1}`, wp.addr, "", "", "", "", wp.note ?? ""]
           .map(csvCell)
           .join(",")
       );
@@ -270,7 +270,7 @@ function buildHTML(
             const noteHtml = wp.note
               ? `<br><span style="font-style:italic;color:#888;font-size:8.5pt;">${escHtml(wp.note)}</span>`
               : "";
-            return `<tr class="waypoint-row"><td></td><td></td><td colspan="2" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td><td></td></tr>`;
+            return `<tr class="waypoint-row"><td></td><td></td><td colspan="3" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td><td></td></tr>`;
           }
         )
         .join("");
@@ -278,8 +278,9 @@ function buildHTML(
       <tr>
         <td>${fmtDate(t.date)}</td>
         <td class="${t.type === "business" ? "badge-business" : "badge-private"}">${fmtType(t.type)}</td>
-        <td>${t.startAddr}</td>
-        <td>${t.endAddr}</td>
+        <td>${escHtml(t.startAddr)}</td>
+        <td>${escHtml(t.endAddr)}</td>
+        <td>${t.note ? `<span style="font-size:9pt;color:#444;">${escHtml(t.note)}</span>` : "<span style=\"color:#bbb;\">–</span>"}</td>
         <td class="num">${t.km.toFixed(1)}</td>
         <td class="num">${t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "–"}</td>
         <td class="num">${fmtDur(t.dur)}</td>
@@ -435,14 +436,14 @@ function buildHTML(
   <table>
     <thead>
       <tr>
-        <th>Datum</th><th>Typ</th><th>Startadresse</th><th>Zieladresse</th>
+        <th>Datum</th><th>Typ</th><th>Startadresse</th><th>Zieladresse</th><th>Zweck / Notiz</th>
         <th class="num">GPS-Strecke (km)</th><th class="num">Kürzeste Route (km)</th><th class="num">Dauer</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
     <tfoot>
       <tr>
-        <td colspan="4">Gesamt</td>
+        <td colspan="5">Gesamt</td>
         <td class="num">${totalKm.toFixed(1)}</td>
         <td class="num">${totalKmRoute !== null ? totalKmRoute.toFixed(1) : "–"}</td>
         <td class="num">${fmtDur(totalDur)}</td>
@@ -695,8 +696,9 @@ async function exportPDFWeb(
   y += 8;
   // ────────────────────────────────────────────────────────────────────────
 
-  const colWidths = [26, 20, 70, 70, 28, 28, 17];
-  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "GPS-Strecke", "Kurzeste Route", "Dauer"];
+  // Columns: Datum, Typ, Start, End, Zweck, GPS-km, Route-km, Dauer
+  const colWidths = [25, 18, 50, 50, 42, 24, 24, 26];
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "Zweck / Notiz", "GPS-km", "Route-km", "Dauer"];
   const rowH = 8;
   const pageH = 210;
   const bottomMargin = 20;
@@ -709,7 +711,7 @@ async function exportPDFWeb(
     doc.setTextColor(...white);
     let cx = margin + 2;
     headers.forEach((h, i) => {
-      if (i >= 4) {
+      if (i >= 5) {
         doc.text(h, cx + colWidths[i] - 4, atY + 5.5, { align: "right" });
       } else {
         doc.text(h, cx, atY + 5.5);
@@ -748,19 +750,26 @@ async function exportPDFWeb(
       fmtType(t.type),
       t.startAddr,
       t.endAddr,
+      t.note ?? "",
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
     ];
     let cellX = margin + 2;
     cells.forEach((cell, i) => {
-      const isNum = i >= 4;
+      const isNum = i >= 5;
       const maxChars = Math.floor(colWidths[i] * 1.8);
       const truncated = cell.length > maxChars ? cell.slice(0, maxChars - 1) + "…" : cell;
       if (isNum) {
         doc.text(truncated, cellX + colWidths[i] - 4, y + 5.5, { align: "right" });
       } else {
-        doc.text(truncated, cellX, y + 5.5);
+        if (i === 4 && !cell) {
+          doc.setTextColor(180, 180, 180);
+          doc.text("–", cellX, y + 5.5);
+          doc.setTextColor(17, 17, 17);
+        } else {
+          doc.text(truncated, cellX, y + 5.5);
+        }
       }
       cellX += colWidths[i];
     });
@@ -777,7 +786,7 @@ async function exportPDFWeb(
           y = drawTableHeader(y);
         }
         const wpX = margin + 2 + colWidths[0] + colWidths[1];
-        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
+        const maxChars = Math.floor((colWidths[2] + colWidths[3] + colWidths[4]) * 1.8);
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(90, 106, 154);
@@ -814,20 +823,20 @@ async function exportPDFWeb(
   doc.setFontSize(9);
   doc.text("Gesamt", margin + 2, y + 6);
   let totX = margin + 2;
-  colWidths.slice(0, 4).forEach((w) => { totX += w; });
-  doc.text(`${totalKm.toFixed(1)} km`, totX + colWidths[4] - 4, y + 6, { align: "right" });
-  totX += colWidths[4];
+  colWidths.slice(0, 5).forEach((w) => { totX += w; });
+  doc.text(`${totalKm.toFixed(1)} km`, totX + colWidths[5] - 4, y + 6, { align: "right" });
+  totX += colWidths[5];
   const totalKmRouteJsPdf = trips.some((t) => t.kmRoute !== undefined)
     ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
     : null;
   doc.text(
     totalKmRouteJsPdf !== null ? `${totalKmRouteJsPdf.toFixed(1)} km` : "-",
-    totX + colWidths[5] - 4,
+    totX + colWidths[6] - 4,
     y + 6,
     { align: "right" }
   );
-  totX += colWidths[5];
-  doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
+  totX += colWidths[6];
+  doc.text(fmtDur(totalDur), totX + colWidths[7] - 4, y + 6, { align: "right" });
   y += totalsH + 10;
 
   if (user?.signatureBlock) {
@@ -998,8 +1007,9 @@ async function exportPDFNative(
   }
   y += 8;
 
-  const colWidths = [26, 20, 70, 70, 28, 28, 17];
-  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "GPS-Strecke", "Kurzeste Route", "Dauer"];
+  // Columns: Datum, Typ, Start, End, Zweck, GPS-km, Route-km, Dauer
+  const colWidthsN = [25, 18, 50, 50, 42, 24, 24, 26];
+  const headersN = ["Datum", "Typ", "Startadresse", "Zieladresse", "Zweck / Notiz", "GPS-km", "Route-km", "Dauer"];
   const rowH = 8;
   const pageH = 210;
   const bottomMargin = 20;
@@ -1011,13 +1021,13 @@ async function exportPDFNative(
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...white);
     let cx = margin + 2;
-    headers.forEach((h, i) => {
-      if (i >= 4) {
-        doc.text(h, cx + colWidths[i] - 4, atY + 5.5, { align: "right" });
+    headersN.forEach((h, i) => {
+      if (i >= 5) {
+        doc.text(h, cx + colWidthsN[i] - 4, atY + 5.5, { align: "right" });
       } else {
         doc.text(h, cx, atY + 5.5);
       }
-      cx += colWidths[i];
+      cx += colWidthsN[i];
     });
     return atY + rowH;
   };
@@ -1049,21 +1059,28 @@ async function exportPDFNative(
       fmtType(t.type),
       t.startAddr,
       t.endAddr,
+      t.note ?? "",
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
     ];
     let cellX = margin + 2;
     cells.forEach((cell, i) => {
-      const isNum = i >= 4;
-      const maxChars = Math.floor(colWidths[i] * 1.8);
+      const isNum = i >= 5;
+      const maxChars = Math.floor(colWidthsN[i] * 1.8);
       const truncated = cell.length > maxChars ? cell.slice(0, maxChars - 1) + "…" : cell;
       if (isNum) {
-        doc.text(truncated, cellX + colWidths[i] - 4, y + 5.5, { align: "right" });
+        doc.text(truncated, cellX + colWidthsN[i] - 4, y + 5.5, { align: "right" });
       } else {
-        doc.text(truncated, cellX, y + 5.5);
+        if (i === 4 && !cell) {
+          doc.setTextColor(180, 180, 180);
+          doc.text("–", cellX, y + 5.5);
+          doc.setTextColor(17, 17, 17);
+        } else {
+          doc.text(truncated, cellX, y + 5.5);
+        }
       }
-      cellX += colWidths[i];
+      cellX += colWidthsN[i];
     });
     y += rowH;
 
@@ -1076,8 +1093,8 @@ async function exportPDFNative(
           y = 20;
           y = drawTableHeader(y);
         }
-        const wpX = margin + 2 + colWidths[0] + colWidths[1];
-        const maxChars = Math.floor((colWidths[2] + colWidths[3]) * 1.8);
+        const wpX = margin + 2 + colWidthsN[0] + colWidthsN[1];
+        const maxChars = Math.floor((colWidthsN[2] + colWidthsN[3] + colWidthsN[4]) * 1.8);
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(90, 106, 154);
@@ -1114,20 +1131,20 @@ async function exportPDFNative(
   doc.setFontSize(9);
   doc.text("Gesamt", margin + 2, y + 6);
   let totX = margin + 2;
-  colWidths.slice(0, 4).forEach((w) => { totX += w; });
-  doc.text(`${totalKm.toFixed(1)} km`, totX + colWidths[4] - 4, y + 6, { align: "right" });
-  totX += colWidths[4];
+  colWidthsN.slice(0, 5).forEach((w) => { totX += w; });
+  doc.text(`${totalKm.toFixed(1)} km`, totX + colWidthsN[5] - 4, y + 6, { align: "right" });
+  totX += colWidthsN[5];
   const totalKmRouteN = trips.some((t) => t.kmRoute !== undefined)
     ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
     : null;
   doc.text(
     totalKmRouteN !== null ? `${totalKmRouteN.toFixed(1)} km` : "-",
-    totX + colWidths[5] - 4,
+    totX + colWidthsN[6] - 4,
     y + 6,
     { align: "right" }
   );
-  totX += colWidths[5];
-  doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
+  totX += colWidthsN[6];
+  doc.text(fmtDur(totalDur), totX + colWidthsN[7] - 4, y + 6, { align: "right" });
   y += totalsH + 10;
 
   if (user?.signatureBlock) {
