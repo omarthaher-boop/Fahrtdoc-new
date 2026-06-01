@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import {
   addCarPlayActionListener,
+  setCarPlayStarted,
   updateCarPlayTripState,
 } from "@/utils/carplayBridge";
 import { useApp } from "@/context/AppContext";
@@ -37,9 +38,11 @@ export function useCarPlay(): void {
     return addCarPlayActionListener((action) => {
       switch (action.type) {
         case "startTrip":
+          setCarPlayStarted(true);
           startTrip(action.tripType);
           break;
         case "stopTrip":
+          setCarPlayStarted(false);
           stopTrip();
           break;
         case "pauseTrip":
@@ -48,4 +51,12 @@ export function useCarPlay(): void {
       }
     });
   }, [startTrip, stopTrip, togglePause]);
+
+  // Clear the CarPlay-started flag when the trip ends from any source
+  // (e.g. user stops the trip from the phone screen)
+  useEffect(() => {
+    if (activeTrip === null) {
+      setCarPlayStarted(false);
+    }
+  }, [activeTrip]);
 }

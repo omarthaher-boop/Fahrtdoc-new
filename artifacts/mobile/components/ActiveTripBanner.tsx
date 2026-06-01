@@ -19,6 +19,7 @@ import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Waypoint } from "@/context/AppContext";
 import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
+import { useCarPlayStarted } from "@/utils/carplayBridge";
 
 const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -58,6 +59,7 @@ export default function ActiveTripBanner() {
   const colors = useColors();
   const { t } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
+  const carplayStarted = useCarPlayStarted();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [showCombinedPauseSheet, setShowCombinedPauseSheet] = useState(false);
@@ -207,6 +209,12 @@ export default function ActiveTripBanner() {
               <View style={[styles.pausedBadge, { backgroundColor: warningColor }]}>
                 <Feather name="pause" size={10} color="#FFFFFF" />
                 <Text style={styles.pausedBadgeText}>{t("tracking.paused")}</Text>
+              </View>
+            )}
+            {carplayStarted && (
+              <View style={styles.carplayBadge}>
+                <Feather name="monitor" size={10} color="#FFFFFF" />
+                <Text style={styles.carplayBadgeText}>{t("tracking.carplaySource")}</Text>
               </View>
             )}
           </View>
@@ -389,6 +397,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   pausedBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  carplayBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#6366F1",
+  },
+  carplayBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
   gpsOffRow: {
     flexDirection: "row",
     alignItems: "center",

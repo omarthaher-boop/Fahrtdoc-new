@@ -247,6 +247,7 @@ const de: Record<string, string> = {
   "tracking.active": "FAHRT LÄUFT",
   "tracking.gpsOff": "GPS deaktiviert — Daten manuell erfassen",
   "tracking.driveDetectStopped": "Fahrterkennung gestoppt — bitte App neu starten",
+  "tracking.carplaySource": "Gestartet über CarPlay",
 };
 
 const en: Record<string, string> = {
@@ -492,6 +493,7 @@ const en: Record<string, string> = {
   "tracking.active": "TRIP ACTIVE",
   "tracking.gpsOff": "GPS off — enter data manually",
   "tracking.driveDetectStopped": "Drive detection stopped — please restart the app",
+  "tracking.carplaySource": "Started via CarPlay",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };

@@ -25,6 +25,7 @@
  */
 
 import { NativeModules, Platform } from "react-native";
+import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Action types — native side → JS
@@ -86,6 +87,48 @@ export function dispatchCarPlayAction(action: CarPlayAction): void {
 if (typeof global !== "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (global as any).FahrtDocCarPlayDispatch = dispatchCarPlayAction;
+}
+
+// ---------------------------------------------------------------------------
+// CarPlay session source tracking
+//
+// `carplayStarted` is true when the most recent startTrip was triggered by
+// the CarPlay / Android Auto native UI, and false once the trip ends.
+// ---------------------------------------------------------------------------
+
+let carplayStarted = false;
+const carplayStartedListeners = new Set<(v: boolean) => void>();
+
+/** Set whether the current trip was started via CarPlay / Android Auto. */
+export function setCarPlayStarted(value: boolean): void {
+  if (carplayStarted === value) return;
+  carplayStarted = value;
+  carplayStartedListeners.forEach((l) => {
+    try {
+      l(value);
+    } catch {
+      // listener error must not block others
+    }
+  });
+}
+
+/**
+ * React hook — returns `true` when the active trip was started from the
+ * CarPlay / Android Auto screen, `false` otherwise.
+ *
+ * Automatically updates whenever the value changes anywhere in the app.
+ */
+export function useCarPlayStarted(): boolean {
+  const [value, setValue] = useState(carplayStarted);
+  useEffect(() => {
+    // Sync in case the value changed between renders
+    setValue(carplayStarted);
+    carplayStartedListeners.add(setValue);
+    return () => {
+      carplayStartedListeners.delete(setValue);
+    };
+  }, []);
+  return value;
 }
 
 // ---------------------------------------------------------------------------
