@@ -238,7 +238,7 @@ export default function ActiveTripBanner() {
             <View style={styles.stat}>
               <Feather name="briefcase" size={12} color={colors.primary} />
               <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-                {activeTrip.type === "business" ? "Geschäftl." : "Privat"}
+                {activeTrip.type === "business" ? t("tripType.business") : t("tripType.private")}
               </Text>
             </View>
             {(activeTrip.waypoints?.length ?? 0) > 0 && (
@@ -299,10 +299,10 @@ export default function ActiveTripBanner() {
               <Feather name="map-pin" size={22} color={colors.primary} />
             </View>
             <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-              Zwischenstopp erfassen?
+              {t("pause.dialog.title")}
             </Text>
             <Text style={[styles.sheetSubtitle, { color: colors.mutedForeground }]}>
-              Aktuellen Standort als Zwischenstopp speichern?
+              {t("pause.dialog.message")}
             </Text>
 
             {/* Location chip */}
@@ -312,12 +312,12 @@ export default function ActiveTripBanner() {
                 <View style={styles.locationLoading}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={[styles.locationLoadingText, { color: colors.mutedForeground }]}>
-                    Standort wird ermittelt …
+                    {t("waypoint.locating")}
                   </Text>
                 </View>
               ) : (
                 <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={2}>
-                  {pauseLocation || "Standort nicht verfügbar"}
+                  {pauseLocation || t("waypoint.addressUnavailable")}
                 </Text>
               )}
             </View>
@@ -333,7 +333,7 @@ export default function ActiveTripBanner() {
                   color: colors.foreground,
                 },
               ]}
-              placeholder="z. B. Kundenbesuch, Ladestation …"
+              placeholder={t("waypoint.note.placeholder")}
               placeholderTextColor={colors.mutedForeground}
               value={pauseNote}
               onChangeText={setPauseNote}
