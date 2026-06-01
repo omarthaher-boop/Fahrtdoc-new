@@ -57,7 +57,7 @@ const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> =>
 
 export default function ActiveTripBanner() {
   const colors = useColors();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
   const carplayStarted = useCarPlayStarted();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -68,6 +68,7 @@ export default function ActiveTripBanner() {
   const [pauseNote, setPauseNote] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [driveTaskRunning, setDriveTaskRunning] = useState(true);
+  const [restarting, setRestarting] = useState(false);
   const noteInputRef = useRef<TextInput>(null);
 
   const refreshDriveTaskStatus = useCallback(async () => {
@@ -80,6 +81,36 @@ export default function ActiveTripBanner() {
       setDriveTaskRunning(false);
     }
   }, []);
+
+  const handleRestartDetect = useCallback(async () => {
+    if (Platform.OS === "web" || restarting) return;
+    setRestarting(true);
+    try {
+      const Location = await import("expo-location");
+      const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
+      if (!isRunning) {
+        await Location.startLocationUpdatesAsync(DRIVE_DETECT_TASK, {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 200,
+          timeInterval: 60000,
+          activityType: Location.ActivityType.OtherNavigation,
+          showsBackgroundLocationIndicator: false,
+          ...(Platform.OS === "android" && {
+            foregroundService: {
+              notificationTitle: "FahrtDoc",
+              notificationBody: language === "de" ? "Fahrt-Erkennung aktiv" : "Drive detection active",
+              notificationColor: "#2563EB",
+            },
+          }),
+        });
+      }
+      setDriveTaskRunning(true);
+    } catch {
+      // Non-fatal — status remains false, banner stays visible
+    } finally {
+      setRestarting(false);
+    }
+  }, [restarting, language]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -223,6 +254,24 @@ export default function ActiveTripBanner() {
             <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
               <Feather name="wifi-off" size={12} color={warningColor} />
               <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.gpsOff")}</Text>
+            </View>
+          )}
+
+          {!driveTaskRunning && Platform.OS !== "web" && (
+            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
+              <Feather name="alert-triangle" size={12} color={warningColor} />
+              <Text style={[styles.gpsOffText, { color: warningColor, flex: 1 }]}>{t("tracking.driveDetectStopped")}</Text>
+              <TouchableOpacity
+                onPress={handleRestartDetect}
+                disabled={restarting}
+                style={[styles.restartBtn, { backgroundColor: warningColor }]}
+              >
+                {restarting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.restartBtnText}>{t("tracking.restartDetect")}</Text>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
@@ -419,6 +468,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   gpsOffText: { fontSize: 11, fontWeight: "600", flexShrink: 1 },
+  restartBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+    minHeight: 26,
+  },
+  restartBtnText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
   statsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   stat: { flexDirection: "row", alignItems: "center", gap: 4 },
   statNum: { fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums" as const] },

@@ -246,7 +246,8 @@ const de: Record<string, string> = {
   "tracking.paused": "PAUSIERT",
   "tracking.active": "FAHRT LÄUFT",
   "tracking.gpsOff": "GPS deaktiviert — Daten manuell erfassen",
-  "tracking.driveDetectStopped": "Fahrterkennung gestoppt — bitte App neu starten",
+  "tracking.driveDetectStopped": "Fahrterkennung gestoppt",
+  "tracking.restartDetect": "Neu starten",
   "tracking.carplaySource": "Gestartet über CarPlay",
 };
 
@@ -492,7 +493,8 @@ const en: Record<string, string> = {
   "tracking.paused": "PAUSED",
   "tracking.active": "TRIP ACTIVE",
   "tracking.gpsOff": "GPS off — enter data manually",
-  "tracking.driveDetectStopped": "Drive detection stopped — please restart the app",
+  "tracking.driveDetectStopped": "Drive detection stopped",
+  "tracking.restartDetect": "Restart",
   "tracking.carplaySource": "Started via CarPlay",
 };
 
