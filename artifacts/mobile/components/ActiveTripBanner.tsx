@@ -124,6 +124,16 @@ export default function ActiveTripBanner() {
   }, [refreshDriveTaskStatus]);
 
   useEffect(() => {
+    if (Platform.OS === "web" || !activeTrip) return;
+    const intervalId = setInterval(() => {
+      if (AppState.currentState === "active") {
+        refreshDriveTaskStatus();
+      }
+    }, 30_000);
+    return () => clearInterval(intervalId);
+  }, [activeTrip, refreshDriveTaskStatus]);
+
+  useEffect(() => {
     if (!activeTrip || paused) {
       pulseAnim.setValue(1);
       return;
