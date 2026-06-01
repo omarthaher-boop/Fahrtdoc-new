@@ -47,6 +47,19 @@ export async function cancelDriveWatchdog(): Promise<void> {
   }
 }
 
+const LANG_KEY = "pref_language";
+
+const WATCHDOG_STRINGS: Record<string, { title: string; body: string }> = {
+  de: {
+    title: "FahrtDoc – Fahrterkennung gestoppt",
+    body: "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
+  },
+  en: {
+    title: "FahrtDoc – Drive detection stopped",
+    body: "Automatic drive detection was interrupted. Please open the app to save your trip.",
+  },
+};
+
 /**
  * Schedule (or reschedule) a watchdog notification. The notification fires
  * WATCHDOG_SECONDS in the future. If the background task keeps running it
@@ -54,14 +67,18 @@ export async function cancelDriveWatchdog(): Promise<void> {
  */
 async function rescheduleWatchdog(): Promise<void> {
   try {
-    const storedId = await AsyncStorage.getItem(DRIVE_WATCHDOG_KEY);
+    const [storedId, lang] = await Promise.all([
+      AsyncStorage.getItem(DRIVE_WATCHDOG_KEY),
+      AsyncStorage.getItem(LANG_KEY),
+    ]);
     if (storedId) {
       await Notifications.cancelScheduledNotificationAsync(storedId).catch(() => {});
     }
+    const strings = WATCHDOG_STRINGS[lang ?? "de"] ?? WATCHDOG_STRINGS["de"];
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: "FahrtDoc – Fahrterkennung gestoppt",
-        body: "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
+        title: strings.title,
+        body: strings.body,
         sound: true,
         data: { watchdog: true },
       },

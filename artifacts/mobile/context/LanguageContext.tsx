@@ -249,6 +249,8 @@ const de: Record<string, string> = {
   "tracking.driveDetectStopped": "Fahrterkennung gestoppt",
   "tracking.restartDetect": "Neu starten",
   "tracking.carplaySource": "Gestartet über CarPlay",
+  "watchdog.title": "FahrtDoc – Fahrterkennung gestoppt",
+  "watchdog.body": "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
 };
 
 const en: Record<string, string> = {
@@ -496,6 +498,8 @@ const en: Record<string, string> = {
   "tracking.driveDetectStopped": "Drive detection stopped",
   "tracking.restartDetect": "Restart",
   "tracking.carplaySource": "Started via CarPlay",
+  "watchdog.title": "FahrtDoc – Drive detection stopped",
+  "watchdog.body": "Automatic drive detection was interrupted. Please open the app to save your trip.",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
