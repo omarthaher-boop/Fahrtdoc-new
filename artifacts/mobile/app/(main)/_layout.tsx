@@ -3,17 +3,38 @@ import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import type { SFSymbol } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
-import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 
 function TrackingDot() {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.6,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [scale]);
+
   return (
-    <View
-      style={styles.trackingDot}
+    <Animated.View
+      style={[styles.trackingDot, { transform: [{ scale }] }]}
       accessibilityLabel="Fahrterfassung aktiv"
     />
   );
