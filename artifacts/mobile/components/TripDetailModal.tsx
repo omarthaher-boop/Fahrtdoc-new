@@ -38,8 +38,8 @@ const fmtDate = (iso: string, locale: string) =>
     year: "numeric",
   });
 
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("de-DE", {
+const fmtTime = (iso: string, locale: string) =>
+  new Date(iso).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -108,7 +108,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                 </Text>
               </View>
               <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
-                {fmtDate(trip.date, locale)} · {fmtTime(trip.date)}
+                {fmtDate(trip.date, locale)} · {fmtTime(trip.date, locale)}
               </Text>
             </View>
             <TouchableOpacity
@@ -127,7 +127,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
           >
             {/* Map */}
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              FAHRTROUTE
+              {t("detail.routeLabel")}
             </Text>
             <TripRouteMap trip={trip} path={trip.path} />
 
@@ -138,7 +138,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                 { color: colors.mutedForeground, marginTop: 20 },
               ]}
             >
-              STATIONEN
+              {t("detail.stationsLabel")}
             </Text>
             <View
               style={[
@@ -160,13 +160,13 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                   <Text
                     style={[styles.stationLabel, { color: colors.mutedForeground }]}
                   >
-                    Start
+                    {t("detail.start")}
                   </Text>
                   <Text
                     style={[styles.stationAddr, { color: colors.foreground }]}
                     numberOfLines={2}
                   >
-                    {trip.startAddr || "Startpunkt unbekannt"}
+                    {trip.startAddr || t("detail.startUnknown")}
                   </Text>
                 </View>
               </View>
@@ -236,13 +236,13 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                   <Text
                     style={[styles.stationLabel, { color: colors.mutedForeground }]}
                   >
-                    Ziel
+                    {t("detail.end")}
                   </Text>
                   <Text
                     style={[styles.stationAddr, { color: colors.foreground }]}
                     numberOfLines={2}
                   >
-                    {trip.endAddr || "Zielpunkt unbekannt"}
+                    {trip.endAddr || t("detail.endUnknown")}
                   </Text>
                 </View>
               </View>
@@ -261,7 +261,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                   {trip.km.toFixed(1)} km
                 </Text>
                 <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-                  Strecke
+                  {t("detail.distance")}
                 </Text>
               </View>
               {dur && (
@@ -277,7 +277,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                     <Text
                       style={[styles.statUnit, { color: colors.mutedForeground }]}
                     >
-                      Fahrzeit
+                      {t("detail.driveTime")}
                     </Text>
                   </View>
                 </>
@@ -295,7 +295,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                     <Text
                       style={[styles.statUnit, { color: colors.mutedForeground }]}
                     >
-                      {waypoints.length === 1 ? "Stopp" : "Stopps"}
+                      {waypoints.length === 1 ? t("detail.stop") : t("detail.stops")}
                     </Text>
                   </View>
                 </>
@@ -308,7 +308,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                   <View style={styles.statItem}>
                     <Feather name="edit" size={14} color="#C98A00" />
                     <Text style={[styles.statValue, { color: "#C98A00", fontSize: 12 }]}>
-                      Bearbeitet
+                      {t("detail.edited")}
                     </Text>
                   </View>
                 </>
@@ -319,14 +319,14 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
             <Text
               style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: 20 }]}
             >
-              NOTIZ
+              {t("detail.noteLabel")}
             </Text>
             <View style={[styles.noteCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.noteInput, { color: colors.foreground }]}
                 value={noteText}
                 onChangeText={(v) => { setNoteText(v); setNoteSaved(false); }}
-                placeholder="Notiz zur Fahrt hinzufügen …"
+                placeholder={t("detail.notePlaceholder")}
                 placeholderTextColor={colors.mutedForeground}
                 multiline
                 numberOfLines={3}
@@ -339,13 +339,13 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                   onPress={handleSaveNote}
                 >
                   <Feather name="check" size={13} color="#FFF" />
-                  <Text style={styles.noteSaveBtnText}>Speichern</Text>
+                  <Text style={styles.noteSaveBtnText}>{t("common.save")}</Text>
                 </TouchableOpacity>
               )}
               {noteSaved && !noteChanged && (
                 <View style={[styles.noteSavedRow]}>
                   <Feather name="check-circle" size={13} color={colors.success} />
-                  <Text style={[styles.noteSavedText, { color: colors.success }]}>Gespeichert</Text>
+                  <Text style={[styles.noteSavedText, { color: colors.success }]}>{t("detail.noteSaved")}</Text>
                 </View>
               )}
             </View>

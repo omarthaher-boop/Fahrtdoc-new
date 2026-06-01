@@ -99,7 +99,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>Fahrt bearbeiten</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>{t("edit.title")}</Text>
             <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.secondary }]}>
               <Feather name="x" size={18} color={colors.foreground} />
             </TouchableOpacity>
@@ -113,7 +113,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
 
             {/* Type toggle */}
             <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Fahrtzweck</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.tripPurpose")}</Text>
               <View style={[styles.typeRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={[styles.typeBtn, type === "business" && { backgroundColor: colors.primary }]}
@@ -121,7 +121,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                 >
                   <Feather name="briefcase" size={14} color={type === "business" ? "#FFF" : colors.mutedForeground} />
                   <Text style={[styles.typeBtnText, { color: type === "business" ? "#FFF" : colors.mutedForeground }]}>
-                    Geschäftlich
+                    {t("tripType.business")}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -130,7 +130,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                 >
                   <Feather name="user" size={14} color={type === "private" ? "#FFF" : colors.mutedForeground} />
                   <Text style={[styles.typeBtnText, { color: type === "private" ? "#FFF" : colors.mutedForeground }]}>
-                    Privat
+                    {t("tripType.private")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -138,7 +138,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
 
             {/* Start address */}
             <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Startadresse</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.startAddr")}</Text>
               <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
                 <TextInput
@@ -148,7 +148,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                   onBlur={() =>
                     syncMapTrip({ startAddr: startAddr.trim() || trip.startAddr, startLat: undefined, startLon: undefined })
                   }
-                  placeholder="Startadresse"
+                  placeholder={t("edit.startAddr")}
                   placeholderTextColor={colors.mutedForeground}
                 />
               </View>
@@ -166,7 +166,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     style={[styles.input, { color: colors.foreground }]}
                     value={wp.addr}
                     onChangeText={(text) => handleWaypointChange(idx, text)}
-                    placeholder="Adresse"
+                    placeholder={t("edit.addrPlaceholder")}
                     placeholderTextColor={colors.mutedForeground}
                   />
                 </View>
@@ -176,7 +176,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     style={[styles.input, { color: colors.foreground }]}
                     value={wp.note ?? ""}
                     onChangeText={(text) => handleWaypointNoteChange(idx, text)}
-                    placeholder="Notiz (optional)"
+                    placeholder={t("edit.notePlaceholder")}
                     placeholderTextColor={colors.mutedForeground}
                   />
                 </View>
@@ -185,7 +185,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
 
             {/* End address */}
             <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Zieladresse</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.endAddr")}</Text>
               <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <View style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]} />
                 <TextInput
@@ -195,7 +195,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                   onBlur={() =>
                     syncMapTrip({ endAddr: endAddr.trim() || trip.endAddr, endLat: undefined, endLon: undefined })
                   }
-                  placeholder="Zieladresse"
+                  placeholder={t("edit.endAddr")}
                   placeholderTextColor={colors.mutedForeground}
                 />
               </View>
@@ -204,7 +204,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
             {/* km + Duration */}
             <View style={styles.twoColRow}>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Strecke (km)</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.distanceKm")}</Text>
                 <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                   <Feather name="navigation" size={14} color={colors.primary} />
                   <TextInput
@@ -218,7 +218,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                 </View>
               </View>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Dauer (Min)</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.durationMin")}</Text>
                 <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                   <Feather name="clock" size={14} color={colors.primary} />
                   <TextInput
@@ -240,7 +240,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
               testID="edit-trip-save"
             >
               <Feather name="check" size={16} color="#FFF" />
-              <Text style={styles.saveBtnText}>Änderungen speichern</Text>
+              <Text style={styles.saveBtnText}>{t("edit.saveChanges")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

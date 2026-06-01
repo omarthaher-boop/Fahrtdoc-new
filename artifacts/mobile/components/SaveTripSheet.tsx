@@ -97,7 +97,7 @@ export default function SaveTripSheet() {
         const shortest = r.find((x) => x.isShortest) ?? r[0];
         if (shortest) setRouteCheckedId(shortest.id);
       })
-      .catch(() => setRouteError("Routen konnten nicht geladen werden"))
+      .catch(() => setRouteError(t("save.routeError")))
       .finally(() => setLoadingRoutes(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingTrip?.id]);
@@ -139,7 +139,7 @@ export default function SaveTripSheet() {
             const shortest = r.find((x) => x.isShortest) ?? r[0];
             if (shortest) setRouteCheckedId(shortest.id);
           })
-          .catch(() => setRouteError("Routen konnten nicht geladen werden"))
+          .catch(() => setRouteError(t("save.routeError")))
           .finally(() => setLoadingRoutes(false));
       }
     } else {
@@ -212,10 +212,10 @@ export default function SaveTripSheet() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.title, { color: colors.foreground }]}>
-                    Fahrt beenden
+                    {t("save.title")}
                   </Text>
                   <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                    Adressen tippen zum Bearbeiten
+                    {t("save.subtitle")}
                   </Text>
                 </View>
               </View>
@@ -302,7 +302,7 @@ export default function SaveTripSheet() {
                         style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
                         numberOfLines={1}
                       >
-                        {draftTrip?.endAddr || "Wird ermittelt …"}
+                        {draftTrip?.endAddr || t("save.addressLoading")}
                       </Text>
                       <TouchableOpacity
                         onPress={() => startFieldEdit("end", draftTrip?.endAddr ?? "")}
@@ -328,7 +328,7 @@ export default function SaveTripSheet() {
                       color={colors.mutedForeground}
                     />
                     <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
-                      {draftTrip?.type === "business" ? "Geschäftlich" : "Privat"}
+                      {draftTrip?.type === "business" ? t("tripType.business") : t("tripType.private")}
                     </Text>
                   </View>
                   {stoppedViaCarPlay && (
@@ -355,7 +355,7 @@ export default function SaveTripSheet() {
 
               {/* Section label */}
               <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-                KILOMETERSTAND WÄHLEN
+                {t("save.kmSection")}
               </Text>
 
               {/* Actual GPS km */}
@@ -381,10 +381,10 @@ export default function SaveTripSheet() {
                   </View>
                   <View>
                     <Text style={[styles.routeName, { color: colors.foreground }]}>
-                      Gefahrene Kilometer
+                      {t("save.gpsKmLabel")}
                     </Text>
                     <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
-                      GPS-aufgezeichnete Strecke
+                      {t("save.gpsKmSub")}
                     </Text>
                   </View>
                 </View>
@@ -398,7 +398,7 @@ export default function SaveTripSheet() {
                 <View style={styles.loadingRow}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-                    Routen werden berechnet …
+                    {t("save.loadingRoutes")}
                   </Text>
                 </View>
               )}
@@ -454,17 +454,17 @@ export default function SaveTripSheet() {
                         </Text>
                         {route.isShortest && !route.isFastest && (
                           <View style={[styles.badge, { backgroundColor: colors.successLight }]}>
-                            <Text style={[styles.badgeText, { color: colors.success }]}>Kürzeste</Text>
+                            <Text style={[styles.badgeText, { color: colors.success }]}>{t("save.badgeShortest")}</Text>
                           </View>
                         )}
                         {route.isFastest && !route.isShortest && (
                           <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-                            <Text style={[styles.badgeText, { color: colors.primary }]}>Schnellste</Text>
+                            <Text style={[styles.badgeText, { color: colors.primary }]}>{t("save.badgeFastest")}</Text>
                           </View>
                         )}
                       </View>
                       <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
-                        ca. {route.durationMin} min Fahrzeit
+                        ca. {route.durationMin} {t("save.routeDurationSuffix")}
                       </Text>
                     </View>
                   </View>
@@ -479,16 +479,16 @@ export default function SaveTripSheet() {
                 style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   if (Platform.OS === "web") {
-                    if (window.confirm("Fahrt speichern?\n\nDie Fahrt wird mit den gewählten Kilometern gespeichert.")) {
+                    if (window.confirm(`${t("save.confirmTitle")}\n\n${t("save.confirmMessage")}`)) {
                       handleSave();
                     }
                   } else {
                     Alert.alert(
-                      "Fahrt speichern?",
-                      "Die Fahrt wird mit den gewählten Kilometern gespeichert.",
+                      t("save.confirmTitle"),
+                      t("save.confirmMessage"),
                       [
-                        { text: "Abbrechen", style: "cancel" },
-                        { text: "Speichern", onPress: handleSave },
+                        { text: t("common.cancel"), style: "cancel" },
+                        { text: t("common.save"), onPress: handleSave },
                       ]
                     );
                   }
@@ -496,24 +496,24 @@ export default function SaveTripSheet() {
                 testID="save-trip-confirm"
               >
                 <Feather name="check" size={15} color="#FFF" />
-                <Text style={styles.saveBtnText}>Speichern</Text>
+                <Text style={styles.saveBtnText}>{t("common.save")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.discardBtn, { borderColor: colors.destructive, backgroundColor: colors.secondary }]}
                 onPress={() => {
                   if (Platform.OS === "web") {
-                    if (window.confirm("Fahrt verwerfen?\n\nDie aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.")) {
+                    if (window.confirm(`${t("save.discardTitle")}\n\n${t("save.discardMessage")}`)) {
                       discardPendingTrip();
                     }
                   } else {
                     Alert.alert(
-                      "Fahrt verwerfen?",
-                      "Die aufgezeichnete Fahrt wird gelöscht und nicht gespeichert.",
+                      t("save.discardTitle"),
+                      t("save.discardMessage"),
                       [
-                        { text: "Zurück", style: "cancel" },
+                        { text: t("save.discardBack"), style: "cancel" },
                         {
-                          text: "Verwerfen",
+                          text: t("save.discardBtn"),
                           style: "destructive",
                           onPress: () => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -527,7 +527,7 @@ export default function SaveTripSheet() {
                 testID="save-trip-cancel"
               >
                 <Feather name="x" size={14} color={colors.destructive} />
-                <Text style={[styles.discardBtnText, { color: colors.destructive }]}>Abbrechen</Text>
+                <Text style={[styles.discardBtnText, { color: colors.destructive }]}>{t("common.cancel")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
