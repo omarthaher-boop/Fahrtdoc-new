@@ -74,6 +74,7 @@ export default function ActiveTripBanner() {
   const [geocoding, setGeocoding] = useState(false);
   const [driveTaskRunning, setDriveTaskRunning] = useState(true);
   const [restarting, setRestarting] = useState(false);
+  const [showWaypoints, setShowWaypoints] = useState(false);
   const noteInputRef = useRef<TextInput>(null);
 
   const refreshDriveTaskStatus = useCallback(async () => {
@@ -149,6 +150,12 @@ export default function ActiveTripBanner() {
       clearDriveDetectStopped();
     }
   }, [driveTaskRunning, language]);
+
+  // Auto-expand waypoint list when a new waypoint is added; collapse when trip resets
+  useEffect(() => {
+    const count = activeTrip?.waypoints?.length ?? 0;
+    setShowWaypoints(count > 0);
+  }, [activeTrip?.waypoints?.length]);
 
   useEffect(() => {
     if (!activeTrip || paused) {
@@ -336,15 +343,58 @@ export default function ActiveTripBanner() {
             {(activeTrip.waypoints?.length ?? 0) > 0 && (
               <>
                 <View style={styles.statDivider} />
-                <View style={styles.stat}>
+                <TouchableOpacity
+                  style={styles.stat}
+                  onPress={() => setShowWaypoints((v) => !v)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
                   <Feather name="map-pin" size={12} color={colors.primary} />
                   <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
                     {activeTrip.waypoints!.length}
                   </Text>
-                </View>
+                  {activeTrip.waypoints!.some((wp) => wp.note) && (
+                    <Feather name="edit-2" size={10} color={colors.primary} />
+                  )}
+                  <Feather
+                    name={showWaypoints ? "chevron-up" : "chevron-down"}
+                    size={10}
+                    color={colors.mutedForeground}
+                  />
+                </TouchableOpacity>
               </>
             )}
           </View>
+
+          {showWaypoints && (activeTrip.waypoints?.length ?? 0) > 0 && (
+            <View style={[styles.waypointList, { borderColor: colors.border, backgroundColor: colors.background }]}>
+              {activeTrip.waypoints!.map((wp, i) => (
+                <View
+                  key={wp.timestamp}
+                  style={[
+                    styles.waypointItem,
+                    i < activeTrip.waypoints!.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                  ]}
+                >
+                  <View style={[styles.waypointBullet, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.waypointBulletText}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.waypointContent}>
+                    <Text style={[styles.waypointAddr, { color: colors.foreground }]} numberOfLines={1}>
+                      {wp.addr}
+                    </Text>
+                    {wp.note ? (
+                      <View style={styles.waypointNoteRow}>
+                        <Feather name="edit-2" size={10} color={colors.primary} />
+                        <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          {wp.note}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
         <View style={styles.actions}>
           <TouchableOpacity
@@ -611,4 +661,30 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   sheetBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
+  waypointList: {
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  waypointItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  waypointBullet: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  waypointBulletText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
+  waypointContent: { flex: 1, gap: 2 },
+  waypointAddr: { fontSize: 12, fontWeight: "600", lineHeight: 16 },
+  waypointNoteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  waypointNote: { fontSize: 11, flex: 1, lineHeight: 15 },
 });
