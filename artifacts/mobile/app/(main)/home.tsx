@@ -1,7 +1,7 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import { Redirect, useFocusEffect, useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -27,8 +27,8 @@ import PaywallModal from "@/components/PaywallModal";
 import { useApp, Trip, reverseGeocode } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
+import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
 import { useSubscription } from "@/lib/revenuecat";
-import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
 
 const fmtDur = (s: number) => {
   if (s < 60) return `${s}s`;
@@ -53,7 +53,7 @@ export default function HomeScreen() {
   const [starting, setStarting] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
-  const [driveTaskRunning, setDriveTaskRunning] = useState(false);
+  const driveTaskRunning = useDriveTaskRunning();
   const dotScale = useRef(new Animated.Value(1)).current;
   const [showPillTooltip, setShowPillTooltip] = useState(false);
   const pillTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,21 +106,6 @@ export default function HomeScreen() {
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
   const startAddrInputRef = useRef<TextInput>(null);
 
-  const checkDriveTask = useCallback(async () => {
-    if (Platform.OS === "web") return;
-    try {
-      const Location = await import("expo-location");
-      const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
-      setDriveTaskRunning(running);
-    } catch {
-      setDriveTaskRunning(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkDriveTask();
-  }, [checkDriveTask]);
-
   const PILL_TOOLTIP_KEY = "aktivPillTooltipSeen";
 
   const dismissPillTooltip = useCallback(async () => {
@@ -158,13 +143,6 @@ export default function HomeScreen() {
     };
   }, [driveTaskRunning, dismissPillTooltip]);
 
-  useFocusEffect(
-    useCallback(() => {
-      checkDriveTask();
-      const interval = setInterval(checkDriveTask, 12_000);
-      return () => clearInterval(interval);
-    }, [checkDriveTask])
-  );
 
   const PERIOD_LABELS: Record<Period, string> = {
     1: t("home.period.1"),

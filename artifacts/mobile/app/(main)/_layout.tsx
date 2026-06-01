@@ -1,12 +1,48 @@
 import { BlurView } from "expo-blur";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import type { SFSymbol } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
+
+function TrackingDot() {
+  return (
+    <View
+      style={styles.trackingDot}
+      accessibilityLabel="Fahrterfassung aktiv"
+    />
+  );
+}
+
+function TabIcon({
+  isIOS,
+  symbolName,
+  featherName,
+  color,
+  tracking,
+}: {
+  isIOS: boolean;
+  symbolName: SFSymbol;
+  featherName: React.ComponentProps<typeof Feather>["name"];
+  color: string;
+  tracking: boolean;
+}) {
+  return (
+    <View style={styles.iconWrapper}>
+      {isIOS ? (
+        <SymbolView name={symbolName} tintColor={color} size={24} />
+      ) : (
+        <Feather name={featherName} size={22} color={color} />
+      )}
+      {tracking && <TrackingDot />}
+    </View>
+  );
+}
 
 function ClassicMainTabs() {
   const colors = useColors();
@@ -15,6 +51,7 @@ function ClassicMainTabs() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const tracking = useDriveTaskRunning();
 
   return (
     <Tabs
@@ -46,36 +83,45 @@ function ClassicMainTabs() {
         name="home"
         options={{
           title: t("nav.home"),
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => (
+            <TabIcon
+              isIOS={isIOS}
+              symbolName="house"
+              featherName="home"
+              color={color}
+              tracking={tracking}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           title: t("nav.trips"),
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="list.bullet" tintColor={color} size={24} />
-            ) : (
-              <Feather name="list" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => (
+            <TabIcon
+              isIOS={isIOS}
+              symbolName="list.bullet"
+              featherName="list"
+              color={color}
+              tracking={tracking}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t("nav.profile"),
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="person" tintColor={color} size={24} />
-            ) : (
-              <Feather name="user" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => (
+            <TabIcon
+              isIOS={isIOS}
+              symbolName="person"
+              featherName="user"
+              color={color}
+              tracking={tracking}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -99,3 +145,22 @@ export default function MainTabLayout() {
 
   return <ClassicMainTabs />;
 }
+
+const styles = StyleSheet.create({
+  iconWrapper: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trackingDot: {
+    position: "absolute",
+    top: -2,
+    right: -6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+});
