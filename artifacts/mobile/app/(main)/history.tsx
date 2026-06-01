@@ -23,7 +23,7 @@ import TripDetailModal from "@/components/TripDetailModal";
 import { useApp, Trip } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
-import { exportPDF, exportCSV } from "@/utils/exportPDF";
+import { exportPDF, exportCSV, exportSplitPDF } from "@/utils/exportPDF";
 import PaywallModal from "@/components/PaywallModal";
 import { useSubscription } from "@/lib/revenuecat";
 import { SUBSCRIPTION_ENABLED, FREE_TRIP_LIMIT } from "@/config/subscription";
@@ -206,6 +206,7 @@ export default function HistoryScreen() {
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+  const [exportingSplit, setExportingSplit] = useState(false);
 
   const PERIOD_OPTIONS: { label: string; value: PeriodFilter }[] = [
     { label: t("history.all"), value: "all" },
@@ -410,6 +411,58 @@ export default function HistoryScreen() {
     } finally {
       setExportingCSV(false);
     }
+  };
+
+  const handleSplitExport = () => {
+    if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
+    if (exportingSplit) return;
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    if (selectionMode && selectedIds.size === 0) {
+      Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
+      return;
+    }
+    const toExport = displayTrips;
+    const businessCount = toExport.filter((tr) => tr.type === "business").length;
+    const privateCount = toExport.filter((tr) => tr.type === "private").length;
+
+    if (businessCount === 0 && privateCount === 0) {
+      Alert.alert(t("history.noTripsTitle"), t("history.noTripsMsg"));
+      return;
+    }
+
+    const lines: string[] = [];
+    if (businessCount > 0) {
+      lines.push(`${businessCount} ${t("history.splitBusiness")}`);
+    }
+    if (privateCount > 0) {
+      lines.push(`${privateCount} ${t("history.splitPrivate")}`);
+    }
+    if (businessCount > 0 && privateCount === 0) {
+      lines.push(t("history.splitNoPrivate"));
+    }
+    if (privateCount > 0 && businessCount === 0) {
+      lines.push(t("history.splitNoBusiness"));
+    }
+
+    Alert.alert(
+      t("history.splitConfirmTitle"),
+      lines.join("\n\n"),
+      [
+        { text: t("history.splitCancel"), style: "cancel" },
+        {
+          text: t("history.splitConfirmBtn"),
+          onPress: async () => {
+            setExportingSplit(true);
+            try {
+              await exportSplitPDF(toExport, user, dateFrom, dateTo, language);
+              AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
+            } finally {
+              setExportingSplit(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleView = (trip: Trip) => {
@@ -681,6 +734,25 @@ export default function HistoryScreen() {
               <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
                 <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
               </Animated.View>
+            )}
+          </View>
+          <View style={styles.exportBtnWrap}>
+            <TouchableOpacity
+              onPress={handleSplitExport}
+              disabled={exportingSplit}
+              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingSplit ? 0.6 : 1 }]}
+            >
+              {exportingSplit ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+              ) : (
+                <Feather name="scissors" size={13} color={colors.primary} />
+              )}
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>{t("history.splitExport")}</Text>
+            </TouchableOpacity>
+            {selectionMode && selectedIds.size > 0 && (
+              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+              </View>
             )}
           </View>
           <View style={styles.exportBtnWrap}>
