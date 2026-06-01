@@ -5,8 +5,9 @@ and the `CarPlayBridge` component in `app/_layout.tsx` are already wired into th
 app. This guide covers the **native side** that must be added before CarPlay /
 Android Auto becomes functional on device.
 
-Pre-written native source files live in `native/ios/` and `native/android/`.
-A post-prebuild setup script automates copying and patching.
+Native source files live in `native/ios/` and `native/android/`.
+A post-prebuild setup script automates copying and patching all of them into the
+generated `ios/` and `android/` directories.
 
 ---
 

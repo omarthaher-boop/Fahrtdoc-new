@@ -15,10 +15,12 @@
  *     3. The entitlement is already declared in app.json (ios.entitlements).
  *
  *   Android — Android Auto:
- *     1. Add FahrtDocCarAppService.kt to the Android project.
- *     2. Declare the service + intent filter in AndroidManifest.xml.
- *     3. Create res/xml/automotive_app_desc.xml.
- *        See artifacts/mobile/docs/carplay-native-setup.md for all templates.
+ *     1. Run `expo prebuild --clean` from artifacts/mobile/.
+ *     2. Run `bash scripts/setup-carplay-native.sh` — copies Kotlin sources,
+ *        patches AndroidManifest.xml, build.gradle, and MainApplication.kt.
+ *     3. Build: `eas build --profile development --platform android`
+ *     4. Test with the Android Auto Desktop Head Unit (DHU).
+ *        See artifacts/mobile/docs/carplay-native-setup.md for full guide.
  *
  * When native modules are absent (managed Expo build, Expo Go, web), all
  * calls in this module are silent no-ops — the app works normally.
