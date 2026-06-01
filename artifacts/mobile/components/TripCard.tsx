@@ -24,6 +24,7 @@ import { useColors } from "@/hooks/useColors";
 import { Trip, useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import TripRouteMap from "@/components/TripRouteMap";
+import TripRouteThumbnail from "@/components/TripRouteThumbnail";
 
 interface Props {
   trip: Trip;
@@ -407,6 +408,10 @@ export default function TripCard({
               <Feather name="alert-circle" size={12} color="#C62828" />
               <Text style={styles.syncErrorText}>{t("trip.syncFailed")}</Text>
             </View>
+          )}
+
+          {!selectionMode && !expanded && (
+            <TripRouteThumbnail trip={trip} expanded={expanded} />
           )}
 
           {!selectionMode && (
