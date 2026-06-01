@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { AppState, Platform } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
 import { serverDeleteAccount } from "@/lib/api";
@@ -685,58 +686,80 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     secureSetItem(email, tripsKey(email), JSON.stringify(next));
   }, []);
 
+  const runPendingRetry = useCallback((bypassBackoff = false) => {
+    const token = serverTokenRef.current;
+    if (!token) return;
+    if (!trackingPrefsRef.current.offlineStorage) return;
+    const now = Date.now();
+    if (!bypassBackoff && now - lastRetryMsRef.current < retryBackoffMsRef.current) return;
+
+    const pending = tripsRef.current.filter(
+      (t) => t.waypointSyncPending && t.waypoints && t.waypoints.length > 0
+    );
+    if (pending.length === 0) {
+      retryBackoffMsRef.current = 30_000;
+      return;
+    }
+
+    lastRetryMsRef.current = now;
+
+    setSyncRetryingIds(new Set(pending.map((t) => t.id)));
+
+    Promise.all(
+      pending.map((t) =>
+        serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok }))
+      )
+    ).then((results) => {
+      setSyncRetryingIds(new Set());
+
+      const allOk = results.every((r) => r.ok);
+      retryBackoffMsRef.current = allOk
+        ? 30_000
+        : Math.min(retryBackoffMsRef.current * 2, 300_000);
+
+      const succeededIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
+      if (succeededIds.size > 0) {
+        setTrips((prev) => {
+          const next = prev.map((t) =>
+            succeededIds.has(t.id) ? { ...t, waypointSyncPending: false } : t
+          );
+          setUserState((u) => {
+            if (u) persistTripsLocal(next, u.email);
+            return u;
+          });
+          return next;
+        });
+      }
+    });
+  }, [persistTripsLocal]);
+
   useEffect(() => {
     const handleAppStateChange = (nextState: string) => {
       if (nextState !== "active") return;
-      const token = serverTokenRef.current;
-      if (!token) return;
-      if (!trackingPrefsRef.current.offlineStorage) return;
-      const now = Date.now();
-      if (now - lastRetryMsRef.current < retryBackoffMsRef.current) return;
-
-      const pending = tripsRef.current.filter(
-        (t) => t.waypointSyncPending && t.waypoints && t.waypoints.length > 0
-      );
-      if (pending.length === 0) {
-        retryBackoffMsRef.current = 30_000;
-        return;
-      }
-
-      lastRetryMsRef.current = now;
-
-      setSyncRetryingIds(new Set(pending.map((t) => t.id)));
-
-      Promise.all(
-        pending.map((t) =>
-          serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok }))
-        )
-      ).then((results) => {
-        setSyncRetryingIds(new Set());
-
-        const allOk = results.every((r) => r.ok);
-        retryBackoffMsRef.current = allOk
-          ? 30_000
-          : Math.min(retryBackoffMsRef.current * 2, 300_000);
-
-        const succeededIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
-        if (succeededIds.size > 0) {
-          setTrips((prev) => {
-            const next = prev.map((t) =>
-              succeededIds.has(t.id) ? { ...t, waypointSyncPending: false } : t
-            );
-            setUserState((u) => {
-              if (u) persistTripsLocal(next, u.email);
-              return u;
-            });
-            return next;
-          });
-        }
-      });
+      runPendingRetry();
     };
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [persistTripsLocal]);
+  }, [runPendingRetry]);
+
+  const prevIsConnectedRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const isConnected = state.isConnected ?? false;
+      const wasConnected = prevIsConnectedRef.current;
+      prevIsConnectedRef.current = isConnected;
+
+      if (isConnected && wasConnected === false) {
+        retryBackoffMsRef.current = 30_000;
+        lastRetryMsRef.current = 0;
+        runPendingRetry(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [runPendingRetry]);
 
   const applyServerAuth = useCallback(async (
     email: string,
