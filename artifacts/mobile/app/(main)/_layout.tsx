@@ -6,9 +6,9 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
 
 function TrackingDot() {
   return (
@@ -136,16 +136,6 @@ function ClassicMainTabs() {
   );
 }
 
-export default function MainTabLayout() {
-  const { user, loading } = useApp();
-
-  if (loading) return null;
-
-  if (!user) return <Redirect href="/" />;
-
-  return <ClassicMainTabs />;
-}
-
 const styles = StyleSheet.create({
   iconWrapper: {
     position: "relative",
@@ -164,3 +154,13 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
   },
 });
+
+export default function MainTabLayout() {
+  const { user, loading } = useApp();
+
+  if (loading) return null;
+
+  if (!user) return <Redirect href="/" />;
+
+  return <ClassicMainTabs />;
+}

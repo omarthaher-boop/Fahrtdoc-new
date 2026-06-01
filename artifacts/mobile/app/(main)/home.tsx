@@ -104,6 +104,7 @@ export default function HomeScreen() {
     return () => pulse.stop();
   }, [driveTaskRunning, dotScale, pillBg]);
 
+
   const [modalStartAddr, setModalStartAddr] = useState("");
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
   const startAddrInputRef = useRef<TextInput>(null);
