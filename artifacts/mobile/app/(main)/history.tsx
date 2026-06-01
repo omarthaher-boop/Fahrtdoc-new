@@ -709,12 +709,12 @@ export default function HistoryScreen() {
             >
               <Feather name="mail" size={13} color={colors.primary} />
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>E-Mail</Text>
+              {selectionMode && selectedIds.size > 0 && (
+                <View style={[styles.emailInlineCount, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+                </View>
+              )}
             </TouchableOpacity>
-            {selectionMode && selectedIds.size > 0 && (
-              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
-                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </Animated.View>
-            )}
           </View>
         </View>
       </View>
@@ -1082,6 +1082,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -7,
     right: -7,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  emailInlineCount: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
