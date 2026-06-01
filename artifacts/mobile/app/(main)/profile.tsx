@@ -360,7 +360,7 @@ export default function ProfileScreen() {
   const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const trackingSectionRef = useRef<View>(null);
-  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, syncStatus, activeTrip, paused, togglePause, setTrackingPref } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, syncStatus, activeTrip, paused, togglePause, setTrackingPref, refreshAddresses, isRefreshingAddresses } = useApp();
   const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -425,6 +425,7 @@ export default function ProfileScreen() {
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null);
 
   const [signatureBlock, setSignatureBlockState] = useState(user?.signatureBlock ?? false);
+  const [addrRefreshDone, setAddrRefreshDone] = useState(false);
 
   useEffect(() => {
     if (scrollTo === "tracking") {
@@ -1068,7 +1069,42 @@ export default function ProfileScreen() {
               value={signatureBlock}
               onValueChange={handleSignatureBlock}
               colors={colors}
+              showDivider
             />
+            <TouchableOpacity
+              style={[styles.listRow, { opacity: isRefreshingAddresses ? 0.6 : 1 }]}
+              onPress={async () => {
+                if (isRefreshingAddresses) return;
+                haptic();
+                setAddrRefreshDone(false);
+                await refreshAddresses();
+                setAddrRefreshDone(true);
+                setTimeout(() => setAddrRefreshDone(false), 3000);
+              }}
+              activeOpacity={0.6}
+              disabled={isRefreshingAddresses}
+            >
+              <View style={[styles.listIconWrap, { backgroundColor: colors.accent }]}>
+                <Feather name="map-pin" size={16} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("row.refreshAddresses")}</Text>
+                <Text style={[styles.listDesc, { color: colors.mutedForeground }]}>
+                  {isRefreshingAddresses
+                    ? t("row.refreshAddresses.running")
+                    : addrRefreshDone
+                    ? t("row.refreshAddresses.done")
+                    : t("row.refreshAddresses.desc")}
+                </Text>
+              </View>
+              {isRefreshingAddresses ? (
+                <Feather name="loader" size={16} color={colors.primary} style={{ marginLeft: 4 }} />
+              ) : addrRefreshDone ? (
+                <Feather name="check" size={16} color="#22C55E" style={{ marginLeft: 4 }} />
+              ) : (
+                <Feather name="refresh-cw" size={16} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
           </View>
 
           <SectionHeader label={t("section.support")} colors={colors} />

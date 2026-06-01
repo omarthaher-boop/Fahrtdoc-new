@@ -108,6 +108,8 @@ interface AppContextType {
   user: UserProfile | null;
   loading: boolean;
   syncStatus: "synced" | "syncing" | "offline";
+  isRefreshingAddresses: boolean;
+  refreshAddresses: () => Promise<void>;
   logout: () => Promise<void>;
   login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
@@ -438,6 +440,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const activeTripRef = useRef<ActiveTrip | null>(null);
   const [syncRetryingIds, setSyncRetryingIds] = useState<ReadonlySet<string>>(new Set());
   const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline">("offline");
+  const [isRefreshingAddresses, setIsRefreshingAddresses] = useState(false);
   const lastRetryMsRef = useRef<number>(0);
   const retryBackoffMsRef = useRef<number>(30_000);
 
@@ -691,6 +694,97 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const persistTripsLocal = useCallback((next: Trip[], email: string) => {
     secureSetItem(email, tripsKey(email), JSON.stringify(next));
   }, []);
+
+  // Returns true when the address string already contains a house number.
+  // Heuristic: the street segment (before the first comma) contains a digit.
+  function hasHouseNumber(addr: string): boolean {
+    const street = addr.split(",")[0] ?? addr;
+    return /\d/.test(street);
+  }
+
+  const refreshAddresses = useCallback(async () => {
+    if (!user) return;
+    setIsRefreshingAddresses(true);
+    try {
+      const current = tripsRef.current;
+      const updates: { id: string; startAddr?: string; endAddr?: string }[] = [];
+
+      for (const trip of current) {
+        const needsStart =
+          trip.startLat !== undefined &&
+          trip.startLon !== undefined &&
+          !hasHouseNumber(trip.startAddr);
+        const needsEnd =
+          trip.endLat !== undefined &&
+          trip.endLon !== undefined &&
+          !hasHouseNumber(trip.endAddr);
+
+        if (!needsStart && !needsEnd) continue;
+
+        const update: { id: string; startAddr?: string; endAddr?: string } = { id: trip.id };
+
+        if (needsStart) {
+          const addr = await reverseGeocode(trip.startLat!, trip.startLon!);
+          if (hasHouseNumber(addr)) update.startAddr = addr;
+          await new Promise<void>((r) => setTimeout(r, 1100));
+        }
+        if (needsEnd) {
+          const addr = await reverseGeocode(trip.endLat!, trip.endLon!);
+          if (hasHouseNumber(addr)) update.endAddr = addr;
+          await new Promise<void>((r) => setTimeout(r, 1100));
+        }
+
+        if (update.startAddr !== undefined || update.endAddr !== undefined) {
+          updates.push(update);
+        }
+      }
+
+      if (updates.length === 0) return;
+
+      setTrips((prev) => {
+        const next = prev.map((t) => {
+          const u = updates.find((upd) => upd.id === t.id);
+          if (!u) return t;
+          return {
+            ...t,
+            ...(u.startAddr !== undefined ? { startAddr: u.startAddr } : {}),
+            ...(u.endAddr !== undefined ? { endAddr: u.endAddr } : {}),
+          };
+        });
+        setUserState((u) => {
+          if (u) persistTripsLocal(next, u.email);
+          return u;
+        });
+        return next;
+      });
+
+      const token = serverTokenRef.current;
+      if (token && trackingPrefsRef.current.offlineStorage) {
+        for (const u of updates) {
+          const changes: Partial<ApiTrip> = {};
+          if (u.startAddr !== undefined) changes.startAddr = u.startAddr;
+          if (u.endAddr !== undefined) changes.endAddr = u.endAddr;
+          serverUpdateTrip(token, u.id, changes);
+        }
+      }
+    } finally {
+      setIsRefreshingAddresses(false);
+    }
+  }, [user, persistTripsLocal]);
+
+  // Auto-trigger address refresh on the first startup after loading completes.
+  // Fire-and-forget: runs silently in the background, no UI blocked.
+  const autoRefreshDoneRef = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    if (autoRefreshDoneRef.current) return;
+    if (!user) return;
+    autoRefreshDoneRef.current = true;
+    const tid = setTimeout(() => {
+      refreshAddresses().catch(() => {});
+    }, 3000);
+    return () => clearTimeout(tid);
+  }, [loading, user, refreshAddresses]);
 
   const runPendingRetry = useCallback((bypassBackoff = false) => {
     const token = serverTokenRef.current;
@@ -1542,6 +1636,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         syncStatus,
+        isRefreshingAddresses,
+        refreshAddresses,
         logout,
         deleteAccount,
         biometricLogin,
