@@ -1078,21 +1078,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [persistTripsLocal]);
 
   const finalizeTrip = useCallback(async (trip: Trip) => {
-    const coords = pendingTripCoords;
     setPendingTrip(null);
     setPendingTripCoords(null);
     setPendingTripPath(null);
-    const tripWithCoords: Trip = coords
-      ? {
-          ...trip,
-          startLat: trip.startLat ?? coords.startLat,
-          startLon: trip.startLon ?? coords.startLon,
-          endLat: trip.endLat ?? coords.endLat,
-          endLon: trip.endLon ?? coords.endLon,
-        }
-      : trip;
-    await addTrip(tripWithCoords);
-  }, [addTrip, pendingTripCoords]);
+    await addTrip(trip);
+  }, [addTrip]);
 
   const discardPendingTrip = useCallback(() => {
     setPendingTrip(null);
@@ -1400,6 +1390,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: activeTrip.type,
       waypoints: activeTrip.waypoints && activeTrip.waypoints.length > 0 ? activeTrip.waypoints : undefined,
       path: activeTrip.positions.length >= 2 ? activeTrip.positions : undefined,
+      ...(firstPos ? { startLat: firstPos.lat, startLon: firstPos.lon } : {}),
+      ...(last ? { endLat: last.lat, endLon: last.lon } : {}),
     };
 
     // Async: geocode end address and update pending trip display
