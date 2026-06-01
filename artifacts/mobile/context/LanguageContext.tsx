@@ -251,6 +251,10 @@ const de: Record<string, string> = {
   "tracking.carplaySource": "Gestartet über CarPlay",
   "watchdog.title": "FahrtDoc – Fahrterkennung gestoppt",
   "watchdog.body": "Die automatische Fahrterkennung wurde unterbrochen. Bitte App öffnen um die Fahrt zu sichern.",
+  "driveNotif.startTitle": "FahrtDoc – Fahrt dokumentieren?",
+  "driveNotif.startBody": "Du fährst — möchtest du diese Fahrt aufzeichnen?",
+  "driveNotif.stopTitle": "FahrtDoc – Fahrt beenden?",
+  "driveNotif.stopBody": "Du scheinst geparkt zu haben — Fahrt jetzt beenden?",
 };
 
 const en: Record<string, string> = {
@@ -500,6 +504,10 @@ const en: Record<string, string> = {
   "tracking.carplaySource": "Started via CarPlay",
   "watchdog.title": "FahrtDoc – Drive detection stopped",
   "watchdog.body": "Automatic drive detection was interrupted. Please open the app to save your trip.",
+  "driveNotif.startTitle": "FahrtDoc – Record trip?",
+  "driveNotif.startBody": "You're driving — would you like to record this trip?",
+  "driveNotif.stopTitle": "FahrtDoc – End trip?",
+  "driveNotif.stopBody": "Looks like you've parked — end the trip now?",
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
