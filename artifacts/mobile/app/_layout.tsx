@@ -55,7 +55,9 @@ function NotificationDeepLink() {
     if (Platform.OS === "web") return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-      if (data?.watchdog || data?.driveDetectStopped) {
+      if (data?.tripNotification) {
+        router.push("/(main)/tracking");
+      } else if (data?.watchdog || data?.driveDetectStopped) {
         router.push("/(main)/home");
       }
     });

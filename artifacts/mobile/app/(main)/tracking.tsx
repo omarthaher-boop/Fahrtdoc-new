@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -90,6 +91,18 @@ export default function TrackingScreen() {
     });
     return () => subscription.remove();
   }, [refreshDriveTaskStatus]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (activeTrip && !paused) {
+      activateKeepAwakeAsync();
+    } else {
+      deactivateKeepAwake();
+    }
+    return () => {
+      deactivateKeepAwake();
+    };
+  }, [activeTrip, paused]);
 
   useEffect(() => {
     if (!activeTrip || paused) {
