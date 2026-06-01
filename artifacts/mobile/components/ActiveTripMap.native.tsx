@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import { useColors } from "@/hooks/useColors";
 
@@ -11,10 +11,9 @@ interface Props {
 export default function ActiveTripMap({ positions, livePos }: Props) {
   const colors = useColors();
   const mapRef = useRef<MapView>(null);
+  const pingAnim = useRef(new Animated.Value(0)).current;
 
-  const allPositions = livePos
-    ? [...positions, livePos]
-    : positions;
+  const allPositions = livePos ? [...positions, livePos] : positions;
 
   const polylineCoords = allPositions.map((p) => ({
     latitude: p.lat,
@@ -35,6 +34,34 @@ export default function ActiveTripMap({ positions, livePos }: Props) {
       600
     );
   }, [currentPos?.lat, currentPos?.lon]);
+
+  useEffect(() => {
+    if (!livePos) {
+      pingAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pingAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(300),
+        Animated.timing(pingAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [livePos !== null, pingAnim]);
+
+  const pingScale = pingAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 2.2] });
+  const pingOpacity = pingAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.7, 0.35, 0] });
 
   const initialRegion = currentPos
     ? {
@@ -90,7 +117,16 @@ export default function ActiveTripMap({ positions, livePos }: Props) {
             zIndex={10}
           >
             <View style={styles.liveOuter}>
-              <View style={[styles.livePing, { borderColor: colors.primary, opacity: 0.3 }]} />
+              <Animated.View
+                style={[
+                  styles.livePing,
+                  {
+                    borderColor: colors.primary,
+                    transform: [{ scale: pingScale }],
+                    opacity: pingOpacity,
+                  },
+                ]}
+              />
               <View style={[styles.livePin, { backgroundColor: colors.primary }]} />
             </View>
           </Marker>
@@ -131,10 +167,10 @@ const styles = StyleSheet.create({
   },
   livePing: {
     position: "absolute",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2.5,
   },
   livePin: {
     width: 18,

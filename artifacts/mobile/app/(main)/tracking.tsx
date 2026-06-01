@@ -64,6 +64,8 @@ export default function TrackingScreen() {
   const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, togglePause, livePos, gpsTracking } = useApp();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const mapFadeAnim = useRef(new Animated.Value(0)).current;
+  const mapShownRef = useRef(false);
   const [showPauseSheet, setShowPauseSheet] = useState(false);
   const [pauseLocation, setPauseLocation] = useState("");
   const [pauseLocationLoading, setPauseLocationLoading] = useState(false);
@@ -127,6 +129,23 @@ export default function TrackingScreen() {
       router.replace("/home");
     }
   }, [activeTrip]);
+
+  const hasPositions = activeTrip ? (activeTrip.positions.length > 0 || livePos !== null) : false;
+  const showMap = gpsTracking && hasPositions;
+
+  useEffect(() => {
+    if (showMap && !mapShownRef.current) {
+      mapShownRef.current = true;
+      Animated.timing(mapFadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    } else if (!showMap) {
+      mapFadeAnim.setValue(0);
+      mapShownRef.current = false;
+    }
+  }, [showMap, mapFadeAnim]);
 
   if (!activeTrip) return null;
 
@@ -217,9 +236,6 @@ export default function TrackingScreen() {
     togglePause();
   };
 
-  const hasPositions = activeTrip.positions.length > 0 || livePos !== null;
-  const showMap = gpsTracking && hasPositions;
-
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
@@ -278,9 +294,7 @@ export default function TrackingScreen() {
 
       {/* Map area */}
       <View style={styles.mapArea}>
-        {showMap ? (
-          <ActiveTripMap positions={activeTrip.positions} livePos={livePos} />
-        ) : (
+        {!showMap && (
           <View style={[styles.mapPlaceholder, { backgroundColor: colors.secondary }]}>
             <View style={[styles.mapPlaceholderIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather
@@ -298,6 +312,11 @@ export default function TrackingScreen() {
                 : t("tracking.screen.gpsOffSub")}
             </Text>
           </View>
+        )}
+        {showMap && (
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: mapFadeAnim }]}>
+            <ActiveTripMap positions={activeTrip.positions} livePos={livePos} />
+          </Animated.View>
         )}
       </View>
 

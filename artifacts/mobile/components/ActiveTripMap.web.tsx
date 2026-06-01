@@ -37,11 +37,21 @@ function startIcon(color: string): L.DivIcon {
 }
 
 function liveIcon(color: string): L.DivIcon {
-  const s = 28;
+  const s = 44;
   return makeDivIcon(
     `<div style="position:relative;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;">
-      <div style="position:absolute;width:28px;height:28px;border-radius:50%;border:2px solid ${color};opacity:0.3;"></div>
-      <div style="width:14px;height:14px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+      <div style="
+        position:absolute;
+        width:28px;height:28px;border-radius:50%;
+        border:2.5px solid ${color};
+        animation:fahrtdoc-live-ping 1.8s ease-out infinite;
+      "></div>
+      <div style="
+        width:16px;height:16px;border-radius:50%;
+        background:${color};border:3px solid white;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4);
+        position:relative;z-index:1;
+      "></div>
     </div>`,
     s
   );
@@ -66,13 +76,27 @@ export default function ActiveTripMap({ positions, livePos }: Props) {
 
   useEffect(() => {
     if (typeof document !== "undefined") {
-      const id = "leaflet-css";
-      if (!document.getElementById(id)) {
+      const leafletId = "leaflet-css";
+      if (!document.getElementById(leafletId)) {
         const link = document.createElement("link");
-        link.id = id;
+        link.id = leafletId;
         link.rel = "stylesheet";
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
+      }
+
+      const pingId = "fahrtdoc-live-ping-css";
+      if (!document.getElementById(pingId)) {
+        const style = document.createElement("style");
+        style.id = pingId;
+        style.textContent = `
+          @keyframes fahrtdoc-live-ping {
+            0%   { transform: scale(0.2); opacity: 0.8; }
+            70%  { transform: scale(2.2); opacity: 0.15; }
+            100% { transform: scale(2.6); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
       }
     }
   }, []);
