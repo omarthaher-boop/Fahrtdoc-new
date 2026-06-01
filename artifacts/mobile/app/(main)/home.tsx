@@ -29,6 +29,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useDriveTaskRunning } from "@/hooks/useDriveTaskRunning";
 import { useSubscription } from "@/lib/revenuecat";
+import { suggestTripType } from "@/utils/suggestTripType";
 
 const fmtDur = (s: number) => {
   if (s < 60) return `${s}s`;
@@ -50,6 +51,7 @@ export default function HomeScreen() {
   const [showStartModal, setShowStartModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
+  const suggestedType = useMemo(() => suggestTripType(), []);
   const [starting, setStarting] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
@@ -302,11 +304,21 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.quickStart")}</Text>
             <View style={styles.quickRow}>
               <TouchableOpacity
-                style={[styles.quickBtn, { backgroundColor: "#EEF2FF", borderColor: "#C7D2FE" }]}
+                style={[
+                  styles.quickBtn,
+                  { backgroundColor: "#EEF2FF", borderColor: suggestedType === "business" ? "#6366F1" : "#C7D2FE" },
+                  suggestedType === "business" && styles.quickBtnSuggested,
+                ]}
                 onPress={() => openStartModal("business")}
                 disabled={starting}
                 testID="start-business"
               >
+                {suggestedType === "business" && (
+                  <View style={styles.suggestedBadge}>
+                    <Feather name="zap" size={9} color="#FFFFFF" />
+                    <Text style={styles.suggestedBadgeText}>{t("home.suggested")}</Text>
+                  </View>
+                )}
                 <View style={[styles.quickIcon, { backgroundColor: "#6366F1" }]}>
                   <Feather name="briefcase" size={22} color="#FFFFFF" />
                 </View>
@@ -316,11 +328,21 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickBtn, { backgroundColor: "#F0FDF4", borderColor: "#86EFAC" }]}
+                style={[
+                  styles.quickBtn,
+                  { backgroundColor: "#F0FDF4", borderColor: suggestedType === "private" ? "#22C55E" : "#86EFAC" },
+                  suggestedType === "private" && styles.quickBtnSuggested,
+                ]}
                 onPress={() => openStartModal("private")}
                 disabled={starting}
                 testID="start-private"
               >
+                {suggestedType === "private" && (
+                  <View style={[styles.suggestedBadge, { backgroundColor: "#22C55E" }]}>
+                    <Feather name="zap" size={9} color="#FFFFFF" />
+                    <Text style={styles.suggestedBadgeText}>{t("home.suggested")}</Text>
+                  </View>
+                )}
                 <View style={[styles.quickIcon, { backgroundColor: "#22C55E" }]}>
                   <Feather name="user" size={22} color="#FFFFFF" />
                 </View>
@@ -608,6 +630,31 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 16,
     gap: 8,
+  },
+  quickBtnSuggested: {
+    borderWidth: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  suggestedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    alignSelf: "flex-start",
+    backgroundColor: "#6366F1",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  suggestedBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
   quickIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontSize: 14, fontWeight: "700" },
