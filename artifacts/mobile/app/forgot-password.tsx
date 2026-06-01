@@ -15,20 +15,26 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 import { requestPasswordReset } from "@/lib/api";
+
+type ErrorKey = "forgot.error.invalidEmail" | "forgot.error.unknown" | "forgot.error.serverError";
 
 export default function ForgotPasswordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
-    setError("");
+    setErrorKey(null);
+    setServerError(null);
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes("@")) {
-      setError("Bitte eine gültige E-Mail-Adresse eingeben.");
+      setErrorKey("forgot.error.invalidEmail");
       return;
     }
 
@@ -38,7 +44,11 @@ export default function ForgotPasswordScreen() {
     try {
       const res = await requestPasswordReset(trimmed);
       if (!res.success) {
-        setError(res.error ?? "Unbekannter Fehler.");
+        if (res.error) {
+          setServerError(res.error);
+        } else {
+          setErrorKey("forgot.error.unknown");
+        }
         setLoading(false);
         return;
       }
@@ -51,7 +61,7 @@ export default function ForgotPasswordScreen() {
         },
       });
     } catch {
-      setError("Verbindung zum Server fehlgeschlagen. Bitte versuche es erneut.");
+      setErrorKey("forgot.error.serverError");
       setLoading(false);
     }
   };
@@ -85,23 +95,23 @@ export default function ForgotPasswordScreen() {
           <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
             <Feather name="lock" size={32} color={colors.primary} />
           </View>
-          <Text style={[styles.title, { color: colors.foreground }]}>Passwort vergessen?</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("forgot.title")}</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Gib deine E-Mail-Adresse ein. Wir senden dir einen 6-stelligen Code zur Wiederherstellung.
+            {t("forgot.subtitle")}
           </Text>
         </View>
 
         {/* Form */}
         <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>E-Mail-Adresse</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: error ? colors.destructive : colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("forgot.emailLabel")}</Text>
+            <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: (errorKey || serverError) ? colors.destructive : colors.border }]}>
               <Feather name="mail" size={16} color={colors.mutedForeground} />
               <TextInput
                 style={[styles.input, { color: colors.foreground }]}
                 value={email}
-                onChangeText={(t) => { setEmail(t); setError(""); }}
-                placeholder="email@beispiel.de"
+                onChangeText={(text) => { setEmail(text); setErrorKey(null); setServerError(null); }}
+                placeholder={t("auth.emailPlaceholder")}
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -112,10 +122,12 @@ export default function ForgotPasswordScreen() {
             </View>
           </View>
 
-          {error ? (
+          {(errorKey || serverError) ? (
             <View style={[styles.errorBanner, { backgroundColor: "#FFF0F3", borderColor: colors.destructive }]}>
               <Feather name="alert-circle" size={14} color={colors.destructive} />
-              <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+              <Text style={[styles.errorText, { color: colors.destructive }]}>
+                {serverError ?? (errorKey ? t(errorKey) : "")}
+              </Text>
             </View>
           ) : null}
 
@@ -130,7 +142,7 @@ export default function ForgotPasswordScreen() {
             ) : (
               <>
                 <Feather name="send" size={16} color="#FFFFFF" />
-                <Text style={styles.submitText}>Code senden</Text>
+                <Text style={styles.submitText}>{t("forgot.sendCode")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -140,13 +152,13 @@ export default function ForgotPasswordScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.accent, borderColor: colors.primary + "30" }]}>
           <Feather name="info" size={15} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.primary }]}>
-            Der Code ist 5 Minuten gültig. In der Produktionsversion wird er per E-Mail zugestellt.
+            {t("forgot.infoBox")}
           </Text>
         </View>
 
         <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
           <Text style={[styles.backLinkText, { color: colors.mutedForeground }]}>
-            Zurück zur Anmeldung
+            {t("forgot.backToLogin")}
           </Text>
         </TouchableOpacity>
       </ScrollView>

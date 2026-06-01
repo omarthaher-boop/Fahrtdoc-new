@@ -343,6 +343,15 @@ const de: Record<string, string> = {
   "tracking.screen.waitingGpsSub": "Karte erscheint sobald eine Position verfügbar ist.",
   "tracking.screen.gpsOff": "GPS deaktiviert",
   "tracking.screen.gpsOffSub": "Strecke wird anhand von Fahrtzeit und Geschwindigkeit geschätzt.",
+  "forgot.title": "Passwort vergessen?",
+  "forgot.subtitle": "Gib deine E-Mail-Adresse ein. Wir senden dir einen 6-stelligen Code zur Wiederherstellung.",
+  "forgot.emailLabel": "E-Mail-Adresse",
+  "forgot.sendCode": "Code senden",
+  "forgot.infoBox": "Der Code ist 5 Minuten gültig. In der Produktionsversion wird er per E-Mail zugestellt.",
+  "forgot.backToLogin": "Zurück zur Anmeldung",
+  "forgot.error.invalidEmail": "Bitte eine gültige E-Mail-Adresse eingeben.",
+  "forgot.error.unknown": "Unbekannter Fehler.",
+  "forgot.error.serverError": "Verbindung zum Server fehlgeschlagen. Bitte versuche es erneut.",
 };
 
 const en: Record<string, string> = {
@@ -684,6 +693,15 @@ const en: Record<string, string> = {
   "tracking.screen.waitingGpsSub": "Map will appear once a position is available.",
   "tracking.screen.gpsOff": "GPS disabled",
   "tracking.screen.gpsOffSub": "Distance is estimated based on drive time and speed.",
+  "forgot.title": "Forgot Password?",
+  "forgot.subtitle": "Enter your email address. We'll send you a 6-digit recovery code.",
+  "forgot.emailLabel": "Email Address",
+  "forgot.sendCode": "Send Code",
+  "forgot.infoBox": "The code is valid for 5 minutes. In the production version it will be delivered by email.",
+  "forgot.backToLogin": "Back to Sign In",
+  "forgot.error.invalidEmail": "Please enter a valid email address.",
+  "forgot.error.unknown": "Unknown error.",
+  "forgot.error.serverError": "Connection to server failed. Please try again.",
 };
 
 export const translations: Record<Language, Record<string, string>> = { de, en };
