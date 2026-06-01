@@ -1,4 +1,5 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { Redirect, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -54,6 +55,8 @@ export default function HomeScreen() {
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [driveTaskRunning, setDriveTaskRunning] = useState(false);
   const dotScale = useRef(new Animated.Value(1)).current;
+  const [showPillTooltip, setShowPillTooltip] = useState(false);
+  const pillTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!driveTaskRunning) {
@@ -96,6 +99,43 @@ export default function HomeScreen() {
   useEffect(() => {
     checkDriveTask();
   }, [checkDriveTask]);
+
+  const PILL_TOOLTIP_KEY = "aktivPillTooltipSeen";
+
+  const dismissPillTooltip = useCallback(async () => {
+    if (pillTooltipTimer.current) {
+      clearTimeout(pillTooltipTimer.current);
+      pillTooltipTimer.current = null;
+    }
+    setShowPillTooltip(false);
+    try {
+      await AsyncStorage.setItem(PILL_TOOLTIP_KEY, "1");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!driveTaskRunning) return;
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem(PILL_TOOLTIP_KEY);
+        if (!seen) {
+          setShowPillTooltip(true);
+          pillTooltipTimer.current = setTimeout(() => {
+            dismissPillTooltip();
+          }, 4000);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      if (pillTooltipTimer.current) {
+        clearTimeout(pillTooltipTimer.current);
+      }
+    };
+  }, [driveTaskRunning, dismissPillTooltip]);
 
   useFocusEffect(
     useCallback(() => {
@@ -214,18 +254,32 @@ export default function HomeScreen() {
               {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
             </Text>
             {driveTaskRunning && (
-              <TouchableOpacity
-                style={styles.driveActivePill}
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                  router.push("/(main)/profile?scrollTo=tracking");
-                }}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
-                <Text style={styles.driveActiveText}>Aktiv</Text>
-              </TouchableOpacity>
+              <View style={styles.pillWrapper}>
+                <TouchableOpacity
+                  style={styles.driveActivePill}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.selectionAsync();
+                    router.push("/(main)/profile?scrollTo=tracking");
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
+                  <Text style={styles.driveActiveText}>Aktiv</Text>
+                </TouchableOpacity>
+                {showPillTooltip && (
+                  <TouchableOpacity
+                    style={styles.pillTooltip}
+                    onPress={dismissPillTooltip}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.pillTooltipCaret} />
+                    <Text style={styles.pillTooltipText}>
+                      {t("home.activePillTooltip")}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
         </View>
@@ -477,6 +531,9 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 13, fontWeight: "500" },
   userNameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   userName: { fontSize: 22, fontWeight: "800", letterSpacing: -0.3 },
+  pillWrapper: {
+    position: "relative",
+  },
   driveActivePill: {
     flexDirection: "row",
     alignItems: "center",
@@ -485,6 +542,41 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
+  },
+  pillTooltip: {
+    position: "absolute",
+    top: 28,
+    left: 0,
+    backgroundColor: "#1F2937",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: 220,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  pillTooltipCaret: {
+    position: "absolute",
+    top: -6,
+    left: 14,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#1F2937",
+  },
+  pillTooltipText: {
+    color: "#F9FAFB",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 17,
   },
   driveActiveDot: {
     width: 7,
