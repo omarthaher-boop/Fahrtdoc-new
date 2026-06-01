@@ -36,15 +36,15 @@ interface Props {
   onRetrySync?: (id: string) => Promise<boolean>;
 }
 
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string, locale: string) =>
+  new Date(iso).toLocaleTimeString(locale === "en" ? "en-GB" : "de-DE", { hour: "2-digit", minute: "2-digit" });
 
-const fmtDurMin = (s: number) => {
+const fmtDurMin = (s: number, t: (key: string) => string) => {
   const m = Math.round(s / 60);
   if (m <= 0) return null;
   const h = Math.floor(m / 60);
   const rem = m % 60;
-  return h > 0 ? `${h}h ${rem}min` : `${m} Min`;
+  return h > 0 ? `${h}${t("trip.dur.h")} ${rem}${t("trip.dur.min")}` : `${m} ${t("trip.dur.min")}`;
 };
 
 export default function TripCard({
@@ -58,7 +58,7 @@ export default function TripCard({
   onRetrySync,
 }: Props) {
   const colors = useColors();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { syncRetryingIds, editTrip } = useApp();
   const isBusiness = trip.type === "business";
   const [isSyncing, setIsSyncing] = useState(false);
@@ -95,7 +95,11 @@ export default function TripCard({
 
   const accentColor = isBusiness ? colors.primary : colors.success;
   const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
-  const dur = fmtDurMin(trip.dur);
+  const dur = fmtDurMin(trip.dur, t);
+  const fmtKm = new Intl.NumberFormat(language === "en" ? "en-GB" : "de-DE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(trip.km);
 
   const handleDelete = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -204,13 +208,13 @@ export default function TripCard({
                 color={accentColor}
               />
               <Text style={[styles.typeText, { color: accentColor }]}>
-                {isBusiness ? "Geschäftlich" : "Privat"}
+                {isBusiness ? t("tripType.business") : t("tripType.private")}
               </Text>
             </View>
 
             <View style={styles.topActions}>
               <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-                {fmtTime(trip.date)}
+                {fmtTime(trip.date, language)}
               </Text>
               {!selectionMode && (
                 <>
@@ -264,7 +268,7 @@ export default function TripCard({
             <View style={styles.addrRow}>
               <View style={[styles.dot, { backgroundColor: colors.primary }]} />
               <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
-                {trip.startAddr || "Startpunkt unbekannt"}
+                {trip.startAddr || t("detail.startUnknown")}
               </Text>
             </View>
             {(trip.waypoints ?? []).map((wp, idx) => (
@@ -289,7 +293,7 @@ export default function TripCard({
             <View style={styles.addrRow}>
               <View style={[styles.dotHollow, { borderColor: colors.mutedForeground }]} />
               <Text style={[styles.addrText, { color: colors.foreground }]} numberOfLines={1}>
-                {trip.endAddr || "Zielpunkt unbekannt"}
+                {trip.endAddr || t("detail.endUnknown")}
               </Text>
             </View>
           </View>
@@ -314,7 +318,7 @@ export default function TripCard({
               <View style={styles.metaItem}>
                 <Feather name="navigation" size={12} color={colors.primary} />
                 <Text style={[styles.metaText, { color: colors.foreground }]}>
-                  {trip.km.toFixed(1)} km
+                  {fmtKm} km
                 </Text>
               </View>
               {dur && (
@@ -381,7 +385,7 @@ export default function TripCard({
               {trip.edited && (
                 <View style={[styles.editedBadge, { backgroundColor: "#FFF8E7", borderColor: "#FFB703" }]}>
                   <Feather name="edit" size={11} color="#C98A00" />
-                  <Text style={[styles.editedText, { color: "#C98A00" }]}>Bearbeitet</Text>
+                  <Text style={[styles.editedText, { color: "#C98A00" }]}>{t("detail.edited")}</Text>
                 </View>
               )}
             </View>
@@ -421,7 +425,7 @@ export default function TripCard({
                 <Feather name="file-text" size={18} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.noteSheetTitle, { color: colors.foreground }]}>Notiz</Text>
+                <Text style={[styles.noteSheetTitle, { color: colors.foreground }]}>{t("trip.note.title")}</Text>
                 <Text style={[styles.noteSheetSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {trip.startAddr ? `${trip.startAddr.substring(0, 28)}…` : trip.date}
                 </Text>
@@ -442,7 +446,7 @@ export default function TripCard({
               ]}
               value={noteText}
               onChangeText={setNoteText}
-              placeholder="Notiz zur Fahrt hinzufügen …"
+              placeholder={t("detail.notePlaceholder")}
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={5}
@@ -456,7 +460,7 @@ export default function TripCard({
               onPress={handleNoteSave}
             >
               <Feather name="check" size={15} color="#FFF" />
-              <Text style={styles.noteSheetSaveBtnText}>Speichern</Text>
+              <Text style={styles.noteSheetSaveBtnText}>{t("common.save")}</Text>
             </TouchableOpacity>
 
             {!!trip.note && (
@@ -468,7 +472,7 @@ export default function TripCard({
                 }}
               >
                 <Text style={[styles.noteSheetDeleteText, { color: colors.destructive }]}>
-                  Notiz löschen
+                  {t("trip.note.delete")}
                 </Text>
               </TouchableOpacity>
             )}
