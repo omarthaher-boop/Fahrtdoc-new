@@ -45,6 +45,41 @@ function showExportError(err: unknown, lang: Language, retry: () => void): void 
   ]);
 }
 
+function showWebToast(message: string): void {
+  if (typeof document === "undefined") return;
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  Object.assign(toast.style, {
+    position: "fixed",
+    bottom: "24px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#b71c1c",
+    color: "#fff",
+    padding: "12px 20px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    zIndex: "999999",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+    maxWidth: "90vw",
+    textAlign: "center",
+    opacity: "1",
+    transition: "opacity 0.3s ease",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 350);
+  }, 4000);
+}
+
+function showExportErrorWeb(err: unknown, lang: Language): void {
+  const message = getExportErrorMessage(err, lang);
+  console.error("[exportPDF] Web export failed:", err instanceof Error ? err.message : String(err));
+  showWebToast(message);
+}
+
 // ─── CSV helpers ─────────────────────────────────────────────────────────────
 
 function csvCell(value: string | number): string {
@@ -152,7 +187,11 @@ export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFr
     return;
   }
   if (Platform.OS === "web") {
-    await exportCSVWeb(trips, user, dateFrom, dateTo);
+    try {
+      await exportCSVWeb(trips, user, dateFrom, dateTo);
+    } catch (err) {
+      showExportErrorWeb(err, lang);
+    }
   } else {
     try {
       await exportCSVNative(trips, user, dateFrom, dateTo);
@@ -1197,7 +1236,11 @@ export async function exportPDF(
     return;
   }
   if (Platform.OS === "web") {
-    await exportPDFWeb(trips, user, dateFrom, dateTo, "Fahrtenbuch.pdf", undefined, lang);
+    try {
+      await exportPDFWeb(trips, user, dateFrom, dateTo, "Fahrtenbuch.pdf", undefined, lang);
+    } catch (err) {
+      showExportErrorWeb(err, lang);
+    }
   } else {
     try {
       await exportPDFNative(trips, user, dateFrom, dateTo, "Fahrtenbuch exportieren", undefined, lang);
@@ -1228,27 +1271,31 @@ export async function exportSplitPDF(
   }
 
   if (Platform.OS === "web") {
-    if (businessTrips.length > 0) {
-      await exportPDFWeb(
-        businessTrips,
-        user,
-        dateFrom,
-        dateTo,
-        "Fahrtenbuch_Geschaeftlich.pdf",
-        "Geschäftliche Fahrten",
-        lang
-      );
-    }
-    if (privateTrips.length > 0) {
-      await exportPDFWeb(
-        privateTrips,
-        user,
-        dateFrom,
-        dateTo,
-        "Fahrtenbuch_Privat.pdf",
-        "Private Fahrten",
-        lang
-      );
+    try {
+      if (businessTrips.length > 0) {
+        await exportPDFWeb(
+          businessTrips,
+          user,
+          dateFrom,
+          dateTo,
+          "Fahrtenbuch_Geschaeftlich.pdf",
+          "Geschäftliche Fahrten",
+          lang
+        );
+      }
+      if (privateTrips.length > 0) {
+        await exportPDFWeb(
+          privateTrips,
+          user,
+          dateFrom,
+          dateTo,
+          "Fahrtenbuch_Privat.pdf",
+          "Private Fahrten",
+          lang
+        );
+      }
+    } catch (err) {
+      showExportErrorWeb(err, lang);
     }
   } else {
     try {
