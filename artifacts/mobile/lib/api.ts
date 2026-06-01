@@ -43,10 +43,10 @@ export interface ApiTrip {
   date: string;
   startAddr: string;
   endAddr: string;
-  startLat?: number;
-  startLon?: number;
-  endLat?: number;
-  endLon?: number;
+  startLat?: number | null;
+  startLon?: number | null;
+  endLat?: number | null;
+  endLon?: number | null;
   km: number;
   dur: number;
   type: "business" | "private";

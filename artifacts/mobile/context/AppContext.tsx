@@ -315,10 +315,10 @@ function apiTripToLocal(t: ApiTrip): Trip {
     date: t.date,
     startAddr: t.startAddr,
     endAddr: t.endAddr,
-    startLat: t.startLat,
-    startLon: t.startLon,
-    endLat: t.endLat,
-    endLon: t.endLon,
+    startLat: t.startLat ?? undefined,
+    startLon: t.startLon ?? undefined,
+    endLat: t.endLat ?? undefined,
+    endLon: t.endLon ?? undefined,
     km: t.km,
     dur: t.dur,
     type: t.type,
@@ -1161,8 +1161,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [persistTripsLocal]);
 
   const editTrip = useCallback((id: string, changes: Partial<Trip>) => {
+    // When an address is changed to a *different* value without accompanying
+    // new coordinates, the stored GPS coords are stale. Compare against the
+    // current trip (via tripsRef so we always read the latest value) before
+    // deciding to clear. This avoids wiping coords on edits that happen to
+    // pass the same address string unchanged (e.g. the edit modal always
+    // includes both address fields even when only km/dur/type was edited).
+    const existing = tripsRef.current.find((t) => t.id === id);
+
+    const clearStart =
+      existing != null &&
+      'startAddr' in changes &&
+      changes.startAddr !== existing.startAddr &&
+      changes.startLat === undefined &&
+      changes.startLon === undefined;
+
+    const clearEnd =
+      existing != null &&
+      'endAddr' in changes &&
+      changes.endAddr !== existing.endAddr &&
+      changes.endLat === undefined &&
+      changes.endLon === undefined;
+
+    const serverChanges: Partial<ApiTrip> = { ...changes };
+    if (clearStart) { serverChanges.startLat = null; serverChanges.startLon = null; }
+    if (clearEnd) { serverChanges.endLat = null; serverChanges.endLon = null; }
+
     setTrips((prev) => {
-      const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
+      const next = prev.map((t) => {
+        if (t.id !== id) return t;
+        const updated = { ...t, ...changes };
+        // Remove stale coord keys so they are truly absent in local state.
+        if (clearStart) { delete updated.startLat; delete updated.startLon; }
+        if (clearEnd) { delete updated.endLat; delete updated.endLon; }
+        return updated;
+      });
       setUserState((u) => {
         if (u) persistTripsLocal(next, u.email);
         return u;
@@ -1171,7 +1204,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token && trackingPrefsRef.current.offlineStorage) {
-      serverUpdateTrip(token, id, changes).then((ok) => {
+      serverUpdateTrip(token, id, serverChanges).then((ok) => {
         if (!ok) {
           // Local state is updated; if the server update failed, the server
           // retains the old version which will win on the next merge/re-login.
