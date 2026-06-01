@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -89,6 +90,9 @@ export default function HistoryScreen() {
   const [showDateRange, setShowDateRange] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [filtersLoaded, setFiltersLoaded] = useState(false);
@@ -114,6 +118,7 @@ export default function HistoryScreen() {
             if (saved.dateFrom !== undefined) setDateFrom(saved.dateFrom);
             if (saved.dateTo !== undefined) setDateTo(saved.dateTo);
             if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
+            if (saved.selectedMonth !== undefined) setSelectedMonth(saved.selectedMonth);
           } catch {}
         }
         if (selectionRaw) {
@@ -143,9 +148,9 @@ export default function HistoryScreen() {
     }
     AsyncStorage.setItem(
       FILTER_STORAGE_KEY,
-      JSON.stringify({ periodFilter, typeFilter, dateFrom, dateTo, showDateRange })
+      JSON.stringify({ periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth })
     ).catch(() => {});
-  }, [filtersLoaded, periodFilter, typeFilter, dateFrom, dateTo, showDateRange]);
+  }, [filtersLoaded, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth]);
 
   useEffect(() => {
     if (!selectionLoaded) return;
@@ -171,6 +176,8 @@ export default function HistoryScreen() {
     setDateFrom("");
     setDateTo("");
     setShowDateRange(false);
+    setSelectedMonth(null);
+    setShowMonthPicker(false);
     AsyncStorage.removeItem(FILTER_STORAGE_KEY).catch(() => {});
   };
 
@@ -244,6 +251,16 @@ export default function HistoryScreen() {
   const statsDur = useMemo(() => displayTrips.reduce((a, b) => a + b.dur, 0), [displayTrips]);
 
   const locale = language === "en" ? "en-US" : "de-DE";
+
+  const monthNames = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleString(locale, { month: "short" })),
+    [locale]
+  );
+
+  const activeMonthLabel = selectedMonth
+    ? new Date(selectedMonth.year, selectedMonth.month, 1).toLocaleString(locale, { month: "short", year: "numeric" })
+    : t("history.pickMonth");
+
   const groups = useMemo(
     () => groupByDate(filteredForDisplay, t("history.today"), t("history.yesterday"), locale),
     [filteredForDisplay, t, locale]
@@ -282,6 +299,20 @@ export default function HistoryScreen() {
   const clearSelection = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setSelectedIds(new Set());
+  };
+
+  const selectMonth = (year: number, month: number) => {
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const fmt = (d: Date) =>
+      `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+    setSelectedMonth({ year, month });
+    setDateFrom(fmt(first));
+    setDateTo(fmt(last));
+    setPeriodFilter("all");
+    setShowDateRange(false);
+    setShowMonthPicker(false);
+    if (Platform.OS !== "web") Haptics.selectionAsync();
   };
 
   // --- Export handlers ---
@@ -395,7 +426,11 @@ export default function HistoryScreen() {
             return (
               <TouchableOpacity
                 key={String(o.value)}
-                onPress={() => { setPeriodFilter(o.value); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
+                onPress={() => {
+                  setPeriodFilter(o.value);
+                  if (selectedMonth) { setSelectedMonth(null); setDateFrom(""); setDateTo(""); }
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
+                }}
                 style={[
                   styles.pill,
                   {
@@ -410,6 +445,43 @@ export default function HistoryScreen() {
               </TouchableOpacity>
             );
           })}
+
+          {/* Month picker pill */}
+          <TouchableOpacity
+            onPress={() => {
+              setShowMonthPicker((p) => !p);
+              setShowDateRange(false);
+              if (Platform.OS !== "web") Haptics.selectionAsync();
+            }}
+            style={[
+              styles.pill,
+              styles.pillWithIcon,
+              {
+                backgroundColor: selectedMonth ? "#1A2B6B" : colors.card,
+                borderColor: selectedMonth ? "#1A2B6B" : colors.border,
+              },
+            ]}
+          >
+            <Feather name="calendar" size={13} color={selectedMonth ? "#FFFFFF" : colors.mutedForeground} />
+            <Text style={[styles.pillText, { color: selectedMonth ? "#FFFFFF" : colors.mutedForeground }]}>
+              {activeMonthLabel}
+            </Text>
+            {selectedMonth && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setSelectedMonth(null);
+                  setDateFrom("");
+                  setDateTo("");
+                  setShowMonthPicker(false);
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              >
+                <Feather name="x" size={12} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -503,7 +575,7 @@ export default function HistoryScreen() {
           </View>
           {isDateRangeActive && (
             <TouchableOpacity
-              onPress={() => { setDateFrom(""); setDateTo(""); }}
+              onPress={() => { setDateFrom(""); setDateTo(""); setSelectedMonth(null); }}
               style={[styles.clearDateBtn, { borderColor: colors.destructive }]}
             >
               <Feather name="x" size={12} color={colors.destructive} />
@@ -681,6 +753,67 @@ export default function HistoryScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Month picker modal */}
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.monthPickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMonthPicker(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.monthPickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Year navigation */}
+              <View style={styles.monthPickerYearRow}>
+                <TouchableOpacity
+                  onPress={() => setPickerYear((y) => y - 1)}
+                  style={[styles.monthPickerYearBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                >
+                  <Feather name="chevron-left" size={18} color={colors.foreground} />
+                </TouchableOpacity>
+                <Text style={[styles.monthPickerYearText, { color: colors.foreground }]}>{pickerYear}</Text>
+                <TouchableOpacity
+                  onPress={() => setPickerYear((y) => Math.min(y + 1, new Date().getFullYear()))}
+                  style={[styles.monthPickerYearBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                >
+                  <Feather name="chevron-right" size={18} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+              {/* Month grid: 4 rows × 3 columns */}
+              <View style={styles.monthPickerGrid}>
+                {monthNames.map((name, idx) => {
+                  const isActive = selectedMonth?.year === pickerYear && selectedMonth?.month === idx;
+                  const isFuture = new Date(pickerYear, idx, 1) > new Date();
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => !isFuture && selectMonth(pickerYear, idx)}
+                      disabled={isFuture}
+                      style={[
+                        styles.monthPickerCell,
+                        {
+                          backgroundColor: isActive ? "#1A2B6B" : colors.secondary,
+                          borderColor: isActive ? "#1A2B6B" : colors.border,
+                          opacity: isFuture ? 0.35 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.monthPickerCellText, { color: isActive ? "#FFFFFF" : colors.foreground }]}>
+                        {name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Edit modal */}
       <EditTripModal
@@ -929,4 +1062,53 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: "800" },
   emptyText: { fontSize: 14, textAlign: "center" },
+  monthPickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  monthPickerCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    width: 300,
+    gap: 16,
+  },
+  monthPickerYearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  monthPickerYearBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthPickerYearText: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  monthPickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  monthPickerCell: {
+    width: "30%",
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthPickerCellText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
