@@ -80,7 +80,7 @@ function groupByDate(
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { trips, deleteTrip, editTrip, retryWaypointSync, user, syncStatus } = useApp();
+  const { trips, deleteTrip, editTrip, retryWaypointSync, user, syncStatus, syncRetryingIds } = useApp();
   const { t, language } = useLanguage();
 
   const { isSubscribed } = useSubscription();
@@ -104,6 +104,17 @@ export default function HistoryScreen() {
   // Selection state — declared here so the persist effect below can reference them
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Sync retry banner animation
+  const syncBannerAnim = useRef(new Animated.Value(0)).current;
+  const isRetrying = syncRetryingIds.size > 0;
+  useEffect(() => {
+    Animated.timing(syncBannerAnim, {
+      toValue: isRetrying ? 1 : 0,
+      duration: 280,
+      useNativeDriver: false,
+    }).start();
+  }, [isRetrying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Badge bounce animation — fires on every count change, skips initial render
   const badgeScale = useRef(new Animated.Value(1)).current;
@@ -555,6 +566,25 @@ export default function HistoryScreen() {
           </View>
         </View>
       </View>
+
+      {/* Sync retry banner */}
+      <Animated.View
+        style={[
+          styles.syncRetryBanner,
+          {
+            backgroundColor: colors.primary + "14",
+            borderBottomColor: colors.primary + "30",
+            maxHeight: syncBannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 44] }),
+            opacity: syncBannerAnim,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.75 }] }} />
+        <Text style={[styles.syncRetryBannerText, { color: colors.primary }]}>
+          {t("history.syncRetrying")}
+        </Text>
+      </Animated.View>
 
       {/* Filter Row 1: period */}
       <View style={[styles.filterRow1Wrap, { backgroundColor: colors.background }]}>
@@ -1143,6 +1173,20 @@ const styles = StyleSheet.create({
   syncBadgeText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  syncRetryBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 16,
+    overflow: "hidden",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  syncRetryBannerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flexShrink: 1,
   },
   filterRow1Wrap: { paddingBottom: 8 },
   filterRow2Wrap: { paddingBottom: 10 },
