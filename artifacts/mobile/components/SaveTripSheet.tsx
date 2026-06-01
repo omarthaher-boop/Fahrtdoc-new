@@ -60,6 +60,7 @@ export default function SaveTripSheet() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [gpsChecked, setGpsChecked] = useState(true);
   const [routeCheckedId, setRouteCheckedId] = useState<string | null>(null);
+  const [useRouteDuration, setUseRouteDuration] = useState(false);
   const [draftTrip, setDraftTrip] = useState<Trip | null>(null);
   const [editingField, setEditingField] = useState<"end" | number | null>(null);
   const [fieldDraftValue, setFieldDraftValue] = useState("");
@@ -72,6 +73,7 @@ export default function SaveTripSheet() {
       setRouteError(null);
       setGpsChecked(true);
       setRouteCheckedId(null);
+      setUseRouteDuration(false);
       setDraftTrip(null);
       setEditingField(null);
       setFieldDraftValue("");
@@ -82,6 +84,7 @@ export default function SaveTripSheet() {
     setDraftTrip(pendingTrip);
     setGpsChecked(true);
     setRouteCheckedId(null);
+    setUseRouteDuration(false);
 
     if (!pendingTripCoords) return;
     setLoadingRoutes(true);
@@ -176,8 +179,14 @@ export default function SaveTripSheet() {
       if (shortest) kmRoute = shortest.km;
     }
 
-    await finalizeTrip({ ...draftTrip, km, kmRoute });
-  }, [draftTrip, gpsChecked, routeCheckedId, routes, finalizeTrip]);
+    let dur = draftTrip.dur;
+    if (useRouteDuration && routeCheckedId) {
+      const route = routes.find((r) => r.id === routeCheckedId);
+      if (route) dur = route.durationMin * 60;
+    }
+
+    await finalizeTrip({ ...draftTrip, km, kmRoute, dur });
+  }, [draftTrip, gpsChecked, routeCheckedId, routes, useRouteDuration, finalizeTrip]);
 
   if (!pendingTrip) return null;
 
@@ -463,16 +472,67 @@ export default function SaveTripSheet() {
                           </View>
                         )}
                       </View>
-                      <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
-                        ca. {route.durationMin} {t("save.routeDurationSuffix")}
+                    </View>
+                  </View>
+                  <View style={styles.routeStats}>
+                    <Text style={[styles.routeKm, { color: colors.primary }]}>
+                      {route.km.toFixed(1)} km
+                    </Text>
+                    <View style={styles.routeDurRow}>
+                      <Feather name="clock" size={10} color={colors.mutedForeground} />
+                      <Text style={[styles.routeDurText, { color: colors.mutedForeground }]}>
+                        {route.durationMin} {t("save.routeDurationSuffix")}
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.routeKm, { color: colors.primary }]}>
-                    {route.km.toFixed(1)} km
-                  </Text>
                 </TouchableOpacity>
               ))}
+
+              {/* Use route duration toggle — only shown when a route is selected */}
+              {routeCheckedId && routes.length > 0 && (
+                <TouchableOpacity
+                  style={[
+                    styles.routeCard,
+                    {
+                      backgroundColor: useRouteDuration ? colors.accent : colors.secondary,
+                      borderColor: useRouteDuration ? colors.primary : colors.border,
+                      marginTop: 4,
+                    },
+                  ]}
+                  onPress={() => setUseRouteDuration((v) => !v)}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.routeLeft}>
+                    <View
+                      style={[
+                        styles.checkOuter,
+                        {
+                          borderColor: useRouteDuration ? colors.primary : colors.border,
+                          backgroundColor: useRouteDuration ? colors.primary : "transparent",
+                        },
+                      ]}
+                    >
+                      {useRouteDuration && <Feather name="check" size={12} color="#FFF" />}
+                    </View>
+                    <View>
+                      <Text style={[styles.routeName, { color: colors.foreground }]}>
+                        {t("save.useRouteDuration")}
+                      </Text>
+                      <Text style={[styles.routeSub, { color: colors.mutedForeground }]}>
+                        {t("save.useRouteDurationSub")}
+                      </Text>
+                    </View>
+                  </View>
+                  {useRouteDuration && (() => {
+                    const selected = routes.find((r) => r.id === routeCheckedId);
+                    return selected ? (
+                      <Text style={[styles.routeKm, { color: colors.primary }]}>
+                        {fmtDur(selected.durationMin * 60)}
+                      </Text>
+                    ) : null;
+                  })()}
+                </TouchableOpacity>
+              )}
 
               {/* Action buttons */}
               <TouchableOpacity
@@ -647,7 +707,10 @@ const styles = StyleSheet.create({
   routeNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   routeName: { fontSize: 14, fontWeight: "700" },
   routeSub: { fontSize: 12, marginTop: 2 },
-  routeKm: { fontSize: 15, fontWeight: "800", flexShrink: 0, marginLeft: 8 },
+  routeStats: { alignItems: "flex-end", flexShrink: 0, marginLeft: 8 },
+  routeKm: { fontSize: 15, fontWeight: "800" },
+  routeDurRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  routeDurText: { fontSize: 11 },
   badge: {
     paddingHorizontal: 7,
     paddingVertical: 2,
