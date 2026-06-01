@@ -57,29 +57,50 @@ export default function HomeScreen() {
   const dotScale = useRef(new Animated.Value(1)).current;
   const [showPillTooltip, setShowPillTooltip] = useState(false);
   const pillTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pillBg = useRef(new Animated.Value(0)).current;
+
+  const pillBgColor = pillBg.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#DCFCE7", "#BBF7D0"],
+  });
 
   useEffect(() => {
     if (!driveTaskRunning) {
       dotScale.setValue(1);
+      pillBg.setValue(0);
       return;
     }
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(dotScale, {
-          toValue: 1.45,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotScale, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
+        Animated.parallel([
+          Animated.timing(dotScale, {
+            toValue: 1.45,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pillBg, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: false,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(dotScale, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pillBg, {
+            toValue: 0,
+            duration: 700,
+            useNativeDriver: false,
+          }),
+        ]),
       ])
     );
     pulse.start();
     return () => pulse.stop();
-  }, [driveTaskRunning, dotScale]);
+  }, [driveTaskRunning, dotScale, pillBg]);
 
   const [modalStartAddr, setModalStartAddr] = useState("");
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
@@ -256,7 +277,6 @@ export default function HomeScreen() {
             {driveTaskRunning && (
               <View style={styles.pillWrapper}>
                 <TouchableOpacity
-                  style={styles.driveActivePill}
                   onPress={() => {
                     if (Platform.OS !== "web") Haptics.selectionAsync();
                     router.push("/(main)/profile?scrollTo=tracking");
@@ -264,8 +284,10 @@ export default function HomeScreen() {
                   activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
-                  <Text style={styles.driveActiveText}>Aktiv</Text>
+                  <Animated.View style={[styles.driveActivePill, { backgroundColor: pillBgColor }]}>
+                    <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
+                    <Text style={styles.driveActiveText}>Aktiv</Text>
+                  </Animated.View>
                 </TouchableOpacity>
                 {showPillTooltip && (
                   <TouchableOpacity
@@ -538,7 +560,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#DCFCE7",
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
