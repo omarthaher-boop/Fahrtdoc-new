@@ -254,8 +254,16 @@ export default function ActiveTripBanner() {
             )}
             {carplayStarted && (
               <View style={styles.carplayBadge}>
-                <Feather name="monitor" size={10} color="#FFFFFF" />
-                <Text style={styles.carplayBadgeText}>{t("tracking.carplaySource")}</Text>
+                <Feather
+                  name={Platform.OS === "android" ? "smartphone" : "monitor"}
+                  size={10}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.carplayBadgeText}>
+                  {Platform.OS === "android"
+                    ? t("tracking.androidAutoSource")
+                    : t("tracking.carplaySource")}
+                </Text>
               </View>
             )}
           </View>
