@@ -71,6 +71,7 @@ export interface ActiveTrip {
   distance: number;
   positions: { lat: number; lon: number }[];
   waypoints?: Waypoint[];
+  note?: string;
 }
 
 export interface UserProfile {
@@ -139,6 +140,7 @@ interface AppContextType {
   livePos: { lat: number; lon: number } | null;
   startTrip: (type: "business" | "private", startAddrOverride?: string) => Promise<void>;
   stopTrip: () => Promise<Trip | null>;
+  setActiveTripNote: (note: string) => void;
   togglePause: (waypoint?: Waypoint) => void;
   elapsed: number;
   pendingTrip: Trip | null;
@@ -1498,6 +1500,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const setActiveTripNote = useCallback((note: string) => {
+    setActiveTrip((prev) => (prev ? { ...prev, note } : null));
+  }, []);
+
   const stopTrip = useCallback(async (): Promise<Trip | null> => {
     if (!activeTrip) return null;
 
@@ -1577,6 +1583,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: activeTrip.type,
       waypoints: activeTrip.waypoints && activeTrip.waypoints.length > 0 ? activeTrip.waypoints : undefined,
       path: activeTrip.positions.length >= 2 ? decimatePath(activeTrip.positions) : undefined,
+      ...(activeTrip.note?.trim() ? { note: activeTrip.note.trim() } : {}),
       ...(firstPos ? { startLat: firstPos.lat, startLon: firstPos.lon } : {}),
       ...(last ? { endLat: last.lat, endLon: last.lon } : {}),
     };
@@ -1668,6 +1675,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         livePos,
         startTrip,
         stopTrip,
+        setActiveTripNote,
         togglePause,
         elapsed,
         pendingTrip,

@@ -534,6 +534,32 @@ export default function SaveTripSheet() {
                 </TouchableOpacity>
               )}
 
+              {/* Trip note */}
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                {t("save.noteSection")}
+              </Text>
+              <TextInput
+                style={[
+                  styles.noteInput,
+                  {
+                    backgroundColor: colors.secondary,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  },
+                ]}
+                placeholder={t("save.notePlaceholder")}
+                placeholderTextColor={colors.mutedForeground}
+                value={draftTrip?.note ?? ""}
+                onChangeText={(text) =>
+                  setDraftTrip((prev) => (prev ? { ...prev, note: text || undefined } : null))
+                }
+                multiline
+                numberOfLines={3}
+                maxLength={300}
+                returnKeyType="done"
+                blurOnSubmit
+              />
+
               {/* Action buttons */}
               <TouchableOpacity
                 style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
@@ -762,4 +788,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   discardBtnText: { fontSize: 14, fontWeight: "700" },
+  noteInput: {
+    alignSelf: "stretch",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    minHeight: 72,
+    textAlignVertical: "top",
+  },
 });

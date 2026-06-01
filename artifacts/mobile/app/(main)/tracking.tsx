@@ -61,7 +61,7 @@ export default function TrackingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
+  const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, togglePause, livePos, gpsTracking } = useApp();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showPauseSheet, setShowPauseSheet] = useState(false);
@@ -70,7 +70,10 @@ export default function TrackingScreen() {
   const [pauseNote, setPauseNote] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [driveTaskRunning, setDriveTaskRunning] = useState(true);
+  const [tripNote, setTripNote] = useState(activeTrip?.note ?? "");
+  const [noteExpanded, setNoteExpanded] = useState(!!(activeTrip?.note));
   const noteInputRef = useRef<TextInput>(null);
+  const tripNoteInputRef = useRef<TextInput>(null);
 
   const refreshDriveTaskStatus = useCallback(async () => {
     if (Platform.OS === "web") return;
@@ -382,6 +385,49 @@ export default function TrackingScreen() {
             </Text>
           </View>
         ) : null}
+
+        {/* Trip note */}
+        {noteExpanded ? (
+          <View style={[styles.tripNoteRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Feather name="edit-3" size={13} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+            <TextInput
+              ref={tripNoteInputRef}
+              style={[styles.tripNoteInput, { color: colors.foreground }]}
+              placeholder={t("tracking.screen.notePlaceholder")}
+              placeholderTextColor={colors.mutedForeground}
+              value={tripNote}
+              onChangeText={(text) => {
+                setTripNote(text);
+                setActiveTripNote(text);
+              }}
+              multiline
+              maxLength={300}
+              returnKeyType="done"
+              blurOnSubmit
+            />
+            {tripNote.length === 0 && (
+              <TouchableOpacity
+                onPress={() => setNoteExpanded(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="x" size={14} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addNoteBtn}
+            onPress={() => {
+              setNoteExpanded(true);
+              setTimeout(() => tripNoteInputRef.current?.focus(), 50);
+            }}
+          >
+            <Feather name="edit-3" size={12} color={colors.mutedForeground} />
+            <Text style={[styles.addNoteBtnText, { color: colors.mutedForeground }]}>
+              {t("tracking.screen.addNote")}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Action buttons */}
         <View style={styles.actionsRow}>
@@ -729,4 +775,29 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   sheetBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
+  tripNoteRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  tripNoteInput: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    minHeight: 36,
+    textAlignVertical: "top",
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  addNoteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+  },
+  addNoteBtnText: { fontSize: 12, fontWeight: "500" },
 });
