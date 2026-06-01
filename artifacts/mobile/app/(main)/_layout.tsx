@@ -78,6 +78,14 @@ function ClassicMainTabs() {
             ),
         }}
       />
+      <Tabs.Screen
+        name="tracking"
+        options={{
+          title: "",
+          tabBarButton: () => null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
     </Tabs>
   );
 }

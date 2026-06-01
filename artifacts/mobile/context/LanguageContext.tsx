@@ -256,6 +256,19 @@ const de: Record<string, string> = {
   "driveNotif.startBody": "Du fährst — möchtest du diese Fahrt aufzeichnen?",
   "driveNotif.stopTitle": "FahrtDoc – Fahrt beenden?",
   "driveNotif.stopBody": "Du scheinst geparkt zu haben — Fahrt jetzt beenden?",
+  "tracking.screen.title": "Fahrt läuft",
+  "tracking.screen.elapsed": "Fahrzeit",
+  "tracking.screen.distance": "Strecke",
+  "tracking.screen.waypoints": "Stopps",
+  "tracking.screen.from": "Von",
+  "tracking.screen.pause": "Pausieren",
+  "tracking.screen.resume": "Fortsetzen",
+  "tracking.screen.stop": "Fahrt stoppen",
+  "tracking.screen.pausedNote": "Fahrt ist pausiert — Stopp wird nicht erfasst.",
+  "tracking.screen.waitingGps": "Warte auf GPS-Signal",
+  "tracking.screen.waitingGpsSub": "Karte erscheint sobald eine Position verfügbar ist.",
+  "tracking.screen.gpsOff": "GPS deaktiviert",
+  "tracking.screen.gpsOffSub": "Strecke wird anhand von Fahrtzeit und Geschwindigkeit geschätzt.",
 };
 
 const en: Record<string, string> = {
@@ -506,10 +519,26 @@ const en: Record<string, string> = {
   "tracking.androidAutoSource": "Started via Android Auto",
   "watchdog.title": "FahrtDoc – Drive detection stopped",
   "watchdog.body": "Automatic drive detection was interrupted. Please open the app to save your trip.",
+<<<<<<< HEAD
   "driveNotif.startTitle": "FahrtDoc – Record trip?",
   "driveNotif.startBody": "You're driving — would you like to record this trip?",
   "driveNotif.stopTitle": "FahrtDoc – End trip?",
   "driveNotif.stopBody": "Looks like you've parked — end the trip now?",
+=======
+  "tracking.screen.title": "Trip in progress",
+  "tracking.screen.elapsed": "Drive time",
+  "tracking.screen.distance": "Distance",
+  "tracking.screen.waypoints": "Stops",
+  "tracking.screen.from": "From",
+  "tracking.screen.pause": "Pause",
+  "tracking.screen.resume": "Resume",
+  "tracking.screen.stop": "Stop trip",
+  "tracking.screen.pausedNote": "Trip is paused — stop is not being recorded.",
+  "tracking.screen.waitingGps": "Waiting for GPS signal",
+  "tracking.screen.waitingGpsSub": "Map will appear once a position is available.",
+  "tracking.screen.gpsOff": "GPS disabled",
+  "tracking.screen.gpsOffSub": "Distance is estimated based on drive time and speed.",
+>>>>>>> 2b0d7d3 (feat(mobile): Add dedicated full-screen tracking screen for active trips)
 };
 
 const translations: Record<Language, Record<string, string>> = { de, en };
