@@ -60,6 +60,8 @@ export default function HomeScreen() {
   const [showPillTooltip, setShowPillTooltip] = useState(false);
   const pillTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pillBg = useRef(new Animated.Value(0)).current;
+  const [trackingElapsed, setTrackingElapsed] = useState(0);
+  const trackingStartRef = useRef<number | null>(null);
 
   const pillBgColor = pillBg.interpolate({
     inputRange: [0, 1],
@@ -104,6 +106,29 @@ export default function HomeScreen() {
     return () => pulse.stop();
   }, [driveTaskRunning, dotScale, pillBg]);
 
+  useEffect(() => {
+    if (!driveTaskRunning) {
+      trackingStartRef.current = null;
+      setTrackingElapsed(0);
+      return;
+    }
+    trackingStartRef.current = Date.now();
+    setTrackingElapsed(0);
+    const interval = setInterval(() => {
+      if (trackingStartRef.current !== null) {
+        setTrackingElapsed(Math.floor((Date.now() - trackingStartRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [driveTaskRunning]);
+
+  const fmtTracking = (s: number): string => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m`;
+    return `${s}s`;
+  };
 
   const [modalStartAddr, setModalStartAddr] = useState("");
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
@@ -267,7 +292,7 @@ export default function HomeScreen() {
                 >
                   <Animated.View style={[styles.driveActivePill, { backgroundColor: pillBgColor }]}>
                     <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
-                    <Text style={styles.driveActiveText}>Aktiv</Text>
+                    <Text style={styles.driveActiveText}>Aktiv · {fmtTracking(trackingElapsed)}</Text>
                   </Animated.View>
                 </TouchableOpacity>
                 {showPillTooltip && (
