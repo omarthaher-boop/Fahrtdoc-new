@@ -406,7 +406,7 @@ export default function HistoryScreen() {
     }
     setExportingCSV(true);
     try {
-      await exportCSV(displayTrips, user, dateFrom, dateTo, language);
+      await exportCSV(displayTrips, user, dateFrom, dateTo, language, t("history.exportCSVEmpty"), t("history.exportCSVEmptyMsg"));
       AsyncStorage.removeItem(SELECTION_STORAGE_KEY).catch(() => {});
     } finally {
       setExportingCSV(false);
@@ -759,6 +759,7 @@ export default function HistoryScreen() {
             <TouchableOpacity
               onPress={handleExportCSV}
               disabled={exportingCSV}
+              accessibilityLabel={t("history.exportCSV")}
               style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingCSV ? 0.6 : 1 }]}
             >
               {exportingCSV ? (

@@ -144,9 +144,11 @@ async function exportCSVNative(trips: Trip[], user?: UserProfile | null, dateFro
   }
 }
 
-export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, lang: Language = "de"): Promise<void> {
+export async function exportCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, dateTo?: string, lang: Language = "de", emptyTitle?: string, emptyMsg?: string): Promise<void> {
   if (trips.length === 0) {
-    Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
+    const title = emptyTitle ?? (lang === "de" ? "Keine Fahrten" : "No Trips");
+    const msg = emptyMsg ?? (lang === "de" ? "Es gibt keine Fahrten für den gewählten Zeitraum." : "There are no trips for the selected period.");
+    Alert.alert(title, msg);
     return;
   }
   if (Platform.OS === "web") {
