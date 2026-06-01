@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -52,6 +53,31 @@ export default function HomeScreen() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const [driveTaskRunning, setDriveTaskRunning] = useState(false);
+  const dotScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!driveTaskRunning) {
+      dotScale.setValue(1);
+      return;
+    }
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotScale, {
+          toValue: 1.45,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotScale, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [driveTaskRunning, dotScale]);
+
   const [modalStartAddr, setModalStartAddr] = useState("");
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
   const startAddrInputRef = useRef<TextInput>(null);
@@ -195,7 +221,7 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <View style={styles.driveActiveDot} />
+                <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
                 <Text style={styles.driveActiveText}>Aktiv</Text>
               </TouchableOpacity>
             )}
