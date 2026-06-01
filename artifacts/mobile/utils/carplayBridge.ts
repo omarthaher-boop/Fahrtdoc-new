@@ -30,6 +30,16 @@ import { NativeModules, NativeEventEmitter, Platform } from "react-native";
 import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
+// Trip source platform type
+// ---------------------------------------------------------------------------
+
+/**
+ * Identifies which in-car platform started the current trip.
+ * `null` means the trip was not started from an in-car UI.
+ */
+export type TripSourcePlatform = "carplay" | "androidAuto" | null;
+
+// ---------------------------------------------------------------------------
 // Action types — native side → JS
 // ---------------------------------------------------------------------------
 
@@ -105,6 +115,9 @@ if (typeof global !== "undefined") {
 // `carplayStarted` is true when the most recent startTrip was triggered by
 // the CarPlay / Android Auto native UI, and false once the trip ends.
 //
+// `tripSourcePlatform` records which platform triggered the start
+// ("carplay" | "androidAuto" | null) and is cleared when the trip ends.
+//
 // `carplayStopped` is true when the most recent stopTrip was triggered by
 // the CarPlay / Android Auto native UI, and false once the save sheet closes.
 // ---------------------------------------------------------------------------
@@ -112,7 +125,14 @@ if (typeof global !== "undefined") {
 let carplayStarted = false;
 const carplayStartedListeners = new Set<(v: boolean) => void>();
 
-/** Set whether the current trip was started via CarPlay / Android Auto. */
+let tripSourcePlatform: TripSourcePlatform = null;
+const tripSourcePlatformListeners = new Set<(v: TripSourcePlatform) => void>();
+
+/**
+ * Set whether the current trip was started via CarPlay / Android Auto.
+ * Also captures the source platform (`"carplay"` on iOS, `"androidAuto"` on
+ * Android) so the banner component does not need to inspect `Platform.OS`.
+ */
 export function setCarPlayStarted(value: boolean): void {
   if (carplayStarted === value) return;
   carplayStarted = value;
@@ -123,6 +143,22 @@ export function setCarPlayStarted(value: boolean): void {
       // listener error must not block others
     }
   });
+
+  const platform: TripSourcePlatform = value
+    ? Platform.OS === "android"
+      ? "androidAuto"
+      : "carplay"
+    : null;
+  if (tripSourcePlatform !== platform) {
+    tripSourcePlatform = platform;
+    tripSourcePlatformListeners.forEach((l) => {
+      try {
+        l(platform);
+      } catch {
+        // listener error must not block others
+      }
+    });
+  }
 }
 
 /**
@@ -139,6 +175,26 @@ export function useCarPlayStarted(): boolean {
     carplayStartedListeners.add(setValue);
     return () => {
       carplayStartedListeners.delete(setValue);
+    };
+  }, []);
+  return value;
+}
+
+/**
+ * React hook — returns the in-car platform that started the current trip
+ * (`"carplay"`, `"androidAuto"`, or `null`).
+ *
+ * The value is set automatically by `setCarPlayStarted` and cleared when
+ * that function is called with `false`. Components should use this instead
+ * of checking `Platform.OS` inline so the logic stays in the bridge layer.
+ */
+export function useTripSourcePlatform(): TripSourcePlatform {
+  const [value, setValue] = useState<TripSourcePlatform>(tripSourcePlatform);
+  useEffect(() => {
+    setValue(tripSourcePlatform);
+    tripSourcePlatformListeners.add(setValue);
+    return () => {
+      tripSourcePlatformListeners.delete(setValue);
     };
   }, []);
   return value;

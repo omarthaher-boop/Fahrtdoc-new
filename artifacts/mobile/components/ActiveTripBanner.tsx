@@ -24,7 +24,7 @@ import {
   clearDriveDetectStopped,
   checkAndSendDriveDetectStoppedNotif,
 } from "@/utils/driveDetect";
-import { useCarPlayStarted } from "@/utils/carplayBridge";
+import { useTripSourcePlatform } from "@/utils/carplayBridge";
 
 const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -64,7 +64,7 @@ export default function ActiveTripBanner() {
   const colors = useColors();
   const { t, language } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
-  const carplayStarted = useCarPlayStarted();
+  const tripSource = useTripSourcePlatform();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [showCombinedPauseSheet, setShowCombinedPauseSheet] = useState(false);
@@ -276,15 +276,15 @@ export default function ActiveTripBanner() {
                 <Text style={styles.pausedBadgeText}>{t("tracking.paused")}</Text>
               </View>
             )}
-            {carplayStarted && (
+            {tripSource !== null && (
               <View style={styles.carplayBadge}>
                 <Feather
-                  name={Platform.OS === "android" ? "smartphone" : "monitor"}
+                  name={tripSource === "androidAuto" ? "smartphone" : "monitor"}
                   size={10}
                   color="#FFFFFF"
                 />
                 <Text style={styles.carplayBadgeText}>
-                  {Platform.OS === "android"
+                  {tripSource === "androidAuto"
                     ? t("tracking.androidAutoSource")
                     : t("tracking.carplaySource")}
                 </Text>
