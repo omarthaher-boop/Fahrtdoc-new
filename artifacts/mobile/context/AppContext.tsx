@@ -61,6 +61,7 @@ export interface Trip {
   waypoints?: Waypoint[];
   path?: { lat: number; lon: number }[];
   waypointSyncPending?: boolean;
+  syncPending?: "create" | "update";
 }
 
 export interface ActiveTrip {
@@ -349,7 +350,7 @@ function tripToApiPayload(t: Trip): ApiTrip {
     type: t.type,
     edited: t.edited ?? undefined,
     waypoints: t.waypoints && t.waypoints.length > 0 ? t.waypoints : undefined,
-    // path and waypointSyncPending are client-only; never sent to the server
+    // path, waypointSyncPending, and syncPending are client-only; never sent to the server
   };
 }
 
@@ -506,7 +507,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const { merged, localOnly, waypointPatch } = mergeTrips(result.trips, serverApiTrips);
               finalTrips = merged;
               if (localOnly.length > 0) {
-                serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
+                serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload)).then((ok) => {
+                  if (ok) {
+                    const upsertedIds = new Set(localOnly.map((t) => t.id));
+                    setTrips((prev) => {
+                      const next = prev.map((t) => {
+                        if (!upsertedIds.has(t.id) || !t.syncPending) return t;
+                        const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = t;
+                        return rest;
+                      });
+                      setUserState((u) => {
+                        if (u) persistTripsLocal(next, u.email);
+                        return u;
+                      });
+                      return next;
+                    });
+                  }
+                });
               } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && result.trips.length > 0) {
                 serverBatchUpsertTrips(result.serverToken, result.trips.map(tripToApiPayload));
               }
@@ -796,23 +813,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     if (!bypassBackoff && now - lastRetryMsRef.current < retryBackoffMsRef.current) return;
 
-    const pending = tripsRef.current.filter(
-      (t) => t.waypointSyncPending && t.waypoints && t.waypoints.length > 0
+    const allTrips = tripsRef.current;
+
+    // Trips whose full create/update never reached the server
+    const syncPendingCreate = allTrips.filter((t) => t.syncPending === "create");
+    const syncPendingUpdate = allTrips.filter((t) => t.syncPending === "update");
+
+    // Trips that exist on the server but whose waypoints are still pending
+    // (exclude trips with syncPending — they haven't been created yet, so
+    //  a waypoint-only update would fail with 404)
+    const waypointPending = allTrips.filter(
+      (t) => t.waypointSyncPending && !t.syncPending && t.waypoints && t.waypoints.length > 0
     );
-    if (pending.length === 0) {
+
+    const hasPending =
+      syncPendingCreate.length > 0 ||
+      syncPendingUpdate.length > 0 ||
+      waypointPending.length > 0;
+
+    if (!hasPending) {
       retryBackoffMsRef.current = 30_000;
       return;
     }
 
     lastRetryMsRef.current = now;
 
-    setSyncRetryingIds(new Set(pending.map((t) => t.id)));
+    const allPendingIds = new Set([
+      ...syncPendingCreate.map((t) => t.id),
+      ...syncPendingUpdate.map((t) => t.id),
+      ...waypointPending.map((t) => t.id),
+    ]);
+    setSyncRetryingIds(allPendingIds);
 
-    Promise.all(
-      pending.map((t) =>
-        serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({ id: t.id, ok }))
-      )
-    ).then((results) => {
+    Promise.all([
+      ...syncPendingCreate.map((t) =>
+        serverCreateTrip(token, tripToApiPayload(t)).then((ok) => ({
+          id: t.id,
+          ok,
+          kind: "create" as const,
+          hasWaypoints: !!(t.waypoints && t.waypoints.length > 0),
+        }))
+      ),
+      ...syncPendingUpdate.map((t) =>
+        serverUpdateTrip(token, t.id, tripToApiPayload(t)).then((ok) => ({
+          id: t.id,
+          ok,
+          kind: "update" as const,
+          hasWaypoints: false,
+        }))
+      ),
+      ...waypointPending.map((t) =>
+        serverUpdateTrip(token, t.id, { waypoints: t.waypoints }).then((ok) => ({
+          id: t.id,
+          ok,
+          kind: "waypoint" as const,
+          hasWaypoints: false,
+        }))
+      ),
+    ]).then((results) => {
       setSyncRetryingIds(new Set());
 
       const allOk = results.every((r) => r.ok);
@@ -820,12 +878,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? 30_000
         : Math.min(retryBackoffMsRef.current * 2, 300_000);
 
-      const succeededIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
-      if (succeededIds.size > 0) {
+      const succeeded = results.filter((r) => r.ok);
+      if (succeeded.length > 0) {
+        const createdIds = new Set(
+          succeeded.filter((r) => r.kind === "create").map((r) => r.id)
+        );
+        const updatedIds = new Set(
+          succeeded.filter((r) => r.kind === "update").map((r) => r.id)
+        );
+        const waypointIds = new Set(
+          succeeded.filter((r) => r.kind === "waypoint").map((r) => r.id)
+        );
+
         setTrips((prev) => {
-          const next = prev.map((t) =>
-            succeededIds.has(t.id) ? { ...t, waypointSyncPending: false } : t
-          );
+          const next = prev.map((t) => {
+            if (createdIds.has(t.id)) {
+              // Full create succeeded — clear both syncPending and waypointSyncPending
+              const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = t;
+              return rest;
+            }
+            if (updatedIds.has(t.id)) {
+              const { syncPending: _sp, ...rest } = t;
+              return rest;
+            }
+            if (waypointIds.has(t.id)) {
+              return { ...t, waypointSyncPending: false };
+            }
+            return t;
+          });
           setUserState((u) => {
             if (u) persistTripsLocal(next, u.email);
             return u;
@@ -878,7 +958,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverApiTrips);
       let result = merged;
       if (localOnly.length > 0) {
-        await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
+        const upsertOk = await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
+        if (upsertOk) {
+          const upsertedIds = new Set(localOnly.map((t) => t.id));
+          result = result.map((t) => {
+            if (!upsertedIds.has(t.id) || !t.syncPending) return t;
+            const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = t;
+            return rest;
+          });
+        }
       } else if (serverApiTrips.filter((t) => !t.deleted).length === 0 && localTrips.length > 0) {
         await serverBatchUpsertTrips(token, localTrips.map(tripToApiPayload));
       }
@@ -1004,10 +1092,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       serverTokenRef.current = token;
       setSyncStatus("synced");
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
-      if (localOnly.length > 0) {
-        await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
-      }
       let patchedMerged = merged;
+      if (localOnly.length > 0) {
+        const upsertOk = await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
+        if (upsertOk) {
+          const upsertedIds = new Set(localOnly.map((t) => t.id));
+          patchedMerged = patchedMerged.map((t) => {
+            if (!upsertedIds.has(t.id) || !t.syncPending) return t;
+            const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = t;
+            return rest;
+          });
+        }
+      }
       if (waypointPatch.length > 0) {
         const patchIds = new Set(waypointPatch.map((t) => t.id));
         patchedMerged = patchedMerged.map((t) =>
@@ -1046,7 +1142,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
         finalTrips = merged;
         if (localOnly.length > 0) {
-          serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload));
+          serverBatchUpsertTrips(result.serverToken, localOnly.map(tripToApiPayload)).then((ok) => {
+            if (ok) {
+              const upsertedIds = new Set(localOnly.map((t) => t.id));
+              setTrips((prev) => {
+                const next = prev.map((t) => {
+                  if (!upsertedIds.has(t.id) || !t.syncPending) return t;
+                  const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = t;
+                  return rest;
+                });
+                setUserState((u) => {
+                  if (u) persistTripsLocal(next, u.email);
+                  return u;
+                });
+                return next;
+              });
+            }
+          });
         }
       }
     }
@@ -1218,11 +1330,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus("syncing");
       serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
         setSyncStatus(ok ? "synced" : "offline");
-        if (ok && hasWaypoints) {
-          // Server confirmed the full trip including waypoints — clear pending flag
+        if (ok) {
+          // Server confirmed the full trip (including any waypoints) — clear all pending flags
+          setTrips((prev) => {
+            const next = prev.map((tr) => {
+              if (tr.id !== t.id) return tr;
+              const { syncPending: _sp, waypointSyncPending: _wp, ...rest } = tr;
+              return rest;
+            });
+            setUserState((u) => {
+              if (u) persistTripsLocal(next, u.email);
+              return u;
+            });
+            return next;
+          });
+        } else {
+          // Create failed (offline or server error) — mark the trip so
+          // runPendingRetry will re-send it on reconnect / app-active
           setTrips((prev) => {
             const next = prev.map((tr) =>
-              tr.id === t.id ? { ...tr, waypointSyncPending: false } : tr
+              tr.id === t.id
+                ? { ...tr, syncPending: "create" as const, waypointSyncPending: false }
+                : tr
             );
             setUserState((u) => {
               if (u) persistTripsLocal(next, u.email);
@@ -1231,8 +1360,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             return next;
           });
         }
-        // If create failed, the trip remains local-only and will be uploaded
-        // on the next successful login/restore merge.
       });
     }
   }, [persistTripsLocal]);
@@ -1315,6 +1442,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus("syncing");
       serverUpdateTrip(token, id, serverChanges).then((ok) => {
         setSyncStatus(ok ? "synced" : "offline");
+        if (!ok) {
+          // Update failed — mark the trip for retry on reconnect / app-active.
+          // Keep existing syncPending: "create" if the trip was never created;
+          // otherwise set "update" so runPendingRetry sends the full current state.
+          setTrips((prev) => {
+            const next = prev.map((t) => {
+              if (t.id !== id) return t;
+              if (t.syncPending === "create") return t;
+              return { ...t, syncPending: "update" as const };
+            });
+            setUserState((u) => {
+              if (u) persistTripsLocal(next, u.email);
+              return u;
+            });
+            return next;
+          });
+        }
       });
     }
   }, [persistTripsLocal]);
