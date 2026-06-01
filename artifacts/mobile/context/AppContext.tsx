@@ -1029,6 +1029,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     accounts[key].passwordHash = passwordHash;
     await saveAccounts(accounts);
     await storeSession(key, passwordHash);
+
+    // Re-login to get a fresh server token — the old one was revoked when the
+    // password was reset on the server.
+    try {
+      const loginResult = await serverLogin(key, newPassword);
+      if (loginResult && loginResult !== "network_error") {
+        await secureSetItem(key, serverTokenKey(key), loginResult.token);
+        setServerToken(loginResult.token);
+        serverTokenRef.current = loginResult.token;
+      }
+    } catch {
+      // Offline fallback — local session is valid; sync resumes on next login
+    }
   }, []);
 
   const requestPasswordChangeCode = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
@@ -1061,6 +1074,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         accounts[key].passwordHash = passwordHash;
         await saveAccounts(accounts);
         await storeSession(key, passwordHash);
+      }
+
+      // The server revoked all sessions on password change — get a fresh token
+      // so sync continues without the user having to log out and back in.
+      try {
+        const loginResult = await serverLogin(key, newPassword);
+        if (loginResult && loginResult !== "network_error") {
+          await secureSetItem(key, serverTokenKey(key), loginResult.token);
+          setServerToken(loginResult.token);
+          serverTokenRef.current = loginResult.token;
+        }
+      } catch {
+        // Offline fallback — sync resumes on next app launch
       }
     }
     return result;
