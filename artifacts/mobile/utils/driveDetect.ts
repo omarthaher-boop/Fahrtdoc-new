@@ -14,8 +14,12 @@ const DRIVE_WATCHDOG_KEY = "fahrtdoc_watchdog_notif_id";
 
 export const DRIVE_DETECT_STOPPED_AT_KEY = "fahrtdoc_detect_stopped_at";
 const DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY = "fahrtdoc_detect_stopped_notif";
+/** Written by the background task each time it fires successfully. */
+export const DRIVE_DETECT_HEARTBEAT_KEY = "fahrtdoc_detect_heartbeat";
 /** Fire the "still stopped" notification after the task has been down for this long. */
 const STOPPED_NOTIFICATION_THRESHOLD_MS = 2 * 60 * 1000;
+/** A heartbeat written within this window means the task is still alive. */
+const HEARTBEAT_FRESH_MS = 10 * 60 * 1000;
 
 const SPEED_DRIVING_MS = 7;
 const SPEED_PARKED_MS = 2.5;
@@ -115,15 +119,29 @@ export async function clearDriveDetectStopped(): Promise<void> {
  * If the drive-detect task has been stopped for ≥ STOPPED_NOTIFICATION_THRESHOLD_MS
  * and the notification has not yet been sent for this outage, fires a local push
  * notification and marks it as sent so it won't repeat.
+ *
+ * A fresh heartbeat (written by the background task itself each time it runs)
+ * takes precedence over the stopped-at key — if the task fired recently the
+ * notification is suppressed and the stopped state is cleared automatically.
  */
 export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise<void> {
   try {
-    const [stoppedAtRaw, sentRaw] = await AsyncStorage.multiGet([
+    const [stoppedAtRaw, sentRaw, heartbeatRaw] = await AsyncStorage.multiGet([
       DRIVE_DETECT_STOPPED_AT_KEY,
       DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY,
+      DRIVE_DETECT_HEARTBEAT_KEY,
     ]);
     const stoppedAt = stoppedAtRaw[1] ? parseInt(stoppedAtRaw[1], 10) : null;
     const alreadySent = sentRaw[1] === "true";
+    const lastHeartbeat = heartbeatRaw[1] ? parseInt(heartbeatRaw[1], 10) : null;
+
+    // If the background task fired recently, the task is still alive — clear any
+    // stale stopped state and skip the notification.
+    if (lastHeartbeat !== null && Date.now() - lastHeartbeat < HEARTBEAT_FRESH_MS) {
+      await AsyncStorage.multiRemove([DRIVE_DETECT_STOPPED_AT_KEY, DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY]);
+      return;
+    }
+
     if (!stoppedAt || alreadySent) return;
     if (Date.now() - stoppedAt < STOPPED_NOTIFICATION_THRESHOLD_MS) return;
 
@@ -182,6 +200,10 @@ if (Constants.appOwnership !== "expo") {
       DRIVE_DETECT_TASK,
       async ({ data, error }: TaskManager.TaskManagerTaskBody<TaskData>) => {
         if (error || !data?.locations?.length) return;
+
+        // Write a heartbeat so checkAndSendDriveDetectStoppedNotif can confirm
+        // the task is still alive even when the banner component is not mounted.
+        await AsyncStorage.setItem(DRIVE_DETECT_HEARTBEAT_KEY, String(Date.now())).catch(() => {});
 
         try {
           const [remindRaw, tripActiveRaw, stateRaw, cooldownRaw, langRaw] =
