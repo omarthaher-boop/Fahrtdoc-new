@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +18,29 @@ import { Trip, Waypoint } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import TripRouteMap from "@/components/TripRouteMap";
 import LocationPickerModal from "@/components/LocationPickerModal";
+
+async function geocodeAddress(addr: string): Promise<{ lat: number; lon: number } | null> {
+  if (!addr) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/search` +
+      `?q=${encodeURIComponent(addr)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept-Language": "de", "User-Agent": "DriveLog/1.0" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+    if (!data?.length) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 interface Coord {
   lat: number;
@@ -46,6 +69,9 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   const [pinnedEnd, setPinnedEnd] = useState<Coord | null>(null);
   const [pickerFor, setPickerFor] = useState<"start" | "end" | null>(null);
 
+  const onSaveRef = useRef(onSave);
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
   useEffect(() => {
     if (trip) {
       setType(trip.type);
@@ -67,6 +93,46 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       );
     }
   }, [trip]);
+
+  // When the modal opens for a trip that has addresses but no stored coords,
+  // geocode them silently so the map shows pins and future opens are instant.
+  useEffect(() => {
+    if (!trip || !visible) return;
+    const needsStart = trip.startLat == null && !!trip.startAddr;
+    const needsEnd = trip.endLat == null && !!trip.endAddr;
+    if (!needsStart && !needsEnd) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const [startCoord, endCoord] = await Promise.all([
+        needsStart ? geocodeAddress(trip.startAddr) : Promise.resolve(null),
+        needsEnd ? geocodeAddress(trip.endAddr) : Promise.resolve(null),
+      ]);
+      if (cancelled) return;
+
+      const coordChanges: Partial<Trip> = {};
+
+      if (startCoord) {
+        setPinnedStart(startCoord);
+        setMapTrip((prev) => (prev ? { ...prev, startLat: startCoord.lat, startLon: startCoord.lon } : prev));
+        coordChanges.startLat = startCoord.lat;
+        coordChanges.startLon = startCoord.lon;
+      }
+      if (endCoord) {
+        setPinnedEnd(endCoord);
+        setMapTrip((prev) => (prev ? { ...prev, endLat: endCoord.lat, endLon: endCoord.lon } : prev));
+        coordChanges.endLat = endCoord.lat;
+        coordChanges.endLon = endCoord.lon;
+      }
+
+      if (Object.keys(coordChanges).length > 0) {
+        onSaveRef.current(trip.id, coordChanges);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [trip?.id, visible]);
 
   const syncMapTrip = (overrides: Partial<Trip>) => {
     setMapTrip((prev) => (prev ? { ...prev, ...overrides } : prev));
