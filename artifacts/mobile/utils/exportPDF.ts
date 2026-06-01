@@ -1,5 +1,6 @@
 import { Platform, Alert, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import { jsPDF } from "jspdf";
 import type { Trip, UserProfile } from "@/context/AppContext";
 import type { Language } from "@/context/LanguageContext";
 
@@ -423,7 +424,6 @@ async function exportPDFWeb(
   filename = "Fahrtenbuch.pdf",
   typeLabel?: string
 ): Promise<void> {
-  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
@@ -759,7 +759,6 @@ async function exportPDFNative(
   dialogTitle = "Fahrtenbuch exportieren",
   typeLabel?: string
 ): Promise<void> {
-  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
@@ -1044,11 +1043,21 @@ async function exportPDFNative(
   doc.text(`Erstellt am ${exportedAt}`, pageW - margin, y, { align: "right" });
 
   // Save to temp file and share
-  const pdfBase64 = doc.output("datauristring").split(",")[1];
-  const filename = `Fahrtenbuch_${Date.now()}.pdf`;
+  const pdfBytes = doc.output("arraybuffer") as ArrayBuffer;
+  const uint8 = new Uint8Array(pdfBytes);
+  let binary = "";
+  const chunkSize = 1024;
+  for (let i = 0; i < uint8.length; i += chunkSize) {
+    const chunk = uint8.subarray(i, i + chunkSize);
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+  }
+  const pdfBase64 = btoa(binary);
+  const pdfFilename = `Fahrtenbuch_${Date.now()}.pdf`;
   const cacheDir2 = FileSystem.cacheDirectory;
   if (!cacheDir2) throw new Error("cacheDirectory unavailable");
-  const fileUri = cacheDir2 + filename;
+  const fileUri = cacheDir2 + pdfFilename;
   await FileSystem.writeAsStringAsync(fileUri, pdfBase64, {
     encoding: FileSystem.EncodingType.Base64,
   });
