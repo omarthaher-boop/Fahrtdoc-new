@@ -451,6 +451,7 @@ export default function HomeScreen() {
                 onDelete={deleteTrip}
                 onEdit={handleEdit}
                 onView={handleView}
+                onCardPress={handleView}
                 onRetrySync={retryWaypointSync}
               />
             ))

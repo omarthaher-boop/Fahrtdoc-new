@@ -30,6 +30,7 @@ interface Props {
   onDelete?: (id: string) => void;
   onEdit?: (trip: Trip) => void;
   onView?: (trip: Trip) => void;
+  onCardPress?: (trip: Trip) => void;
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
@@ -52,6 +53,7 @@ export default function TripCard({
   onDelete,
   onEdit,
   onView,
+  onCardPress,
   selectionMode = false,
   selected = false,
   onToggleSelect,
@@ -133,6 +135,15 @@ export default function TripCard({
     onToggleSelect?.(trip.id);
   };
 
+  const handleCardBodyPress = () => {
+    if (onCardPress) {
+      if (Platform.OS !== "web") Haptics.selectionAsync();
+      onCardPress(trip);
+    } else {
+      handleToggleExpand();
+    }
+  };
+
   const handleToggleExpand = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (!expanded) {
@@ -163,7 +174,7 @@ export default function TripCard({
   return (
     <>
       <Pressable
-        onPress={selectionMode ? undefined : handleToggleExpand}
+        onPress={selectionMode ? undefined : handleCardBodyPress}
         style={[
           styles.card,
           {
