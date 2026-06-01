@@ -102,12 +102,78 @@ User taps CarPlay button
   → useCarPlay handler → AppContext.startTrip / stopTrip / togglePause
 ```
 
-### Testing (iOS)
+### Testing (iOS) — Xcode CarPlay Simulator Checklist
 
-- Requires Xcode + the Xcode CarPlay Simulator window.
-- Enable in Xcode: **I/O → CarPlay → CarPlay Simulator**.
-- The app must be signed with the approved CarPlay entitlement certificate.
-- Build a **development client** first: `eas build --profile development --platform ios`
+> All native source files are ready in `native/ios/`. Follow these steps on a Mac with Xcode installed.
+
+**Step 1 — Prebuild and wire native code**
+
+```bash
+cd artifacts/mobile
+expo prebuild --clean
+bash scripts/setup-carplay-native.sh
+cd ios && pod install && cd ..
+```
+
+Expected output from the setup script:
+```
+✅ Copied Swift + ObjC bridge files to ios/<AppName>/
+✅ Added CarPlaySceneDelegate.swift to Xcode project
+✅ Added FahrtDocCarPlayModule.swift to Xcode project
+✅ Added FahrtDocCarPlayModule.m to Xcode project
+✅ Xcode project updated.
+```
+
+**Step 2 — Build a development client via EAS**
+
+```bash
+# Must run from artifacts/mobile/, not the repo root
+eas build --profile development --platform ios
+```
+
+Install the resulting `.ipa` on a physical iPhone or on the iOS Simulator.
+
+**Step 3 — Open the CarPlay Simulator in Xcode**
+
+1. Open `ios/fahrtdoc.xcworkspace` in Xcode (after `pod install`).
+2. Run the app on an iPhone Simulator (or a connected device).
+3. In the Xcode menu bar: **I/O → CarPlay → CarPlay Simulator**.
+4. A separate CarPlay window opens — this is the car display.
+
+**Step 4 — Verify idle state**
+
+- ✅ CarPlay window shows title **"FahrtDoc"**
+- ✅ Two buttons are visible: **"Geschäftl. starten"** and **"Privat starten"**
+- ✅ Status row reads **"Bereit zur Fahrt"**
+
+**Step 5 — Test "Geschäftl. starten"**
+
+1. Tap **"Geschäftl. starten"** in the CarPlay window.
+2. ✅ The phone app transitions to the active trip screen (ActiveTripBanner visible).
+3. ✅ CarPlay window re-renders with: Art = Geschäftlich, Status = ● Läuft, live Dauer + Distanz.
+4. ✅ Save sheet does NOT appear yet.
+
+**Step 6 — Test "Privat starten"** (end the business trip first, then repeat)
+
+1. Stop the trip from the phone screen.
+2. Tap **"Privat starten"** in the CarPlay window.
+3. ✅ Phone app starts a new private trip.
+4. ✅ CarPlay template shows Art = Privat.
+
+**Step 7 — Test "Pausieren" / "Fortsetzen"**
+
+1. While a trip is active, tap **"Pausieren"** in the CarPlay window.
+2. ✅ CarPlay template updates: Status = ⏸ Pausiert, button title changes to **"Fortsetzen"**.
+3. ✅ Phone app ActiveTripBanner shows paused state.
+4. Tap **"Fortsetzen"** in the CarPlay window.
+5. ✅ Status returns to ● Läuft on both screens.
+
+**Step 8 — Test "Fahrt beenden"**
+
+1. While a trip is active, tap **"Fahrt beenden"** in the CarPlay window.
+2. ✅ Phone app shows the save-trip sheet (SaveTripSheet).
+3. ✅ CarPlay window returns to the idle state (two start buttons).
+4. ✅ Completing the save sheet on the phone dismisses it normally.
 
 ---
 
