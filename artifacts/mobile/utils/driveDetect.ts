@@ -59,23 +59,6 @@ export async function cancelDriveWatchdog(): Promise<void> {
 
 const LANG_KEY = "pref_language";
 
-const DRIVE_NOTIF_STRINGS: Record<
-  string,
-  { startTitle: string; startBody: string; stopTitle: string; stopBody: string }
-> = {
-  de: {
-    startTitle: "FahrtDoc – Fahrt dokumentieren?",
-    startBody: "Du fährst — möchtest du diese Fahrt aufzeichnen?",
-    stopTitle: "FahrtDoc – Fahrt beenden?",
-    stopBody: "Du scheinst geparkt zu haben — Fahrt jetzt beenden?",
-  },
-  en: {
-    startTitle: "FahrtDoc – Record trip?",
-    startBody: "You're driving — would you like to record this trip?",
-    stopTitle: "FahrtDoc – End trip?",
-    stopBody: "Looks like you've parked — end the trip now?",
-  },
-};
 
 const DETECT_STOPPED_STRINGS: Record<string, { title: string; body: string }> = {
   de: {
@@ -225,8 +208,8 @@ if (Constants.appOwnership !== "expo") {
           const prevState = stateRaw[1] as DriveState | null;
           const lastNotify = cooldownRaw[1] ? parseInt(cooldownRaw[1], 10) : 0;
           const now = Date.now();
-          const driveStrings =
-            DRIVE_NOTIF_STRINGS[langRaw[1] ?? "de"] ?? DRIVE_NOTIF_STRINGS["de"];
+          const langKey = (langRaw[1] === "en" ? "en" : "de") as keyof typeof translations;
+          const driveDict = translations[langKey];
 
           // Watchdog: keep rescheduling while a trip is active so if the task
           // is killed by the OS the notification fires automatically.
@@ -250,10 +233,10 @@ if (Constants.appOwnership !== "expo") {
           if (now - lastNotify < COOLDOWN_MS) return;
 
           if (curState === "driving" && prevState !== "driving" && !tripActive) {
-            await sendNotification(driveStrings.startTitle, driveStrings.startBody);
+            await sendNotification(driveDict["driveNotif.startTitle"], driveDict["driveNotif.startBody"]);
             await AsyncStorage.setItem(DRIVE_COOLDOWN_KEY, String(now));
           } else if (curState === "parked" && prevState === "driving" && tripActive) {
-            await sendNotification(driveStrings.stopTitle, driveStrings.stopBody);
+            await sendNotification(driveDict["driveNotif.stopTitle"], driveDict["driveNotif.stopBody"]);
             await AsyncStorage.setItem(DRIVE_COOLDOWN_KEY, String(now));
           }
         } catch {
