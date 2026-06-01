@@ -349,10 +349,14 @@ export default function HistoryScreen() {
       return;
     }
     const toExport = displayTrips;
-    const lines = toExport.map(
-      (trip) =>
-        `${new Date(trip.date).toLocaleDateString(locale)}  |  ${trip.type === "business" ? t("tripType.business") : t("tripType.private")}  |  ${trip.startAddr} → ${trip.endAddr}  |  ${trip.km.toFixed(1)} km  |  ${fmtDur(trip.dur)}`
-    );
+    const lines = toExport.flatMap((trip) => {
+      const tripLine = `${new Date(trip.date).toLocaleDateString(locale)}  |  ${trip.type === "business" ? t("tripType.business") : t("tripType.private")}  |  ${trip.startAddr} → ${trip.endAddr}  |  ${trip.km.toFixed(1)} km  |  ${fmtDur(trip.dur)}`;
+      const waypointLines = (trip.waypoints ?? []).map((wp, i) => {
+        const note = wp.note ? `  (${wp.note})` : "";
+        return `    ↳ Zwischenstopp ${i + 1}: ${wp.addr}${note}`;
+      });
+      return [tripLine, ...waypointLines];
+    });
     const exportedAt = new Date().toLocaleDateString(locale);
     const dateRange = dateFrom || dateTo
       ? [dateFrom, dateTo].filter(Boolean).join(" - ")
