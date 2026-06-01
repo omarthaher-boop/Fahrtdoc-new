@@ -17,6 +17,12 @@ import { useColors } from "@/hooks/useColors";
 import { Trip, Waypoint } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import TripRouteMap from "@/components/TripRouteMap";
+import LocationPickerModal from "@/components/LocationPickerModal";
+
+interface Coord {
+  lat: number;
+  lon: number;
+}
 
 interface Props {
   trip: Trip | null;
@@ -36,6 +42,10 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [mapTrip, setMapTrip] = useState<Trip | null>(trip);
 
+  const [pinnedStart, setPinnedStart] = useState<Coord | null>(null);
+  const [pinnedEnd, setPinnedEnd] = useState<Coord | null>(null);
+  const [pickerFor, setPickerFor] = useState<"start" | "end" | null>(null);
+
   useEffect(() => {
     if (trip) {
       setType(trip.type);
@@ -45,6 +55,16 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
       setDurMin(String(Math.round(trip.dur / 60)));
       setWaypoints(trip.waypoints ? [...trip.waypoints] : []);
       setMapTrip(trip);
+      setPinnedStart(
+        trip.startLat != null && trip.startLon != null
+          ? { lat: trip.startLat, lon: trip.startLon }
+          : null
+      );
+      setPinnedEnd(
+        trip.endLat != null && trip.endLon != null
+          ? { lat: trip.endLat, lon: trip.endLon }
+          : null
+      );
     }
   }, [trip]);
 
@@ -60,27 +80,46 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
     setWaypoints((prev) => prev.map((wp, i) => (i === idx ? { ...wp, note } : wp)));
   };
 
+  const handlePinStart = (coord: Coord) => {
+    setPinnedStart(coord);
+    syncMapTrip({ startLat: coord.lat, startLon: coord.lon });
+  };
+
+  const handlePinEnd = (coord: Coord) => {
+    setPinnedEnd(coord);
+    syncMapTrip({ endLat: coord.lat, endLon: coord.lon });
+  };
+
   const handleSave = () => {
     if (!trip) return;
     const kmNum = parseFloat(km.replace(",", "."));
     const durNum = parseInt(durMin, 10);
+    const resolvedStartAddr = startAddr.trim() || trip.startAddr;
+    const resolvedEndAddr = endAddr.trim() || trip.endAddr;
+
     syncMapTrip({
-      startAddr: startAddr.trim() || trip.startAddr,
-      endAddr: endAddr.trim() || trip.endAddr,
-      startLat: undefined,
-      startLon: undefined,
-      endLat: undefined,
-      endLon: undefined,
+      startAddr: resolvedStartAddr,
+      endAddr: resolvedEndAddr,
+      startLat: pinnedStart?.lat,
+      startLon: pinnedStart?.lon,
+      endLat: pinnedEnd?.lat,
+      endLon: pinnedEnd?.lon,
     });
+
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     onSave(trip.id, {
       type,
-      startAddr: startAddr.trim() || trip.startAddr,
-      endAddr: endAddr.trim() || trip.endAddr,
+      startAddr: resolvedStartAddr,
+      endAddr: resolvedEndAddr,
       km: isNaN(kmNum) ? trip.km : kmNum,
       dur: isNaN(durNum) ? trip.dur : durNum * 60,
       edited: true,
       waypoints: waypoints,
+      startLat: pinnedStart?.lat,
+      startLon: pinnedStart?.lon,
+      endLat: pinnedEnd?.lat,
+      endLon: pinnedEnd?.lon,
     });
     onClose();
   };
@@ -88,164 +127,248 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   if (!trip) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.sheet}
-      >
-        <View style={[styles.container, { backgroundColor: colors.card }]}>
-          {/* Handle */}
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <Pressable style={styles.overlay} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.sheet}
+        >
+          <View style={[styles.container, { backgroundColor: colors.card }]}>
+            {/* Handle */}
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>{t("edit.title")}</Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.secondary }]}>
-              <Feather name="x" size={18} color={colors.foreground} />
-            </TouchableOpacity>
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.foreground }]}>{t("edit.title")}</Text>
+              <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.secondary }]}>
+                <Feather name="x" size={18} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Route map — built from current form state, refreshes on address blur */}
+              <View style={styles.mapWrapper}>
+                {mapTrip && <TripRouteMap trip={mapTrip} path={mapTrip.path} />}
+              </View>
+
+              {/* Type toggle */}
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.tripPurpose")}</Text>
+                <View style={[styles.typeRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, type === "business" && { backgroundColor: colors.primary }]}
+                    onPress={() => setType("business")}
+                  >
+                    <Feather name="briefcase" size={14} color={type === "business" ? "#FFF" : colors.mutedForeground} />
+                    <Text style={[styles.typeBtnText, { color: type === "business" ? "#FFF" : colors.mutedForeground }]}>
+                      {t("tripType.business")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, type === "private" && { backgroundColor: colors.success }]}
+                    onPress={() => setType("private")}
+                  >
+                    <Feather name="user" size={14} color={type === "private" ? "#FFF" : colors.mutedForeground} />
+                    <Text style={[styles.typeBtnText, { color: type === "private" ? "#FFF" : colors.mutedForeground }]}>
+                      {t("tripType.private")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Start address */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.fieldLabelRow}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.startAddr")}</Text>
+                  {pinnedStart && (
+                    <View style={[styles.pinnedBadge, { backgroundColor: colors.primary + "22" }]}>
+                      <Feather name="map-pin" size={10} color={colors.primary} />
+                      <Text style={[styles.pinnedBadgeText, { color: colors.primary }]}>{t("edit.pinned")}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground }]}
+                    value={startAddr}
+                    onChangeText={(v) => {
+                      setStartAddr(v);
+                      setPinnedStart(null);
+                      syncMapTrip({ startAddr: v.trim() || trip.startAddr, startLat: undefined, startLon: undefined });
+                    }}
+                    onBlur={() =>
+                      syncMapTrip({
+                        startAddr: startAddr.trim() || trip.startAddr,
+                        startLat: pinnedStart?.lat,
+                        startLon: pinnedStart?.lon,
+                      })
+                    }
+                    placeholder={t("edit.startAddr")}
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.pinBtn,
+                      {
+                        backgroundColor: pinnedStart ? colors.primary + "22" : colors.secondary,
+                        borderColor: pinnedStart ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => setPickerFor("start")}
+                  >
+                    <Feather
+                      name="map-pin"
+                      size={15}
+                      color={pinnedStart ? colors.primary : colors.mutedForeground}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Waypoints */}
+              {waypoints.map((wp, idx) => (
+                <View style={styles.fieldGroup} key={wp.timestamp}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+                    {`${t("waypoint.label")} ${idx + 1}`}
+                  </Text>
+                  <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="map-pin" size={14} color={colors.primary} />
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      value={wp.addr}
+                      onChangeText={(text) => handleWaypointChange(idx, text)}
+                      placeholder={t("edit.addrPlaceholder")}
+                      placeholderTextColor={colors.mutedForeground}
+                    />
+                  </View>
+                  <View style={[styles.noteRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="file-text" size={13} color={colors.mutedForeground} />
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      value={wp.note ?? ""}
+                      onChangeText={(text) => handleWaypointNoteChange(idx, text)}
+                      placeholder={t("edit.notePlaceholder")}
+                      placeholderTextColor={colors.mutedForeground}
+                    />
+                  </View>
+                </View>
+              ))}
+
+              {/* End address */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.fieldLabelRow}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.endAddr")}</Text>
+                  {pinnedEnd && (
+                    <View style={[styles.pinnedBadge, { backgroundColor: colors.primary + "22" }]}>
+                      <Feather name="map-pin" size={10} color={colors.primary} />
+                      <Text style={[styles.pinnedBadgeText, { color: colors.primary }]}>{t("edit.pinned")}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                  <View style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]} />
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground }]}
+                    value={endAddr}
+                    onChangeText={(v) => {
+                      setEndAddr(v);
+                      setPinnedEnd(null);
+                      syncMapTrip({ endAddr: v.trim() || trip.endAddr, endLat: undefined, endLon: undefined });
+                    }}
+                    onBlur={() =>
+                      syncMapTrip({
+                        endAddr: endAddr.trim() || trip.endAddr,
+                        endLat: pinnedEnd?.lat,
+                        endLon: pinnedEnd?.lon,
+                      })
+                    }
+                    placeholder={t("edit.endAddr")}
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.pinBtn,
+                      {
+                        backgroundColor: pinnedEnd ? colors.primary + "22" : colors.secondary,
+                        borderColor: pinnedEnd ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => setPickerFor("end")}
+                  >
+                    <Feather
+                      name="map-pin"
+                      size={15}
+                      color={pinnedEnd ? colors.primary : colors.mutedForeground}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* km + Duration */}
+              <View style={styles.twoColRow}>
+                <View style={[styles.fieldGroup, { flex: 1 }]}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.distanceKm")}</Text>
+                  <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="navigation" size={14} color={colors.primary} />
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      value={km}
+                      onChangeText={setKm}
+                      placeholder="0.0"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+                <View style={[styles.fieldGroup, { flex: 1 }]}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.durationMin")}</Text>
+                  <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="clock" size={14} color={colors.primary} />
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      value={durMin}
+                      onChangeText={setDurMin}
+                      placeholder="0"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Save button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSave}
+                testID="edit-trip-save"
+              >
+                <Feather name="check" size={16} color="#FFF" />
+                <Text style={styles.saveBtnText}>{t("edit.saveChanges")}</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Route map — built from current form state, refreshes on address blur */}
-            <View style={styles.mapWrapper}>
-              {mapTrip && <TripRouteMap trip={mapTrip} path={mapTrip.path} />}
-            </View>
-
-            {/* Type toggle */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.tripPurpose")}</Text>
-              <View style={[styles.typeRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <TouchableOpacity
-                  style={[styles.typeBtn, type === "business" && { backgroundColor: colors.primary }]}
-                  onPress={() => setType("business")}
-                >
-                  <Feather name="briefcase" size={14} color={type === "business" ? "#FFF" : colors.mutedForeground} />
-                  <Text style={[styles.typeBtnText, { color: type === "business" ? "#FFF" : colors.mutedForeground }]}>
-                    {t("tripType.business")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeBtn, type === "private" && { backgroundColor: colors.success }]}
-                  onPress={() => setType("private")}
-                >
-                  <Feather name="user" size={14} color={type === "private" ? "#FFF" : colors.mutedForeground} />
-                  <Text style={[styles.typeBtnText, { color: type === "private" ? "#FFF" : colors.mutedForeground }]}>
-                    {t("tripType.private")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Start address */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.startAddr")}</Text>
-              <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  value={startAddr}
-                  onChangeText={setStartAddr}
-                  onBlur={() =>
-                    syncMapTrip({ startAddr: startAddr.trim() || trip.startAddr, startLat: undefined, startLon: undefined })
-                  }
-                  placeholder={t("edit.startAddr")}
-                  placeholderTextColor={colors.mutedForeground}
-                />
-              </View>
-            </View>
-
-            {/* Waypoints */}
-            {waypoints.map((wp, idx) => (
-              <View style={styles.fieldGroup} key={wp.timestamp}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
-                  {`${t("waypoint.label")} ${idx + 1}`}
-                </Text>
-                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Feather name="map-pin" size={14} color={colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    value={wp.addr}
-                    onChangeText={(text) => handleWaypointChange(idx, text)}
-                    placeholder={t("edit.addrPlaceholder")}
-                    placeholderTextColor={colors.mutedForeground}
-                  />
-                </View>
-                <View style={[styles.noteRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Feather name="file-text" size={13} color={colors.mutedForeground} />
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    value={wp.note ?? ""}
-                    onChangeText={(text) => handleWaypointNoteChange(idx, text)}
-                    placeholder={t("edit.notePlaceholder")}
-                    placeholderTextColor={colors.mutedForeground}
-                  />
-                </View>
-              </View>
-            ))}
-
-            {/* End address */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.endAddr")}</Text>
-              <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <View style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  value={endAddr}
-                  onChangeText={setEndAddr}
-                  onBlur={() =>
-                    syncMapTrip({ endAddr: endAddr.trim() || trip.endAddr, endLat: undefined, endLon: undefined })
-                  }
-                  placeholder={t("edit.endAddr")}
-                  placeholderTextColor={colors.mutedForeground}
-                />
-              </View>
-            </View>
-
-            {/* km + Duration */}
-            <View style={styles.twoColRow}>
-              <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.distanceKm")}</Text>
-                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Feather name="navigation" size={14} color={colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    value={km}
-                    onChangeText={setKm}
-                    placeholder="0.0"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-              </View>
-              <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.durationMin")}</Text>
-                <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Feather name="clock" size={14} color={colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    value={durMin}
-                    onChangeText={setDurMin}
-                    placeholder="0"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Save button */}
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-              onPress={handleSave}
-              testID="edit-trip-save"
-            >
-              <Feather name="check" size={16} color="#FFF" />
-              <Text style={styles.saveBtnText}>{t("edit.saveChanges")}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      {/* Location pickers — rendered outside the main modal to avoid z-index issues */}
+      <LocationPickerModal
+        visible={pickerFor === "start"}
+        label={t("edit.pinStart")}
+        initialAddress={startAddr || trip.startAddr}
+        initialCoord={pinnedStart ?? undefined}
+        onConfirm={handlePinStart}
+        onClose={() => setPickerFor(null)}
+      />
+      <LocationPickerModal
+        visible={pickerFor === "end"}
+        label={t("edit.pinEnd")}
+        initialAddress={endAddr || trip.endAddr}
+        initialCoord={pinnedEnd ?? undefined}
+        onConfirm={handlePinEnd}
+        onClose={() => setPickerFor(null)}
+      />
+    </>
   );
 }
 
@@ -290,12 +413,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fieldGroup: { marginBottom: 14 },
+  fieldLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
   fieldLabel: {
     fontSize: 11,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 6,
+  },
+  pinnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pinnedBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   typeRow: {
     flexDirection: "row",
@@ -324,6 +466,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   input: { flex: 1, fontSize: 14 },
+  pinBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   addrDot: {
     width: 10,
     height: 10,
