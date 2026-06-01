@@ -13,6 +13,7 @@ import * as ExpoCrypto from "expo-crypto";
 import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secureStorage";
 import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
+import { decimatePath } from "@/utils/decimatePath";
 import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 import {
   showTripNotification,
@@ -1562,8 +1563,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       endLat: last.lat,
       endLon: last.lon,
     } : null);
-    // Store the full breadcrumb trail so the map can render the actual driven path
-    setPendingTripPath(activeTrip.positions.length >= 2 ? activeTrip.positions : null);
+    // Store the decimated breadcrumb trail so the map can render the actual driven path
+    // without jank on long trips (capped at 200 points via Douglas-Peucker)
+    setPendingTripPath(activeTrip.positions.length >= 2 ? decimatePath(activeTrip.positions) : null);
 
     const newTrip: Trip = {
       id: activeTrip.id,
@@ -1574,7 +1576,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dur: durSec,
       type: activeTrip.type,
       waypoints: activeTrip.waypoints && activeTrip.waypoints.length > 0 ? activeTrip.waypoints : undefined,
-      path: activeTrip.positions.length >= 2 ? activeTrip.positions : undefined,
+      path: activeTrip.positions.length >= 2 ? decimatePath(activeTrip.positions) : undefined,
       ...(firstPos ? { startLat: firstPos.lat, startLon: firstPos.lon } : {}),
       ...(last ? { endLat: last.lat, endLon: last.lon } : {}),
     };
