@@ -1,10 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Linking,
   Modal,
   Platform,
@@ -103,6 +104,24 @@ export default function HistoryScreen() {
   // Selection state — declared here so the persist effect below can reference them
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Badge bounce animation — fires on every count change, skips initial render
+  const badgeScale = useRef(new Animated.Value(1)).current;
+  const badgeFirstRender = useRef(true);
+  useEffect(() => {
+    if (badgeFirstRender.current) {
+      badgeFirstRender.current = false;
+      return;
+    }
+    if (selectedIds.size === 0) return;
+    badgeScale.setValue(1.4);
+    Animated.spring(badgeScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 4,
+      tension: 200,
+    }).start();
+  }, [selectedIds.size]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     Promise.all([
@@ -623,9 +642,9 @@ export default function HistoryScreen() {
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
-              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
                 <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </View>
+              </Animated.View>
             )}
           </View>
           <View style={styles.exportBtnWrap}>
@@ -642,9 +661,9 @@ export default function HistoryScreen() {
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>CSV</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
-              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
                 <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </View>
+              </Animated.View>
             )}
           </View>
           <View style={styles.exportBtnWrap}>
@@ -656,9 +675,9 @@ export default function HistoryScreen() {
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>E-Mail</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
-              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
                 <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </View>
+              </Animated.View>
             )}
           </View>
         </View>
