@@ -9,9 +9,12 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native — generated prebuild directories (gitignored)
 ios/
 android/
+# But keep the pre-written native source templates
+!native/
+!native/**
 *.orig.*
 *.jks
 *.p8
