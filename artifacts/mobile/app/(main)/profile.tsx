@@ -228,10 +228,16 @@ function ToggleRow({
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
           <Text style={[styles.listLabel, { color: colors.foreground }]}>{label}</Text>
-          {statusActive && (
+          {statusActive === true && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" }} />
               <Text style={{ fontSize: 11, fontWeight: "600", color: "#22C55E", letterSpacing: 0.2 }}>Aktiv</Text>
+            </View>
+          )}
+          {statusActive === false && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#F97316" }} />
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#F97316", letterSpacing: 0.2 }}>Gestoppt</Text>
             </View>
           )}
         </View>
