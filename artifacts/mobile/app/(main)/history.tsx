@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Linking,
   Platform,
@@ -135,6 +136,10 @@ export default function HistoryScreen() {
 
   const isFiltersActive =
     periodFilter !== "all" || typeFilter !== "all" || !!dateFrom || !!dateTo;
+
+  // Export loading state
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -288,22 +293,34 @@ export default function HistoryScreen() {
 
   const handleExportPDF = async () => {
     if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
+    if (exportingPDF) return;
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    await exportPDF(displayTrips, user, dateFrom, dateTo, language);
+    setExportingPDF(true);
+    try {
+      await exportPDF(displayTrips, user, dateFrom, dateTo, language);
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
   const handleExportCSV = async () => {
     if (SUBSCRIPTION_ENABLED && !isSubscribed) { setShowPaywall(true); return; }
+    if (exportingCSV) return;
     if (Platform.OS !== "web") Haptics.selectionAsync();
     if (selectionMode && selectedIds.size === 0) {
       Alert.alert(t("history.noSelection"), t("history.noSelectionMsg"));
       return;
     }
-    await exportCSV(displayTrips, user, dateFrom, dateTo, language);
+    setExportingCSV(true);
+    try {
+      await exportCSV(displayTrips, user, dateFrom, dateTo, language);
+    } finally {
+      setExportingCSV(false);
+    }
   };
 
   const handleView = (trip: Trip) => {
@@ -484,9 +501,14 @@ export default function HistoryScreen() {
           <View style={styles.exportBtnWrap}>
             <TouchableOpacity
               onPress={handleExportPDF}
-              style={[styles.exportBtn, { borderColor: colors.primary }]}
+              disabled={exportingPDF}
+              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingPDF ? 0.6 : 1 }]}
             >
-              <Feather name="file-text" size={13} color={colors.primary} />
+              {exportingPDF ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+              ) : (
+                <Feather name="file-text" size={13} color={colors.primary} />
+              )}
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
@@ -498,9 +520,14 @@ export default function HistoryScreen() {
           <View style={styles.exportBtnWrap}>
             <TouchableOpacity
               onPress={handleExportCSV}
-              style={[styles.exportBtn, { borderColor: colors.primary }]}
+              disabled={exportingCSV}
+              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingCSV ? 0.6 : 1 }]}
             >
-              <Feather name="grid" size={13} color={colors.primary} />
+              {exportingCSV ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+              ) : (
+                <Feather name="grid" size={13} color={colors.primary} />
+              )}
               <Text style={[styles.exportBtnText, { color: colors.primary }]}>CSV</Text>
             </TouchableOpacity>
             {selectionMode && selectedIds.size > 0 && (
