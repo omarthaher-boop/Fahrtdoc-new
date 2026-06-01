@@ -18,7 +18,12 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Waypoint } from "@/context/AppContext";
-import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
+import {
+  DRIVE_DETECT_TASK,
+  recordDriveDetectStopped,
+  clearDriveDetectStopped,
+  checkAndSendDriveDetectStoppedNotif,
+} from "@/utils/driveDetect";
 import { useCarPlayStarted } from "@/utils/carplayBridge";
 
 const fmtTime = (s: number) => {
@@ -132,6 +137,18 @@ export default function ActiveTripBanner() {
     }, 30_000);
     return () => clearInterval(intervalId);
   }, [activeTrip, refreshDriveTaskStatus]);
+
+  // Track how long drive detection has been stopped and fire a notification
+  // after 2 minutes so the user cannot silently miss missed trips.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!driveTaskRunning) {
+      recordDriveDetectStopped();
+      checkAndSendDriveDetectStoppedNotif(language);
+    } else {
+      clearDriveDetectStopped();
+    }
+  }, [driveTaskRunning, language]);
 
   useEffect(() => {
     if (!activeTrip || paused) {

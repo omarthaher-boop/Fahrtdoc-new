@@ -11,6 +11,11 @@ const DRIVE_STATE_KEY = "fahrtdoc_drive_state";
 const DRIVE_COOLDOWN_KEY = "fahrtdoc_notify_cooldown";
 const DRIVE_WATCHDOG_KEY = "fahrtdoc_watchdog_notif_id";
 
+export const DRIVE_DETECT_STOPPED_AT_KEY = "fahrtdoc_detect_stopped_at";
+const DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY = "fahrtdoc_detect_stopped_notif";
+/** Fire the "still stopped" notification after the task has been down for this long. */
+const STOPPED_NOTIFICATION_THRESHOLD_MS = 2 * 60 * 1000;
+
 const SPEED_DRIVING_MS = 7;
 const SPEED_PARKED_MS = 2.5;
 const COOLDOWN_MS = 5 * 60 * 1000;
@@ -66,6 +71,77 @@ const DRIVE_NOTIF_STRINGS: Record<
     stopBody: "Looks like you've parked — end the trip now?",
   },
 };
+
+const DETECT_STOPPED_STRINGS: Record<string, { title: string; body: string }> = {
+  de: {
+    title: "FahrtDoc – Fahrterkennung pausiert",
+    body: "Die automatische Fahrterkennung ist seit über 2 Minuten gestoppt. Tippe hier, um sie neu zu starten.",
+  },
+  en: {
+    title: "FahrtDoc – Drive detection paused",
+    body: "Automatic drive detection has been stopped for over 2 minutes. Tap here to restart it.",
+  },
+};
+
+/**
+ * Record the moment the drive-detect task was first observed as stopped.
+ * Idempotent — only writes if no existing timestamp is stored.
+ */
+export async function recordDriveDetectStopped(): Promise<void> {
+  try {
+    const existing = await AsyncStorage.getItem(DRIVE_DETECT_STOPPED_AT_KEY);
+    if (!existing) {
+      await AsyncStorage.setItem(DRIVE_DETECT_STOPPED_AT_KEY, String(Date.now()));
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Clear the stopped-at timestamp and the "notification sent" flag.
+ * Call this when the drive-detect task is confirmed running again.
+ */
+export async function clearDriveDetectStopped(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([DRIVE_DETECT_STOPPED_AT_KEY, DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY]);
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * If the drive-detect task has been stopped for ≥ STOPPED_NOTIFICATION_THRESHOLD_MS
+ * and the notification has not yet been sent for this outage, fires a local push
+ * notification and marks it as sent so it won't repeat.
+ */
+export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise<void> {
+  try {
+    const [stoppedAtRaw, sentRaw] = await AsyncStorage.multiGet([
+      DRIVE_DETECT_STOPPED_AT_KEY,
+      DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY,
+    ]);
+    const stoppedAt = stoppedAtRaw[1] ? parseInt(stoppedAtRaw[1], 10) : null;
+    const alreadySent = sentRaw[1] === "true";
+    if (!stoppedAt || alreadySent) return;
+    if (Date.now() - stoppedAt < STOPPED_NOTIFICATION_THRESHOLD_MS) return;
+
+    const strings = DETECT_STOPPED_STRINGS[lang] ?? DETECT_STOPPED_STRINGS["en"];
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: strings.title,
+        body: strings.body,
+        sound: true,
+        data: { driveDetectStopped: true },
+      },
+      trigger: null,
+    });
+    await AsyncStorage.setItem(DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY, "true");
+  } catch {
+    // Non-fatal
+  }
+}
+
 
 const WATCHDOG_STRINGS: Record<string, { title: string; body: string }> = {
   de: {
