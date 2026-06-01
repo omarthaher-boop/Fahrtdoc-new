@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   isBiometricAvailable,
   authenticateWithBiometrics,
@@ -25,7 +25,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 
 import { useApp } from "@/context/AppContext";
@@ -328,6 +328,9 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const trackingSectionRef = useRef<View>(null);
   const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
   const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
@@ -388,6 +391,21 @@ export default function ProfileScreen() {
   const [pwError, setPwError] = useState("");
 
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (scrollTo === "tracking") {
+      const timer = setTimeout(() => {
+        trackingSectionRef.current?.measureLayout(
+          scrollRef.current?.getInnerViewNode?.() as any,
+          (_, y) => {
+            scrollRef.current?.scrollTo({ y: y - 16, animated: true });
+          },
+          () => {}
+        );
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollTo]);
 
   useEffect(() => {
     const load = async () => {
@@ -825,7 +843,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.avatarWrap}>
@@ -898,7 +916,9 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <SectionHeader label={t("section.tracking")} colors={colors} />
+          <View ref={trackingSectionRef} collapsable={false}>
+            <SectionHeader label={t("section.tracking")} colors={colors} />
+          </View>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider statusActive={driveTaskRunning} />
             <ToggleRow icon="map-pin" label={t("row.gpsTracking")} description={t("row.gpsTracking.desc")} value={gpsTracking} onValueChange={handleGpsTracking} colors={colors} showDivider />

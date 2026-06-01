@@ -1,6 +1,6 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -40,6 +40,7 @@ type Period = 1 | 3 | 6 | 12;
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { t } = useLanguage();
   const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync, deleteTrip, editTrip } = useApp();
   const { isSubscribed } = useSubscription();
@@ -185,10 +186,18 @@ export default function HomeScreen() {
               {user?.name?.split(" ")[0] ?? t("home.defaultDriver")}
             </Text>
             {driveTaskRunning && (
-              <View style={styles.driveActivePill}>
+              <TouchableOpacity
+                style={styles.driveActivePill}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
+                  router.push("/(main)/profile?scrollTo=tracking");
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <View style={styles.driveActiveDot} />
                 <Text style={styles.driveActiveText}>Aktiv</Text>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
         </View>
