@@ -80,7 +80,7 @@ function groupByDate(
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { trips, deleteTrip, editTrip, retryWaypointSync, user } = useApp();
+  const { trips, deleteTrip, editTrip, retryWaypointSync, user, syncStatus } = useApp();
   const { t, language } = useLanguage();
 
   const { isSubscribed } = useSubscription();
@@ -429,12 +429,48 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>{t("nav.trips")}</Text>
-        {isFiltersActive && (
-          <TouchableOpacity onPress={resetFilters} style={[styles.resetBtn, { borderColor: colors.destructive }]}>
-            <Feather name="x" size={12} color={colors.destructive} />
-            <Text style={[styles.resetBtnText, { color: colors.destructive }]}>{t("history.resetFilter")}</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerRight}>
+          {isFiltersActive && (
+            <TouchableOpacity onPress={resetFilters} style={[styles.resetBtn, { borderColor: colors.destructive }]}>
+              <Feather name="x" size={12} color={colors.destructive} />
+              <Text style={[styles.resetBtnText, { color: colors.destructive }]}>{t("history.resetFilter")}</Text>
+            </TouchableOpacity>
+          )}
+          <View style={[
+            styles.syncBadge,
+            {
+              backgroundColor:
+                syncStatus === "synced" ? colors.success + "18" :
+                syncStatus === "syncing" ? colors.primary + "18" :
+                colors.secondary,
+              borderColor:
+                syncStatus === "synced" ? colors.success + "40" :
+                syncStatus === "syncing" ? colors.primary + "40" :
+                colors.border,
+            },
+          ]}>
+            <Feather
+              name={syncStatus === "synced" ? "cloud" : syncStatus === "syncing" ? "upload-cloud" : "cloud-off"}
+              size={12}
+              color={
+                syncStatus === "synced" ? colors.success :
+                syncStatus === "syncing" ? colors.primary :
+                colors.mutedForeground
+              }
+            />
+            <Text style={[
+              styles.syncBadgeText,
+              {
+                color:
+                  syncStatus === "synced" ? colors.success :
+                  syncStatus === "syncing" ? colors.primary :
+                  colors.mutedForeground,
+              },
+            ]}>
+              {syncStatus === "synced" ? t("profile.synced") : syncStatus === "syncing" ? t("history.syncing") : t("profile.offline")}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Filter Row 1: period */}
@@ -869,6 +905,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.4,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   resetBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -879,6 +920,19 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   resetBtnText: { fontSize: 12, fontWeight: "600" },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  syncBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
   filterRow1Wrap: { paddingBottom: 8 },
   filterRow2Wrap: { paddingBottom: 10 },
   filterRow: {

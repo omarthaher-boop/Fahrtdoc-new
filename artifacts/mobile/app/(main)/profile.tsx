@@ -337,7 +337,7 @@ export default function ProfileScreen() {
   const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const trackingSectionRef = useRef<View>(null);
-  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, syncStatus, activeTrip, paused, togglePause, setTrackingPref } = useApp();
   const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -881,10 +881,14 @@ export default function ProfileScreen() {
               <Text style={[styles.statusValue, { color: colors.foreground }]}>{user?.plate || "-"}</Text>
             </View>
             <View style={styles.statusCell}>
-              <Feather name="check-circle" size={15} color={isSynced ? colors.success : colors.mutedForeground} />
+              <Feather
+                name={syncStatus === "synced" ? "check-circle" : syncStatus === "syncing" ? "upload-cloud" : "cloud-off"}
+                size={15}
+                color={syncStatus === "synced" ? colors.success : syncStatus === "syncing" ? colors.primary : colors.mutedForeground}
+              />
               <Text style={[styles.statusLabel, { color: colors.mutedForeground }]}>{t("profile.sync")}</Text>
-              <Text style={[styles.statusValue, { color: isSynced ? colors.success : colors.mutedForeground }]}>
-                {isSynced ? t("profile.synced") : t("profile.offline")}
+              <Text style={[styles.statusValue, { color: syncStatus === "synced" ? colors.success : syncStatus === "syncing" ? colors.primary : colors.mutedForeground }]}>
+                {syncStatus === "synced" ? t("profile.synced") : syncStatus === "syncing" ? t("history.syncing") : t("profile.offline")}
               </Text>
             </View>
           </View>

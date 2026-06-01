@@ -107,7 +107,7 @@ interface SessionRecord {
 interface AppContextType {
   user: UserProfile | null;
   loading: boolean;
-  isSynced: boolean;
+  syncStatus: "synced" | "syncing" | "offline";
   logout: () => Promise<void>;
   login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
@@ -437,6 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const tripsRef = useRef<Trip[]>([]);
   const activeTripRef = useRef<ActiveTrip | null>(null);
   const [syncRetryingIds, setSyncRetryingIds] = useState<ReadonlySet<string>>(new Set());
+  const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline">("offline");
   const lastRetryMsRef = useRef<number>(0);
   const retryBackoffMsRef = useRef<number>(30_000);
 
@@ -495,6 +496,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             serverTokenRef.current = result.serverToken;
             const serverApiTrips = await fetchServerTrips(result.serverToken);
             if (serverApiTrips !== null) {
+              setSyncStatus("synced");
               const { merged, localOnly, waypointPatch } = mergeTrips(result.trips, serverApiTrips);
               finalTrips = merged;
               if (localOnly.length > 0) {
@@ -610,6 +612,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTrips([]);
     setServerToken(null);
     serverTokenRef.current = null;
+    setSyncStatus("offline");
     const removals: Promise<void>[] = [
       AsyncStorage.removeItem("session"),
       AsyncStorage.removeItem(BG_POSITIONS_KEY),
@@ -664,6 +667,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTrips([]);
     setServerToken(null);
     serverTokenRef.current = null;
+    setSyncStatus("offline");
 
     const removals: Promise<void>[] = [
       AsyncStorage.removeItem("session"),
@@ -773,6 +777,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     serverTokenRef.current = token;
     const serverApiTrips = await fetchServerTrips(token);
     if (serverApiTrips !== null) {
+      setSyncStatus("synced");
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, serverApiTrips);
       let result = merged;
       if (localOnly.length > 0) {
@@ -840,6 +845,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } else {
           finalTrips = [];
         }
+        setSyncStatus("synced");
 
         const profile: UserProfile = { name: serverResult.name, email: key, plate: serverResult.plate };
         setUserState(profile);
@@ -899,6 +905,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await secureSetItem(key, serverTokenKey(key), token);
       setServerToken(token);
       serverTokenRef.current = token;
+      setSyncStatus("synced");
       const { merged, localOnly, waypointPatch } = mergeTrips(localTrips, await fetchServerTrips(token) || []);
       if (localOnly.length > 0) {
         await serverBatchUpsertTrips(token, localOnly.map(tripToApiPayload));
@@ -938,6 +945,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       serverTokenRef.current = result.serverToken;
       const serverApiTrips = await fetchServerTrips(result.serverToken);
       if (serverApiTrips !== null) {
+        setSyncStatus("synced");
         const { merged, localOnly } = mergeTrips(result.trips, serverApiTrips);
         finalTrips = merged;
         if (localOnly.length > 0) {
@@ -976,6 +984,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await secureSetItem(key, serverTokenKey(key), loginResult.token);
         setServerToken(loginResult.token);
         serverTokenRef.current = loginResult.token;
+        setSyncStatus("synced");
       }
     }
 
@@ -1109,7 +1118,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     if (token && trackingPrefsRef.current.offlineStorage) {
+      setSyncStatus("syncing");
       serverCreateTrip(token, tripToApiPayload(t)).then((ok) => {
+        setSyncStatus(ok ? "synced" : "offline");
         if (ok && hasWaypoints) {
           // Server confirmed the full trip including waypoints — clear pending flag
           setTrips((prev) => {
@@ -1153,12 +1164,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token && trackingPrefsRef.current.offlineStorage) {
+      setSyncStatus("syncing");
       serverDeleteTrip(token, id).then((ok) => {
-        if (!ok) {
-          // Local state is updated; if the server soft-delete failed, the trip
-          // remains active on the server. Server state will win on the next
-          // merge, so the trip may reappear after re-login on another device.
-        }
+        setSyncStatus(ok ? "synced" : "offline");
       });
     }
   }, [persistTripsLocal]);
@@ -1207,11 +1215,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     const token = serverTokenRef.current;
     if (token && trackingPrefsRef.current.offlineStorage) {
+      setSyncStatus("syncing");
       serverUpdateTrip(token, id, serverChanges).then((ok) => {
-        if (!ok) {
-          // Local state is updated; if the server update failed, the server
-          // retains the old version which will win on the next merge/re-login.
-        }
+        setSyncStatus(ok ? "synced" : "offline");
       });
     }
   }, [persistTripsLocal]);
@@ -1535,7 +1541,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         loading,
-        isSynced: serverToken !== null,
+        syncStatus,
         logout,
         deleteAccount,
         biometricLogin,
