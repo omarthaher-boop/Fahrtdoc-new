@@ -100,10 +100,6 @@ project.save
 RUBY
 
   ok "Xcode project updated."
-  echo
-  echo "  ⚠️  IMPORTANT: Add the CarPlay UISceneManifest to app.json → ios.infoPlist"
-  echo "     AFTER the Apple CarPlay entitlement is approved (see docs/carplay-native-setup.md)."
-  echo "     Also re-add ios.entitlements.com.apple.developer.carplay-driving-task = true."
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

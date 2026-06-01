@@ -40,19 +40,12 @@ Apply at: https://developer.apple.com/contact/carplay/
 - Category: **Driving Task App**
 - Approval typically takes 2–4 weeks.
 
-> ⚠️  The entitlement key was **temporarily removed** from `app.json` for the
-> App Store v1.x submission while awaiting Apple approval.
-> After approval, re-add it under `ios.entitlements`:
-> ```json
-> "entitlements": {
->   "com.apple.developer.carplay-driving-task": true
-> }
-> ```
+> ✅  The entitlement key is now **active** in `app.json` under `ios.entitlements`.
+> Apple has approved the CarPlay Driving Task entitlement for this App ID.
 
 ### Step 2: Add UIApplicationSceneManifest to app.json
 
-Add the following to `ios.infoPlist` in `app.json` **after Step 1 is approved**,
-then re-run `expo prebuild`:
+The following is already added to `ios.infoPlist` in `app.json`:
 
 ```json
 "UIApplicationSceneManifest": {
