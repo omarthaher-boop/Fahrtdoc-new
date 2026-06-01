@@ -337,7 +337,7 @@ export default function ProfileScreen() {
   const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const trackingSectionRef = useRef<View>(null);
-  const { user, logout, deleteAccount, updateProfile, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, isSynced, activeTrip, paused, togglePause, setTrackingPref } = useApp();
   const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -397,6 +397,8 @@ export default function ProfileScreen() {
   const [pwError, setPwError] = useState("");
 
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null);
+
+  const [signatureBlock, setSignatureBlockState] = useState(user?.signatureBlock ?? false);
 
   useEffect(() => {
     if (scrollTo === "tracking") {
@@ -462,6 +464,7 @@ export default function ProfileScreen() {
       setEditVehicleModel(user.vehicleModel ?? "");
       setEditVehicleYear(user.vehicleYear ?? "");
       setEditVehicleColor(user.vehicleColor ?? "");
+      setSignatureBlockState(user.signatureBlock ?? false);
     }
   }, [user]);
 
@@ -792,6 +795,12 @@ export default function ProfileScreen() {
     }
   }, [logout, router, t]);
 
+  const handleSignatureBlock = useCallback((v: boolean) => {
+    haptic();
+    setSignatureBlockState(v);
+    updateCompanyInfo(user?.companyName ?? "", user?.logoUri ?? "", v).catch(() => {});
+  }, [updateCompanyInfo, user]);
+
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
       t("deleteAccount.title"),
@@ -980,6 +989,18 @@ export default function ProfileScreen() {
               />
             )}
             <ListRow icon="shield" label={t("row.privacy")} onPress={() => setPrivacyModalVisible(true)} colors={colors} />
+          </View>
+
+          <SectionHeader label={t("section.export")} colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ToggleRow
+              icon="edit-3"
+              label={t("row.signatureBlock")}
+              description={t("row.signatureBlock.desc")}
+              value={signatureBlock}
+              onValueChange={handleSignatureBlock}
+              colors={colors}
+            />
           </View>
 
           <SectionHeader label={t("section.support")} colors={colors} />

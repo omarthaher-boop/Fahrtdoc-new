@@ -214,13 +214,36 @@ async function getAppLogoBase64(): Promise<string | null> {
   }
 }
 
+function buildSignatureBlockHTML(lang: Language): string {
+  const confirmText = lang === "de"
+    ? "Ich bestätige die Richtigkeit der vorstehenden Angaben."
+    : "I confirm the accuracy of the above records.";
+  const placeDate = lang === "de" ? "Ort, Datum" : "Place, Date";
+  const signature = lang === "de" ? "Unterschrift" : "Signature";
+  return `
+  <div class="sig-block">
+    <p class="sig-confirm">${confirmText}</p>
+    <div class="sig-fields">
+      <div class="sig-field">
+        <div class="sig-line"></div>
+        <div class="sig-label">${placeDate}</div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-line"></div>
+        <div class="sig-label">${signature}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function buildHTML(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
   dateTo: string,
   typeLabel?: string,
-  appLogoBase64?: string | null
+  appLogoBase64?: string | null,
+  lang: Language = "de"
 ): string {
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
   const totalDur = trips.reduce((a, t) => a + t.dur, 0);
@@ -334,6 +357,22 @@ function buildHTML(
       display: flex; justify-content: space-between;
       border-top: 1px solid #e0e4f0; padding-top: 12px;
     }
+    .sig-block {
+      margin-top: 28px; border-top: 1px solid #d0d5e8; padding-top: 16px;
+    }
+    .sig-confirm {
+      font-size: 9pt; color: #555; font-style: italic; margin-bottom: 18px;
+    }
+    .sig-fields {
+      display: flex; gap: 48px;
+    }
+    .sig-field { flex: 1; }
+    .sig-line {
+      border-bottom: 1.5px solid #333; height: 36px; margin-bottom: 5px;
+    }
+    .sig-label {
+      font-size: 8pt; color: #888; letter-spacing: 0.3px;
+    }
     .stats-section {
       display: flex; gap: 0; margin-bottom: 16px;
       border: 1px solid #e0e4f0; border-radius: 8px; overflow: hidden;
@@ -408,6 +447,7 @@ function buildHTML(
       </tr>
     </tfoot>
   </table>
+  ${user?.signatureBlock ? buildSignatureBlockHTML(lang) : ""}
   <div class="footer">
     <span>${headerLabel} · ${subLabel}-Export</span>
     <span>Erstellt am ${exportedAt}</span>
@@ -416,13 +456,59 @@ function buildHTML(
 </html>`;
 }
 
+function drawSignatureBlock(
+  doc: jsPDF,
+  y: number,
+  margin: number,
+  contentW: number,
+  pageH: number,
+  bottomMargin: number,
+  lang: Language
+): number {
+  const sigH = 32;
+  if (y + sigH > pageH - bottomMargin) {
+    doc.addPage();
+    y = 20;
+  }
+  y += 4;
+  doc.setDrawColor(200, 210, 230);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, margin + contentW, y);
+  y += 6;
+
+  const confirmText = lang === "de"
+    ? "Ich bestätige die Richtigkeit der vorstehenden Angaben."
+    : "I confirm the accuracy of the above records.";
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(100, 100, 100);
+  doc.text(confirmText, margin, y);
+  y += 10;
+
+  const halfSigW = (contentW - 16) / 2;
+  doc.setDrawColor(50, 50, 50);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, margin + halfSigW, y);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(136, 136, 136);
+  doc.text(lang === "de" ? "Ort, Datum" : "Place, Date", margin, y + 4);
+
+  const sigX = margin + halfSigW + 16;
+  doc.line(sigX, y, sigX + halfSigW, y);
+  doc.text(lang === "de" ? "Unterschrift" : "Signature", sigX, y + 4);
+  y += 8;
+  return y;
+}
+
 async function exportPDFWeb(
   trips: Trip[],
   user: UserProfile | null,
   dateFrom: string,
   dateTo: string,
   filename = "Fahrtenbuch.pdf",
-  typeLabel?: string
+  typeLabel?: string,
+  lang: Language = "de"
 ): Promise<void> {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -742,6 +828,11 @@ async function exportPDFWeb(
   doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
   y += totalsH + 10;
 
+  if (user?.signatureBlock) {
+    y = drawSignatureBlock(doc, y, margin, contentW, pageH, bottomMargin, lang);
+    y += 4;
+  }
+
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray);
@@ -757,7 +848,8 @@ async function exportPDFNative(
   dateFrom: string,
   dateTo: string,
   dialogTitle = "Fahrtenbuch exportieren",
-  typeLabel?: string
+  typeLabel?: string,
+  lang: Language = "de"
 ): Promise<void> {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -1036,6 +1128,11 @@ async function exportPDFNative(
   doc.text(fmtDur(totalDur), totX + colWidths[6] - 4, y + 6, { align: "right" });
   y += totalsH + 10;
 
+  if (user?.signatureBlock) {
+    y = drawSignatureBlock(doc, y, margin, contentW, pageH, bottomMargin, lang);
+    y += 4;
+  }
+
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray);
@@ -1081,10 +1178,10 @@ export async function exportPDF(
     return;
   }
   if (Platform.OS === "web") {
-    await exportPDFWeb(trips, user, dateFrom, dateTo);
+    await exportPDFWeb(trips, user, dateFrom, dateTo, "Fahrtenbuch.pdf", undefined, lang);
   } else {
     try {
-      await exportPDFNative(trips, user, dateFrom, dateTo);
+      await exportPDFNative(trips, user, dateFrom, dateTo, "Fahrtenbuch exportieren", undefined, lang);
     } catch (err) {
       showExportError(err, lang, () => exportPDF(trips, user, dateFrom, dateTo, lang));
     }
@@ -1119,7 +1216,8 @@ export async function exportSplitPDF(
         dateFrom,
         dateTo,
         "Fahrtenbuch_Geschaeftlich.pdf",
-        "Geschäftliche Fahrten"
+        "Geschäftliche Fahrten",
+        lang
       );
     }
     if (privateTrips.length > 0) {
@@ -1129,7 +1227,8 @@ export async function exportSplitPDF(
         dateFrom,
         dateTo,
         "Fahrtenbuch_Privat.pdf",
-        "Private Fahrten"
+        "Private Fahrten",
+        lang
       );
     }
   } else {
@@ -1141,7 +1240,8 @@ export async function exportSplitPDF(
           dateFrom,
           dateTo,
           "Geschäftliche Fahrten exportieren",
-          "Geschäftliche Fahrten"
+          "Geschäftliche Fahrten",
+          lang
         );
       }
       if (privateTrips.length > 0) {
@@ -1151,7 +1251,8 @@ export async function exportSplitPDF(
           dateFrom,
           dateTo,
           "Private Fahrten exportieren",
-          "Private Fahrten"
+          "Private Fahrten",
+          lang
         );
       }
     } catch (err) {

@@ -82,6 +82,7 @@ export interface UserProfile {
   vehicleModel?: string;
   vehicleYear?: string;
   vehicleColor?: string;
+  signatureBlock?: boolean;
 }
 
 interface StoredAccount {
@@ -94,6 +95,7 @@ interface StoredAccount {
   vehicleModel?: string;
   vehicleYear?: string;
   vehicleColor?: string;
+  signatureBlock?: boolean;
 }
 
 interface SessionRecord {
@@ -110,7 +112,7 @@ interface AppContextType {
   login: (email: string, password: string) => Promise<"ok" | "not_found" | "wrong_password" | "server_unavailable">;
   register: (name: string, email: string, plate: string, password: string) => Promise<"ok" | "exists">;
   updateProfile: (name: string, plate: string) => Promise<void>;
-  updateCompanyInfo: (companyName: string, logoUri: string) => Promise<void>;
+  updateCompanyInfo: (companyName: string, logoUri: string, signatureBlock?: boolean) => Promise<void>;
   updateVehicleData: (brand: string, model: string, year: string, color: string) => Promise<void>;
   updatePassword: (email: string, newPassword: string) => Promise<void>;
   requestPasswordChangeCode: () => Promise<{ success: boolean; error?: string }>;
@@ -294,7 +296,7 @@ async function verifyAndRestoreSession(): Promise<{ profile: UserProfile; trips:
     await AsyncStorage.removeItem("session");
     return null;
   }
-  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor };
+  const profile: UserProfile = { name: account.name, email: session.email, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor, signatureBlock: account.signatureBlock };
   const raw2 = await secureGetItem(session.email, tripsKey(session.email));
   let trips: Trip[] = [];
   if (raw2) {
@@ -850,7 +852,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const hash = await sha256Hex(password);
     if (hash !== account.passwordHash) return "wrong_password";
     await storeSession(key, account.passwordHash);
-    const profile: UserProfile = { name: account.name, email: key, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor };
+    const profile: UserProfile = { name: account.name, email: key, plate: account.plate, companyName: account.companyName, logoUri: account.logoUri, vehicleBrand: account.vehicleBrand, vehicleModel: account.vehicleModel, vehicleYear: account.vehicleYear, vehicleColor: account.vehicleColor, signatureBlock: account.signatureBlock };
     setUserState(profile);
 
     const raw = await secureGetItem(key, tripsKey(key));
@@ -993,17 +995,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState((u) => u ? { ...u, name, plate } : u);
   }, [user]);
 
-  const updateCompanyInfo = useCallback(async (companyName: string, logoUri: string) => {
+  const updateCompanyInfo = useCallback(async (companyName: string, logoUri: string, signatureBlock?: boolean) => {
     if (!user) return;
     const accounts = await loadAccounts();
     if (!accounts[user.email]) {
-      accounts[user.email] = { name: user.name ?? "", plate: user.plate ?? "", passwordHash: "", companyName, logoUri };
+      accounts[user.email] = { name: user.name ?? "", plate: user.plate ?? "", passwordHash: "", companyName, logoUri, signatureBlock };
     } else {
       accounts[user.email].companyName = companyName;
       accounts[user.email].logoUri = logoUri;
+      if (signatureBlock !== undefined) accounts[user.email].signatureBlock = signatureBlock;
     }
     await saveAccounts(accounts);
-    setUserState((u) => u ? { ...u, companyName, logoUri } : u);
+    setUserState((u) => u ? { ...u, companyName, logoUri, ...(signatureBlock !== undefined ? { signatureBlock } : {}) } : u);
   }, [user]);
 
   const updateVehicleData = useCallback(async (brand: string, model: string, year: string, color: string) => {
