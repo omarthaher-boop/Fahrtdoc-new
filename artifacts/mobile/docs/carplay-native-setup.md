@@ -87,25 +87,31 @@ The script:
 
 | State | Description |
 |-------|-------------|
-| **Idle** | Two buttons: "Geschäftlich" / "Privat" |
+| **Idle** | Two buttons: "Geschäftl. starten" / "Privat starten". Status row: "Bereit zur Fahrt" |
 | **Confirming** | `CPInformationTemplate` showing trip type and resolved start address ("Adresse wird ermittelt…" until GPS resolves). Buttons: "Bestätigen" / "Abbrechen" |
-| **Active** | Live elapsed time and distance. Buttons: "Pause" (or "Fortsetzen") / "Stopp" |
+| **Active** | Live Art, Dauer, Distanz, Status rows. Buttons: "Pausieren" (or "Fortsetzen") / "Fahrt beenden" |
 
 ### How the data flows
 
 ```
-Idle → user taps "Geschäftlich" or "Privat"
-  → CarPlaySceneDelegate transitions to confirming state
+Idle → user taps "Geschäftl. starten" or "Privat starten"
+  → CarPlaySceneDelegate transitions to confirming (shows "Adresse wird ermittelt…")
   → FahrtDocCarPlayModule.dispatchToJS({ type: "selectTripType", tripType })
   → useCarPlay: resolves current GPS position → reverseGeocode()
   → updateCarPlayTripState({ startAddress: "Musterstr. 4, Berlin" })
-  → CarPlaySceneDelegate.applyTripState() refreshes confirming template
+  → CarPlaySceneDelegate.applyTripState() refreshes confirming template with address
 
 User taps "Bestätigen"
   → FahrtDocCarPlayModule.dispatchToJS({ type: "startTrip", tripType })
   → useCarPlay handler → AppContext.startTrip()
   → AppContext emits updated state (isActive: true)
   → updateCarPlayTripState() → CarPlaySceneDelegate transitions to active
+
+User taps "Abbrechen"
+  → CarPlaySceneDelegate resets to idle locally
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "cancelTripType" })
+  → useCarPlay handler → cleans up geocode state
+  → updateCarPlayTripState() → confirming state already cleared
 
 AppContext (JS) — live trip updates
   → useCarPlay hook
@@ -115,7 +121,7 @@ AppContext (JS) — live trip updates
   → CarPlaySceneDelegate.applyTripState()
   → CPInformationTemplate re-rendered in car display
 
-User taps "Stopp" or "Pause"
+User taps "Fahrt beenden" or "Stopp"
   → CarPlaySceneDelegate → FahrtDocCarPlayModule.dispatchToJS()
   → RCTEventEmitter.sendEvent("FahrtDocCarPlayAction")
   → NativeEventEmitter listener in carplayBridge.ts
@@ -167,33 +173,52 @@ Install the resulting `.ipa` on a physical iPhone or on the iOS Simulator.
 - ✅ Two buttons are visible: **"Geschäftl. starten"** and **"Privat starten"**
 - ✅ Status row reads **"Bereit zur Fahrt"**
 
-**Step 5 — Test "Geschäftl. starten"**
+**Step 5 — Test the confirmation screen ("Geschäftl. starten")**
 
 1. Tap **"Geschäftl. starten"** in the CarPlay window.
+2. ✅ CarPlay immediately shows the confirming template:
+   - Art row: **"Geschäftlich"**
+   - Startadresse row: **"Adresse wird ermittelt…"** (placeholder while GPS resolves)
+   - Buttons: **"Bestätigen"** / **"Abbrechen"**
+3. ✅ After a few seconds the Startadresse row updates to the resolved address (e.g. "Musterstr. 4, 10115 Berlin").
+
+**Step 6 — Test "Bestätigen"**
+
+1. Once the address has resolved, tap **"Bestätigen"**.
 2. ✅ The phone app transitions to the active trip screen (ActiveTripBanner visible).
-3. ✅ CarPlay window re-renders with: Art = Geschäftlich, Status = ● Läuft, live Dauer + Distanz.
-4. ✅ Save sheet does NOT appear yet.
+3. ✅ CarPlay re-renders with: Art, Dauer, Distanz, and Status = "● Läuft".
+4. ✅ Dauer counter increments every second.
+5. ✅ Save sheet does NOT appear yet.
 
-**Step 6 — Test "Privat starten"** (end the business trip first, then repeat)
+**Step 7 — Test "Abbrechen"**
 
-1. Stop the trip from the phone screen.
-2. Tap **"Privat starten"** in the CarPlay window.
-3. ✅ Phone app starts a new private trip.
-4. ✅ CarPlay template shows Art = Privat.
+1. Return to idle first (stop any active trip from the phone screen).
+2. Tap **"Geschäftl. starten"** → confirming screen appears.
+3. Tap **"Abbrechen"**.
+4. ✅ CarPlay returns to idle ("Bereit zur Fahrt", two start buttons).
+5. ✅ No trip was started on the phone.
 
-**Step 7 — Test "Pausieren" / "Fortsetzen"**
+**Step 8 — Test "Privat starten"**
+
+1. From idle, tap **"Privat starten"**.
+2. ✅ Confirming template shows Art = **"Privat"** and Startadresse.
+3. Tap **"Bestätigen"**.
+4. ✅ Phone app starts a new private trip.
+5. ✅ CarPlay active template shows Art = **"Privat"**.
+
+**Step 9 — Test "Pausieren" / "Fortsetzen"**
 
 1. While a trip is active, tap **"Pausieren"** in the CarPlay window.
-2. ✅ CarPlay template updates: Status = ⏸ Pausiert, button title changes to **"Fortsetzen"**.
+2. ✅ CarPlay template updates: Status = "⏸ Pausiert", button title changes to **"Fortsetzen"**.
 3. ✅ Phone app ActiveTripBanner shows paused state.
 4. Tap **"Fortsetzen"** in the CarPlay window.
-5. ✅ Status returns to ● Läuft on both screens.
+5. ✅ Status returns to "● Läuft" on both screens.
 
-**Step 8 — Test "Fahrt beenden"**
+**Step 10 — Test "Fahrt beenden"**
 
 1. While a trip is active, tap **"Fahrt beenden"** in the CarPlay window.
 2. ✅ Phone app shows the save-trip sheet (SaveTripSheet).
-3. ✅ CarPlay window returns to the idle state (two start buttons).
+3. ✅ CarPlay window returns to the idle state (two start buttons, "Bereit zur Fahrt").
 4. ✅ Completing the save sheet on the phone dismisses it normally.
 
 ---
@@ -228,15 +253,15 @@ The script automatically:
 
 | State | Description |
 |-------|-------------|
-| **IDLE** | Two action buttons: "Geschäftlich" / "Privat" |
+| **IDLE** | Two action buttons: "Geschäftl. starten" / "Privat starten". Message: "Bereit zur Fahrt" |
 | **CONFIRMING** | `PaneTemplate` with trip type + start address rows. Actions: "Bestätigen" / "Abbrechen" |
-| **ACTIVE** | Live elapsed time, distance, status rows. Actions: "Pause" / "Stopp" |
+| **ACTIVE** | Live elapsed time, distance, status rows. Actions: "Pausieren" / "Fahrt beenden" |
 
 ### How the data flows
 
 ```
-Idle → user taps "Geschäftlich" or "Privat"
-  → FahrtDocCarScreen transitions to CONFIRMING
+Idle → user taps "Geschäftl. starten" or "Privat starten"
+  → FahrtDocCarScreen transitions to CONFIRMING (shows "Adresse wird ermittelt…")
   → FahrtDocCarPlayModule.dispatchToJS({ type: "selectTripType", tripType })
   → useCarPlay: resolves GPS → reverseGeocode()
   → updateCarPlayTripState({ startAddress: "..." })
@@ -249,6 +274,11 @@ User taps "Bestätigen"
   → AppContext state: isActive: true
   → updateCarPlayTripState() → FahrtDocCarScreen transitions to ACTIVE
 
+User taps "Abbrechen"
+  → FahrtDocCarScreen resets to IDLE locally
+  → FahrtDocCarPlayModule.dispatchToJS({ type: "cancelTripType" })
+  → useCarPlay handler → cleans up geocode state
+
 Live trip updates
   → useCarPlay hook
   → updateCarPlayTripState()                         [carplayBridge.ts]
@@ -257,7 +287,7 @@ Live trip updates
   → FahrtDocCarScreen.applyTripState()
   → Screen.invalidate() → onGetTemplate() re-renders
 
-User taps "Stopp" or "Pause"
+User taps "Fahrt beenden" or "Pausieren"
   → FahrtDocCarScreen → FahrtDocCarPlayModule.dispatchToJS()
   → DeviceEventManagerModule.emit("FahrtDocCarPlayAction")
   → NativeEventEmitter listener in carplayBridge.ts
@@ -293,13 +323,13 @@ See the "Kein Config-Plugin für CarPlay möglich" entry in `replit.md` for full
 artifacts/mobile/
 ├── native/
 │   ├── ios/
-│   │   ├── CarPlaySceneDelegate.swift      ← main CarPlay UI
+│   │   ├── CarPlaySceneDelegate.swift      ← main CarPlay UI (three-state)
 │   │   ├── FahrtDocCarPlayModule.swift     ← RN NativeModule (Swift)
 │   │   └── FahrtDocCarPlayModule.m         ← ObjC bridge header
 │   └── android/
 │       ├── FahrtDocCarAppService.kt        ← CarAppService entry point
 │       ├── FahrtDocCarSession.kt           ← Android Auto session
-│       ├── FahrtDocCarScreen.kt            ← Android Auto screen / template
+│       ├── FahrtDocCarScreen.kt            ← Android Auto screen / template (three-state)
 │       ├── FahrtDocCarPlayModule.kt        ← RN NativeModule (Kotlin)
 │       ├── FahrtDocCarPlayPackage.kt       ← ReactPackage registration
 │       └── automotive_app_desc.xml        ← capability descriptor

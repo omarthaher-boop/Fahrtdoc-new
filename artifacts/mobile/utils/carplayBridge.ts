@@ -47,7 +47,8 @@ export type CarPlayAction =
   | { type: "startTrip"; tripType: "business" | "private" }
   | { type: "stopTrip" }
   | { type: "pauseTrip" }
-  | { type: "selectTripType"; tripType: "business" | "private" };
+  | { type: "selectTripType"; tripType: "business" | "private" }
+  | { type: "cancelTripType" };
 
 // ---------------------------------------------------------------------------
 // Trip state — JS → native CarPlay / Android Auto UI

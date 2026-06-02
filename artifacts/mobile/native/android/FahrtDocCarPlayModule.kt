@@ -63,7 +63,14 @@ class FahrtDocCarPlayModule(
 
     /**
      * Called from JS: updateTripState(state)
-     * state = { isActive, isPaused, tripType?, elapsedSeconds?, distanceKm? }
+     *
+     * state shape (all fields optional except isActive/isPaused):
+     *   isActive: Boolean
+     *   isPaused: Boolean
+     *   tripType?: "business" | "private"
+     *   elapsedSeconds?: Int
+     *   distanceKm?: Double
+     *   startAddress?: String   ← resolved address for the confirming screen
      */
     @ReactMethod
     fun updateTripState(state: ReadableMap) {
@@ -72,7 +79,8 @@ class FahrtDocCarPlayModule(
         val type = if (state.hasKey("tripType") && !state.isNull("tripType")) state.getString("tripType") else null
         val elapsed = if (state.hasKey("elapsedSeconds")) state.getInt("elapsedSeconds") else 0
         val distance = if (state.hasKey("distanceKm")) state.getDouble("distanceKm") else 0.0
-        screen?.applyTripState(active, paused, type, elapsed, distance)
+        val address = if (state.hasKey("startAddress") && !state.isNull("startAddress")) state.getString("startAddress") else null
+        screen?.applyTripState(active, paused, type, elapsed, distance, address)
     }
 
     @ReactMethod

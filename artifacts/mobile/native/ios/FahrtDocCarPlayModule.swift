@@ -38,12 +38,24 @@ class FahrtDocCarPlayModule: RCTEventEmitter {
 
     // MARK: - JS → Native
 
+    /**
+     * Called from JS: NativeModules.FahrtDocCarPlay.updateTripState(state)
+     *
+     * state shape (all fields optional except isActive/isPaused):
+     *   isActive: Bool
+     *   isPaused: Bool
+     *   tripType?: "business" | "private"
+     *   elapsedSeconds?: Int
+     *   distanceKm?: Double
+     *   startAddress?: String   ← resolved address for the confirming screen
+     */
     @objc func updateTripState(_ state: NSDictionary) {
         let isActive = state["isActive"] as? Bool ?? false
         let isPaused = state["isPaused"] as? Bool ?? false
         let tripType = state["tripType"] as? String
         let elapsedSeconds = state["elapsedSeconds"] as? Int ?? 0
         let distanceKm = state["distanceKm"] as? Double ?? 0.0
+        let startAddress = state["startAddress"] as? String
 
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.applyTripState(
@@ -51,7 +63,8 @@ class FahrtDocCarPlayModule: RCTEventEmitter {
                 isPaused: isPaused,
                 tripType: tripType,
                 elapsedSeconds: elapsedSeconds,
-                distanceKm: distanceKm
+                distanceKm: distanceKm,
+                startAddress: startAddress
             )
         }
     }
