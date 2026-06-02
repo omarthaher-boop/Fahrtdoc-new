@@ -72,7 +72,9 @@ function ClassicMainTabs() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const tracking = useDriveTaskRunning();
+  const driveTaskRunning = useDriveTaskRunning();
+  const { activeTrip } = useApp();
+  const tracking = driveTaskRunning || !!activeTrip;
 
   return (
     <Tabs
@@ -153,9 +155,7 @@ function ClassicMainTabs() {
       <Tabs.Screen
         name="tracking"
         options={{
-          title: "",
-          tabBarButton: () => null,
-          tabBarStyle: { display: "none" },
+          href: null,
         }}
       />
     </Tabs>
