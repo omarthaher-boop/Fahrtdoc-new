@@ -124,8 +124,11 @@ export default function TrackingScreen() {
     return () => loop.stop();
   }, [activeTrip, paused, pulseAnim]);
 
+  const hasHadActiveTrip = useRef(!!activeTrip);
   useEffect(() => {
-    if (!activeTrip) {
+    if (activeTrip) {
+      hasHadActiveTrip.current = true;
+    } else if (hasHadActiveTrip.current) {
       router.replace("/home");
     }
   }, [activeTrip]);

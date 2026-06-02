@@ -46,6 +46,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const { user, trips, activeTrip, startTrip, gpsStatus, retryWaypointSync, deleteTrip, editTrip } = useApp();
+  const prevActiveTripRef = useRef(activeTrip);
   const { isSubscribed } = useSubscription();
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
@@ -62,6 +63,13 @@ export default function HomeScreen() {
   const pillBg = useRef(new Animated.Value(0)).current;
   const [trackingElapsed, setTrackingElapsed] = useState(0);
   const trackingStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!prevActiveTripRef.current && activeTrip) {
+      router.replace("/tracking");
+    }
+    prevActiveTripRef.current = activeTrip;
+  }, [activeTrip, router]);
 
   const pillBgColor = pillBg.interpolate({
     inputRange: [0, 1],
@@ -257,7 +265,6 @@ export default function HomeScreen() {
     await startTrip(pendingType, modalStartAddr || undefined);
     setStarting(false);
     setPendingType(null);
-    router.replace("/tracking");
   };
 
 
