@@ -155,8 +155,8 @@ export default function HistoryScreen() {
             const saved = JSON.parse(filterRaw);
             if (saved.periodFilter !== undefined) setPeriodFilter(saved.periodFilter);
             if (saved.typeFilter !== undefined) setTypeFilter(saved.typeFilter);
-            if (saved.dateFrom !== undefined) setDateFrom(saved.dateFrom);
-            if (saved.dateTo !== undefined) setDateTo(saved.dateTo);
+            if (typeof saved.dateFrom === "string") setDateFrom(saved.dateFrom);
+            if (typeof saved.dateTo === "string") setDateTo(saved.dateTo);
             if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
             if (saved.selectedMonth !== undefined) setSelectedMonth(saved.selectedMonth);
           } catch {}
@@ -262,14 +262,14 @@ export default function HistoryScreen() {
       const d = new Date(t.date);
       if (d < cutoff) return false;
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
-      if (dateFrom) {
+      if (typeof dateFrom === "string" && dateFrom.includes(".")) {
         const [dd, mm, yyyy] = dateFrom.split(".").map(Number);
         if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
           const from = new Date(yyyy, mm - 1, dd);
           if (d < from) return false;
         }
       }
-      if (dateTo) {
+      if (typeof dateTo === "string" && dateTo.includes(".")) {
         const [dd, mm, yyyy] = dateTo.split(".").map(Number);
         if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
           const to = new Date(yyyy, mm - 1, dd + 1);
@@ -476,13 +476,13 @@ export default function HistoryScreen() {
     // Re-apply date range from modal inputs over the currently displayed trips
     const toExport = displayTrips.filter((trip) => {
       const d = new Date(trip.date);
-      if (exportModalDateFrom) {
+      if (typeof exportModalDateFrom === "string" && exportModalDateFrom.includes(".")) {
         const [dd, mm, yyyy] = exportModalDateFrom.split(".").map(Number);
         if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
           if (d < new Date(yyyy, mm - 1, dd)) return false;
         }
       }
-      if (exportModalDateTo) {
+      if (typeof exportModalDateTo === "string" && exportModalDateTo.includes(".")) {
         const [dd, mm, yyyy] = exportModalDateTo.split(".").map(Number);
         if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
           if (d >= new Date(yyyy, mm - 1, dd + 1)) return false;
