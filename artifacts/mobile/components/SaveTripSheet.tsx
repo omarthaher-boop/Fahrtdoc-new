@@ -243,6 +243,7 @@ export default function SaveTripSheet() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 8 }}
             >
               {/* Header */}
@@ -668,15 +669,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   sheetWrapper: {
-    flex: 1,
+    maxHeight: "92%",
     justifyContent: "flex-end",
   },
   sheet: {
+    flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 12,
-    maxHeight: "92%",
   },
   handle: {
     width: 40,
