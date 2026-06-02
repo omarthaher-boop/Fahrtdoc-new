@@ -89,6 +89,7 @@ function ClassicMainTabs() {
           height: isWeb ? 84 : undefined,
         },
         tabBarItemStyle: {
+          flex: 1,
           alignItems: "center",
           justifyContent: "center",
         },
