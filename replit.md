@@ -92,6 +92,14 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **`ActiveTripMap.tsx` muss auf `.native` zeigen, nicht `.web`** — Metro lädt bei Native/iOS zuerst `.native.tsx`, dann `.tsx`. Zeigt `.tsx` auf `.web`, überschreibt das auf Plattformen ohne `.native.tsx`-Auflösung den falschen Export. Korrekt: `export { default } from "./ActiveTripMap.native"`.
 
+## Gotchas — Lokale Entwicklung (Allgemein)
+
+- **AsyncStorage-Werte immer mit `typeof === "string"` validieren** — `JSON.parse()` kann beliebige Typen liefern. Besonders dateFrom/dateTo in history.tsx: `.split()` auf Non-String crasht Hermes mit EXC_BAD_ACCESS. Immer: `typeof val === "string" && val.includes(".")` vor `.split(".")`.
+- **Parallele GitHub API PUT-Aufrufe scheitern mit 409** — GitHub's Contents API erlaubt nur einen Commit pro SHA. Bei parallelem Push aller Dateien haben alle denselben SHA → zweiter Commit schlägt fehl. Immer sequenziell pushen (for-loop, nicht Promise.all).
+- **Tab verstecken: `href: null` statt `tabBarButton: () => null`** — `tabBarButton: () => null` lässt den Tab im Flex-Layout bestehen → sichtbare Tabs kleben links statt zentriert. `href: null` entfernt den Tab komplett aus der Leiste (Expo Router v3+).
+- **`useDriveTaskRunning` hat false-negative bei Trip-Start** — `hasStartedLocationUpdatesAsync` kann beim ersten Check nach Trip-Start noch `false` zurückgeben (Race Condition). Fix: (1) Heartbeat-Key sofort beim Mount lesen; (2) `tracking = driveTaskRunning || !!activeTrip` in `_layout.tsx`.
+- **fetch ohne Timeout hängt App ewig** — serverCreateTrip/Update/Delete/BatchUpsert in `lib/api.ts` haben jetzt 10s AbortController-Timeout. Ohne Timeout: App-UI bleibt frozen wenn Server nicht antwortet (z.B. Replit-Sleep).
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
