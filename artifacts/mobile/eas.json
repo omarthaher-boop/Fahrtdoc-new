@@ -50,11 +50,6 @@
         "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
         "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "$EXPO_PUBLIC_REVENUECAT_TEST_API_KEY"
       },
-      "node": {
-        "pnpm": {
-          "frozen": false
-        }
-      },
       "android": {
         "buildType": "app-bundle"
       }
