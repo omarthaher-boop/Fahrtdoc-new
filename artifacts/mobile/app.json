@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fahrtdoc.app",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "entitlements": {
         "com.apple.developer.carplay-driving-task": true
       },
