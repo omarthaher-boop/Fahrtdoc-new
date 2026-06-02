@@ -44,6 +44,9 @@
         "pnpm": {
           "frozen": false
         }
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },
@@ -51,6 +54,10 @@
     "production": {
       "ios": {
         "ascAppId": "6774674056"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
       }
     }
   }
