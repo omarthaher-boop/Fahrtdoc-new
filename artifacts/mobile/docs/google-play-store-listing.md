@@ -95,31 +95,76 @@ Ideal for freelancers, self-employed professionals, field sales reps, and anyone
 
 ---
 
-## Build & Submit (Android)
+## Build & Submit (Android) — Automatisch via EAS Submit
 
-### 1. Produktion-Build erstellen
+Die empfohlene Methode ist EAS Submit. Ein einziger Befehl baut die App und lädt sie direkt in den Internal Testing Track von Google Play hoch.
+
+### Schritt 1: Google Play Service Account anlegen (einmalig)
+
+Der Service Account erlaubt EAS, automatisch Builds an Play Console zu übermitteln.
+
+1. **Google Play Console öffnen** → [play.google.com/console](https://play.google.com/console)
+2. **App anlegen** (falls noch nicht geschehen):
+   - Paketname: `com.fahrtdoc.app`
+   - Standard-Sprache: Deutsch (Deutschland)
+   - App oder Spiel: App
+   - Kostenlos oder kostenpflichtig: Je nach Geschäftsmodell
+3. **Service Account erstellen:**
+   - Einstellungen → API-Zugriff → Mit einem Google Cloud-Projekt verknüpfen
+   - „Neues Dienstkonto erstellen" klicken
+   - Zur Google Cloud Console weitergeleitet → Dienstkonto-Name: `eas-submit` (beliebig)
+   - Rolle: **Service Account User** (reicht für EAS)
+   - Schlüssel erstellen: JSON → herunterladen
+4. **Berechtigungen in Play Console vergeben:**
+   - Zurück zu Play Console → API-Zugriff → Dienstkonto-Liste → „Zugriff verwalten"
+   - Berechtigung: **Releases verwalten** (für Internal Testing Upload)
+   - Speichern
+5. **JSON-Datei ablegen:**
+   ```bash
+   # Die heruntergeladene JSON-Datei hierher kopieren:
+   artifacts/mobile/google-service-account.json
+   ```
+   > ⚠️ Diese Datei enthält einen privaten Schlüssel. Sie ist in `.gitignore` eingetragen und darf nie ins Repository committed werden.
+
+---
+
+### Schritt 2: Store-Eintrag in Play Console ausfüllen (einmalig)
+
+Vor dem ersten Upload muss Play Console einen vollständigen Store-Eintrag haben:
+
+- **App-Name:** FahrtDoc – Fahrtenbuch
+- **Kurzbeschreibung:** Fahrten automatisch aufzeichnen, Kilometernachweis als PDF exportieren.
+- **Vollbeschreibung:** Texte oben verwenden
+- **Datenschutzerklärung-URL:** Pflichtfeld — z.B. `https://deine-domain.de/datenschutz` (DSGVO)
+- **Kategorie:** Navigation
+- **Content-Rating-Fragebogen:** ausfüllen (wird von Play Console geführt)
+- **Grafik-Assets:** siehe Tabelle unten
+
+---
+
+### Schritt 3: Produktion-Build erstellen und automatisch einreichen
+
 ```bash
 cd artifacts/mobile
-git pull origin main
-eas build --platform android --profile production
-```
-Ergebnis: signiertes `.aab`-Bundle (Android App Bundle)
 
-### 2. Manuell in Play Console hochladen
-1. [play.google.com/console](https://play.google.com/console) öffnen
-2. App anlegen → Paketname: `com.fahrtdoc.app`
-3. Interner Test-Track → `.aab` hochladen
-4. Store-Eintrag ausfüllen (Texte oben verwenden)
-5. Datenschutzerklärung-URL hinterlegen (Pflicht)
-6. Content-Rating-Fragebogen ausfüllen
-7. App zur Prüfung einreichen
+# Build erstellen UND automatisch zu Play Console hochladen:
+eas build --platform android --profile production --auto-submit
 
-### 3. Via EAS Submit (optional, benötigt Service Account)
-```bash
-# Service Account JSON aus Play Console herunterladen
-# → In artifacts/mobile/google-service-account.json ablegen
+# Oder: neuesten fertigen Build einreichen (ohne neu zu bauen):
 eas submit --platform android --latest
 ```
+
+Der Upload geht in den **Internal Testing** Track (konfiguriert in `eas.json`).
+Von dort kann manuell in Closed Testing oder Production befördert werden.
+
+---
+
+### Schritt 4: Build in Play Console prüfen
+
+1. [play.google.com/console](https://play.google.com/console) öffnen
+2. App → Testen → Internes Testen
+3. Build sollte nach wenigen Minuten erscheinen
+4. Tester-E-Mail-Adressen hinzufügen → Link zum Opt-in senden
 
 ---
 
@@ -132,4 +177,26 @@ eas submit --platform android --latest
 | Screenshots (Phone) | min. 2 Stück | 16:9 oder 9:16 |
 | Screenshots (Tablet) | optional | 7" und/oder 10" |
 
-Screenshots aus dem iPhone-Simulator oder TestFlight-Device exportieren.
+Screenshots aus dem Android Emulator oder einem physischen Gerät exportieren.
+
+---
+
+## eas.json — Android Submit Konfiguration
+
+Die Submit-Konfiguration ist bereits in `artifacts/mobile/eas.json` hinterlegt:
+
+```json
+"submit": {
+  "production": {
+    "android": {
+      "serviceAccountKeyPath": "./google-service-account.json",
+      "track": "internal"
+    }
+  }
+}
+```
+
+- `serviceAccountKeyPath`: Pfad zur Service Account JSON (relativ zu `artifacts/mobile/`)
+- `track`: `"internal"` — Upload in den Internal Testing Track
+
+Um einen anderen Track zu verwenden (z.B. `"alpha"` oder `"production"`), `track` in `eas.json` anpassen.
