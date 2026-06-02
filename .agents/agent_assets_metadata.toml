@@ -17,3 +17,33 @@ id = "m42VUCvGfSu1mbOzZgvbF"
 uri = "file://exports/history.txt"
 type = "text"
 title = "history.tsx (PDF/CSV Aufrufstellen)"
+
+[[outputs]]
+id = "LLLEZtycrqb2nDbjh2dzC"
+uri = "file://artifacts/mobile/docs/store-assets/feature-graphic.png"
+type = "image"
+title = "Feature Graphic (1024×500) — designed"
+
+[[outputs]]
+id = "aogxa86JLq38VUAHNQQcx"
+uri = "file://artifacts/mobile/docs/store-assets/screenshot-01-home.png"
+type = "image"
+title = "Screenshot 1 – Home (real app)"
+
+[[outputs]]
+id = "qaXuTl6EMSk2BjLZnCtiB"
+uri = "file://artifacts/mobile/docs/store-assets/screenshot-02-active.png"
+type = "image"
+title = "Screenshot 2 – Active Trip (real app)"
+
+[[outputs]]
+id = "wgJFxpG528yQalj7z_QTg"
+uri = "file://artifacts/mobile/docs/store-assets/screenshot-03-history.png"
+type = "image"
+title = "Screenshot 3 – Trip History (real app)"
+
+[[outputs]]
+id = "NZP2XnXFT0fDbpaqVr_NV"
+uri = "file://artifacts/mobile/docs/store-assets/screenshot-04-export.png"
+type = "image"
+title = "Screenshot 4 – PDF Export (real app)"
