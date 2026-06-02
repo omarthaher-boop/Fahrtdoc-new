@@ -16,25 +16,11 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.omarthaher.fahrtdoc",
-      "buildNumber": "22",
-      "entitlements": {
-        "com.apple.developer.carplay-driving-task": true
-      },
+      "buildNumber": "23",
       "infoPlist": {
         "UIBackgroundModes": ["location"],
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIApplicationSceneManifest": {
-          "UIApplicationSupportsMultipleScenes": true,
-          "UISceneConfigurations": {
-            "CPTemplateApplicationSceneSessionRoleApplication": [
-              {
-                "UISceneConfigurationName": "CarPlay",
-                "UISceneDelegateClassName": "$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate"
-              }
-            ]
-          }
-        }
+        "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
