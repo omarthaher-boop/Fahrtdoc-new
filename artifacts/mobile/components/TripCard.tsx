@@ -176,12 +176,13 @@ export default function TripCard({
     <>
       <Pressable
         onPress={selectionMode ? undefined : handleCardBodyPress}
-        style={[
+        style={({ pressed }) => [
           styles.card,
           {
             backgroundColor: selected ? "#EEF3FF" : colors.card,
             borderColor: selected ? colors.primary : colors.border,
             borderWidth: selected ? 1.5 : 1,
+            opacity: pressed && !selectionMode ? 0.75 : 1,
           },
         ]}
       >
@@ -324,7 +325,7 @@ export default function TripCard({
             </TouchableOpacity>
           )}
 
-          {/* Bottom row: km + duration + badges + expand toggle */}
+          {/* Bottom row: km + duration + badges + tap hint */}
           <View style={styles.bottomRow}>
             <View style={styles.metaLeft}>
               <View style={styles.metaItem}>
@@ -343,6 +344,14 @@ export default function TripCard({
               )}
             </View>
             <View style={styles.badgeRow}>
+              {!selectionMode && onCardPress && (
+                <View style={[styles.detailsHint, { borderColor: colors.border }]}>
+                  <Text style={[styles.detailsHintText, { color: colors.mutedForeground }]}>
+                    {t("trip.details")}
+                  </Text>
+                  <Feather name="chevron-right" size={12} color={colors.mutedForeground} />
+                </View>
+              )}
               {trip.waypointSyncPending && (
                 onRetrySync ? (
                   <TouchableOpacity
@@ -680,6 +689,19 @@ const styles = StyleSheet.create({
   editedText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  detailsHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  detailsHintText: {
+    fontSize: 11,
+    fontWeight: "500",
   },
   mapSection: {
     marginTop: 2,
