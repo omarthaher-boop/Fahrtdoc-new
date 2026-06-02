@@ -898,6 +898,7 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad, paddingTop: 4 }}
           showsVerticalScrollIndicator={false}
         >
