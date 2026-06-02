@@ -1,7 +1,7 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -257,9 +257,9 @@ export default function HomeScreen() {
     await startTrip(pendingType, modalStartAddr || undefined);
     setStarting(false);
     setPendingType(null);
+    router.replace("/tracking");
   };
 
-  if (activeTrip) return <Redirect href="/tracking" />;
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
