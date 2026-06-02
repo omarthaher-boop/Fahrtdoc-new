@@ -30,6 +30,9 @@ import { SUBSCRIPTION_ENABLED, FREE_TRIP_LIMIT } from "@/config/subscription";
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 const SELECTION_STORAGE_KEY = "@drivelog_history_selection";
+const SAVED_SELECTIONS_KEY = "@drivelog_saved_selections";
+
+type SavedSelection = { id: string; name: string; tripIds: string[] };
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 type TypeFilter = "all" | "business" | "private";
@@ -105,6 +108,12 @@ export default function HistoryScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Saved selections state
+  const [savedSelections, setSavedSelections] = useState<SavedSelection[]>([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveModalName, setSaveModalName] = useState("");
+  const [showLoadMenu, setShowLoadMenu] = useState(false);
+
   // Sync retry banner animation
   const syncBannerAnim = useRef(new Animated.Value(0)).current;
   const isRetrying = syncRetryingIds.size > 0;
@@ -138,8 +147,9 @@ export default function HistoryScreen() {
     Promise.all([
       AsyncStorage.getItem(FILTER_STORAGE_KEY),
       AsyncStorage.getItem(SELECTION_STORAGE_KEY),
+      AsyncStorage.getItem(SAVED_SELECTIONS_KEY),
     ])
-      .then(([filterRaw, selectionRaw]) => {
+      .then(([filterRaw, selectionRaw, savedSelectionsRaw]) => {
         if (filterRaw) {
           try {
             const saved = JSON.parse(filterRaw);
@@ -159,6 +169,12 @@ export default function HistoryScreen() {
               setSelectedIds(new Set<string>(saved.selectedIds));
               skipNextSelectionPersistRef.current = true;
             }
+          } catch {}
+        }
+        if (savedSelectionsRaw) {
+          try {
+            const parsed = JSON.parse(savedSelectionsRaw);
+            if (Array.isArray(parsed)) setSavedSelections(parsed);
           } catch {}
         }
         setFiltersLoaded(true);
@@ -336,6 +352,48 @@ export default function HistoryScreen() {
   const clearSelection = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setSelectedIds(new Set());
+  };
+
+  // --- Saved selection handlers ---
+  const openSaveModal = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setSaveModalName("");
+    setShowSaveModal(true);
+  };
+
+  const confirmSaveSelection = () => {
+    const name = saveModalName.trim();
+    if (!name) {
+      Alert.alert("", t("history.selectionNameEmpty"));
+      return;
+    }
+    const newEntry: SavedSelection = {
+      id: Date.now().toString(),
+      name,
+      tripIds: Array.from(selectedIds),
+    };
+    const updated = [newEntry, ...savedSelections];
+    setSavedSelections(updated);
+    AsyncStorage.setItem(SAVED_SELECTIONS_KEY, JSON.stringify(updated)).catch(() => {});
+    setShowSaveModal(false);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const loadSavedSelection = (sel: SavedSelection) => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setSelectionMode(true);
+    setSelectedIds(new Set<string>(sel.tripIds));
+    setShowLoadMenu(false);
+  };
+
+  const deleteSavedSelection = (id: string) => {
+    const updated = savedSelections.filter((s) => s.id !== id);
+    setSavedSelections(updated);
+    if (updated.length === 0) {
+      AsyncStorage.removeItem(SAVED_SELECTIONS_KEY).catch(() => {});
+    } else {
+      AsyncStorage.setItem(SAVED_SELECTIONS_KEY, JSON.stringify(updated)).catch(() => {});
+    }
   };
 
   const selectMonth = (year: number, month: number) => {
@@ -873,7 +931,7 @@ export default function HistoryScreen() {
               : t("history.selection")}
           </Text>
         </TouchableOpacity>
-        {selectionMode && (
+        {selectionMode ? (
           <View style={styles.selectionQuick}>
             <TouchableOpacity onPress={selectAll} style={[styles.selQuickBtn, { borderColor: colors.primary }]}>
               <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.selectAll")}</Text>
@@ -883,7 +941,35 @@ export default function HistoryScreen() {
                 <Text style={[styles.selQuickText, { color: colors.mutedForeground }]}>{t("history.selectNone")}</Text>
               </TouchableOpacity>
             )}
+            {selectedIds.size > 0 && (
+              <TouchableOpacity
+                onPress={openSaveModal}
+                style={[styles.selQuickBtn, { borderColor: colors.success, backgroundColor: colors.success + "14" }]}
+              >
+                <Feather name="bookmark" size={11} color={colors.success} />
+                <Text style={[styles.selQuickText, { color: colors.success }]}>{t("history.saveSelection")}</Text>
+              </TouchableOpacity>
+            )}
+            {savedSelections.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setShowLoadMenu(true)}
+                style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
+              >
+                <Feather name="folder" size={11} color={colors.primary} />
+                <Text style={[styles.selQuickText, { color: colors.primary }]}>{savedSelections.length}</Text>
+              </TouchableOpacity>
+            )}
           </View>
+        ) : (
+          savedSelections.length > 0 ? (
+            <TouchableOpacity
+              onPress={() => { setSelectionMode(true); setShowLoadMenu(true); }}
+              style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
+            >
+              <Feather name="folder" size={11} color={colors.primary} />
+              <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.savedSelections")}</Text>
+            </TouchableOpacity>
+          ) : null
         )}
       </View>
 
@@ -1134,6 +1220,136 @@ export default function HistoryScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Save selection name modal */}
+      <Modal
+        visible={showSaveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSaveModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.savedSelOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSaveModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.savedSelCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.savedSelTitle, { color: colors.foreground }]}>
+                {t("history.saveSelectionTitle")}
+              </Text>
+              <Text style={[styles.savedSelSub, { color: colors.mutedForeground }]}>
+                {selectedIds.size} {t("history.selected")}
+              </Text>
+              <View style={[styles.savedSelInput, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="bookmark" size={14} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.savedSelInputText, { color: colors.foreground }]}
+                  value={saveModalName}
+                  onChangeText={setSaveModalName}
+                  placeholder={t("history.saveSelectionPlaceholder")}
+                  placeholderTextColor={colors.mutedForeground}
+                  autoFocus
+                  onSubmitEditing={confirmSaveSelection}
+                  returnKeyType="done"
+                />
+              </View>
+              <View style={styles.savedSelActions}>
+                <TouchableOpacity
+                  onPress={() => setShowSaveModal(false)}
+                  style={[styles.savedSelCancelBtn, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.savedSelCancelText, { color: colors.mutedForeground }]}>
+                    {t("history.splitCancel")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmSaveSelection}
+                  style={[styles.savedSelConfirmBtn, { backgroundColor: colors.primary }]}
+                >
+                  <Feather name="check" size={14} color="#fff" />
+                  <Text style={styles.savedSelConfirmText}>
+                    {t("history.saveSelectionSave")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Load saved selection menu */}
+      <Modal
+        visible={showLoadMenu}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLoadMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.loadMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLoadMenu(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.loadMenuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.savedSelTitle, { color: colors.foreground }]}>
+                {t("history.savedSelections")}
+              </Text>
+              {savedSelections.length === 0 ? (
+                <View style={styles.loadMenuEmpty}>
+                  <Feather name="folder" size={28} color={colors.mutedForeground} />
+                  <Text style={[styles.loadMenuEmptyText, { color: colors.mutedForeground }]}>
+                    {t("history.noSavedSelections")}
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                  {savedSelections.map((sel) => (
+                    <View
+                      key={sel.id}
+                      style={[styles.loadMenuItem, { borderBottomColor: colors.border }]}
+                    >
+                      <View style={styles.loadMenuItemLeft}>
+                        <Feather name="bookmark" size={14} color={colors.primary} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.loadMenuItemName, { color: colors.foreground }]} numberOfLines={1}>
+                            {sel.name}
+                          </Text>
+                          <Text style={[styles.loadMenuItemCount, { color: colors.mutedForeground }]}>
+                            {sel.tripIds.length} {t("home.trips")}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.loadMenuItemActions}>
+                        <TouchableOpacity
+                          onPress={() => loadSavedSelection(sel)}
+                          style={[styles.loadMenuActionBtn, { backgroundColor: colors.primary }]}
+                        >
+                          <Text style={styles.loadMenuActionBtnText}>{t("history.loadSelection")}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => deleteSavedSelection(sel.id)}
+                          style={[styles.loadMenuDeleteBtn, { borderColor: colors.destructive }]}
+                        >
+                          <Feather name="trash-2" size={13} color={colors.destructive} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              <TouchableOpacity
+                onPress={() => setShowLoadMenu(false)}
+                style={[styles.loadMenuCloseBtn, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.loadMenuCloseBtnText, { color: colors.mutedForeground }]}>
+                  {t("common.close")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Paywall modal — shown when non-premium user tries PDF/CSV export */}
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
     </View>
@@ -1298,6 +1514,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   selQuickText: {
     fontSize: 12,
@@ -1571,6 +1790,153 @@ const styles = StyleSheet.create({
   },
   monthPickerCellText: {
     fontSize: 13,
+    fontWeight: "700",
+  },
+  savedSelOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  savedSelCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 22,
+    width: 320,
+    gap: 14,
+  },
+  savedSelTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  savedSelSub: {
+    fontSize: 13,
+    marginTop: -8,
+  },
+  savedSelInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 9,
+  },
+  savedSelInputText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  savedSelActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 2,
+  },
+  savedSelCancelBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  savedSelCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  savedSelConfirmBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  savedSelConfirmText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  loadMenuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  loadMenuCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 22,
+    gap: 16,
+  },
+  loadMenuEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 24,
+  },
+  loadMenuEmptyText: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  loadMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  loadMenuItemLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  loadMenuItemName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  loadMenuItemCount: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  loadMenuItemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  loadMenuActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  loadMenuActionBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  loadMenuDeleteBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMenuCloseBtn: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  loadMenuCloseBtnText: {
+    fontSize: 14,
     fontWeight: "700",
   },
 });
