@@ -14,6 +14,7 @@ import { secureGetItem, secureSetItem, secureRemoveDataKey } from "@/utils/secur
 import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import { decimatePath } from "@/utils/decimatePath";
+import { geocodeAddress } from "@/utils/geocode";
 import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 import {
   showTripNotification,
@@ -795,6 +796,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Auto-trigger address refresh on the first startup after loading completes.
   // Fire-and-forget: runs silently in the background, no UI blocked.
   const autoRefreshDoneRef = useRef(false);
+  // Tracks whether the one-time coord backfill has already been scheduled.
+  const autoBackfillDoneRef = useRef(false);
   useEffect(() => {
     if (loading) return;
     if (autoRefreshDoneRef.current) return;
@@ -1782,6 +1785,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPauseStartedAt(null);
     }
   }, [paused, pauseStartedAt, activeTrip]);
+
+  // One-time background pass: geocode trips that have address text but no stored
+  // coordinates. Runs at 1 req/s to stay within Nominatim's usage policy.
+  const backfillMissingCoords = useCallback(async () => {
+    const current = tripsRef.current;
+    const needsBackfill = current.filter(
+      (t) =>
+        (t.startLat == null && !!t.startAddr) ||
+        (t.endLat == null && !!t.endAddr)
+    );
+    if (needsBackfill.length === 0) return;
+
+    for (const trip of needsBackfill) {
+      const needsStart = trip.startLat == null && !!trip.startAddr;
+      const needsEnd = trip.endLat == null && !!trip.endAddr;
+      const changes: Partial<Trip> = {};
+
+      if (needsStart) {
+        const coord = await geocodeAddress(trip.startAddr);
+        if (coord) {
+          changes.startLat = coord.lat;
+          changes.startLon = coord.lon;
+        }
+        // Rate-limit: 1 request per second
+        await new Promise<void>((r) => setTimeout(r, 1100));
+      }
+
+      if (needsEnd) {
+        const coord = await geocodeAddress(trip.endAddr);
+        if (coord) {
+          changes.endLat = coord.lat;
+          changes.endLon = coord.lon;
+        }
+        await new Promise<void>((r) => setTimeout(r, 1100));
+      }
+
+      if (Object.keys(changes).length > 0) {
+        editTrip(trip.id, changes);
+      }
+    }
+  }, [editTrip]);
+
+  // Schedule the coord backfill once, 5 s after the initial load completes,
+  // so it never blocks the app startup or address-refresh pass.
+  useEffect(() => {
+    if (loading) return;
+    if (autoBackfillDoneRef.current) return;
+    if (!user) return;
+    autoBackfillDoneRef.current = true;
+    const tid = setTimeout(() => {
+      backfillMissingCoords().catch(() => {});
+    }, 5000);
+    return () => clearTimeout(tid);
+  }, [loading, user, backfillMissingCoords]);
 
   return (
     <AppContext.Provider
