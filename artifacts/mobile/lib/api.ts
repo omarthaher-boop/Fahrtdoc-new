@@ -63,12 +63,16 @@ export interface AuthResult {
 }
 
 export async function requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
-  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, error: "network_error" };
+  }
 }
 
 export async function confirmPasswordReset(
@@ -76,12 +80,16 @@ export async function confirmPasswordReset(
   code: string,
   newPassword: string
 ): Promise<ResetPasswordResponse> {
-  const res = await fetch(`${API_BASE}/auth/reset-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, code, newPassword }),
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, newPassword }),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, error: "network_error" };
+  }
 }
 
 export async function serverRegister(

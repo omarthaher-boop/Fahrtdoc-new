@@ -739,21 +739,30 @@ export default function ProfileScreen() {
   }, [user]);
 
   const handlePickLogo = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 2],
-      quality: 0.8,
-      base64: true,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      const ext = (asset.uri.split(".").pop() ?? "png").toLowerCase();
-      const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
-      const dataUri = `data:${mime};base64,${asset.base64}`;
-      setEditLogoUri(dataUri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 2],
+        quality: 0.8,
+        base64: true,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const ext = (asset.uri.split(".").pop() ?? "png").toLowerCase();
+        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+        const dataUri = `data:${mime};base64,${asset.base64}`;
+        setEditLogoUri(dataUri);
+      }
+    } catch {
+      Alert.alert(
+        language === "de" ? "Fehler" : "Error",
+        language === "de"
+          ? "Das Bild konnte nicht ausgewählt werden. Bitte versuche es erneut."
+          : "The image could not be selected. Please try again."
+      );
     }
-  }, []);
+  }, [language]);
 
   const handleSaveCompany = useCallback(async () => {
     await updateCompanyInfo(editCompanyName.trim(), editLogoUri, user?.signatureBlock);

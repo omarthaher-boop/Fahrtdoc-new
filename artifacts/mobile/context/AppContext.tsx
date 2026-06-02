@@ -1582,10 +1582,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 3. High-accuracy initial fix
-        const initial = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
-        });
-        beginTracking(initial.coords.latitude, initial.coords.longitude);
+        try {
+          const initial = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+          });
+          beginTracking(initial.coords.latitude, initial.coords.longitude);
+        } catch {
+          // Location services may be disabled at OS level — fall back gracefully
+          setGpsStatus("denied");
+          beginTracking(52.52, 13.405);
+        }
 
         // 4. Clear background position store for this new trip
         await AsyncStorage.removeItem(BG_POSITIONS_KEY);
@@ -1615,6 +1621,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 6. Foreground watch — keeps React state & live banner updated
+        try {
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
@@ -1642,6 +1649,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         );
         watchRef.current = sub as unknown as number;
+        } catch {
+          // Foreground watch could not start — initial fix already recorded
+        }
       }
     },
     []
