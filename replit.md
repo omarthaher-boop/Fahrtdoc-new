@@ -23,7 +23,7 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 ## Where things live
 
-- `artifacts/mobile/` — Expo React Native App (Bundle ID: `com.fahrtdoc.app`)
+- `artifacts/mobile/` — Expo React Native App (Bundle ID: `com.omarthaher.fahrtdoc`)
 - `artifacts/api-server/` — Express 5 API
 - `artifacts/mobile/utils/exportPDF.ts` — PDF/CSV-Export-Logik
 - `artifacts/mobile/context/AppContext.tsx` — globaler App-State
