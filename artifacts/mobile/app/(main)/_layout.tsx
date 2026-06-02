@@ -88,6 +88,10 @@ function ClassicMainTabs() {
           elevation: 0,
           height: isWeb ? 84 : undefined,
         },
+        tabBarItemStyle: {
+          alignItems: "center",
+          justifyContent: "center",
+        },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
