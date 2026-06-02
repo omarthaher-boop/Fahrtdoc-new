@@ -74,9 +74,6 @@
           }
         ]
       },
-      "entitlements": {
-        "com.apple.developer.carplay-driving-task": true
-      },
       "config": {
         "googleMapsApiKey": "$(GOOGLE_MAPS_IOS_API_KEY)"
       }
