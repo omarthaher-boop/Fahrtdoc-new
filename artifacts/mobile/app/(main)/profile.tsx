@@ -1015,7 +1015,7 @@ export default function ProfileScreen() {
             <SectionHeader label={t("section.tracking")} colors={colors} />
           </View>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider statusActive={driveTaskRunning} />
+            <ToggleRow icon="radio" label={t("row.autoTracking")} description={t("row.autoTracking.desc")} value={autoTracking} onValueChange={handleAutoTracking} colors={colors} showDivider statusActive={Platform.OS === "web" ? undefined : driveTaskRunning} />
             <ToggleRow icon="map-pin" label={t("row.gpsTracking")} description={t("row.gpsTracking.desc")} value={gpsTracking} onValueChange={handleGpsTracking} colors={colors} showDivider />
             <ToggleRow icon="layers" label={t("row.bgTracking")} description={t("row.bgTracking.desc")} value={bgTracking} onValueChange={handleBgTracking} colors={colors} showDivider />
             <ToggleRow icon="database" label={t("row.offline")} description={t("row.offline.desc")} value={offlineStorage} onValueChange={handleOfflineStorage} colors={colors} showDivider />
