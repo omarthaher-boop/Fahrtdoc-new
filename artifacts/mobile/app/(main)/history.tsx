@@ -522,7 +522,14 @@ export default function HistoryScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16, backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>{t("nav.trips")}</Text>
+        <View style={styles.titleBlock}>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("nav.trips")}</Text>
+          {selectedMonth && (
+            <Text style={[styles.monthSubtitle, { color: colors.mutedForeground }]}>
+              {new Date(selectedMonth.year, selectedMonth.month, 1).toLocaleString(locale, { month: "long", year: "numeric" })}
+            </Text>
+          )}
+        </View>
         <View style={styles.headerRight}>
           {isFiltersActive && (
             <TouchableOpacity onPress={resetFilters} style={[styles.resetBtn, { borderColor: colors.destructive }]}>
@@ -1141,10 +1148,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  titleBlock: {
+    flexShrink: 1,
+  },
   title: {
     fontSize: 28,
     fontWeight: "800",
     letterSpacing: -0.4,
+  },
+  monthSubtitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 1,
+    letterSpacing: 0,
   },
   headerRight: {
     flexDirection: "row",
