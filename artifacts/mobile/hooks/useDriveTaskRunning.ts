@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DRIVE_DETECT_TASK, DRIVE_DETECT_HEARTBEAT_KEY } from "@/utils/driveDetect";
 
 const POLL_INTERVAL_MS = 12_000;
+const HEARTBEAT_FRESH_MS = 10 * 60 * 1000;
 
 export function useDriveTaskRunning() {
   const [driveTaskRunning, setDriveTaskRunning] = useState(false);
@@ -19,6 +21,15 @@ export function useDriveTaskRunning() {
   }, []);
 
   useEffect(() => {
+    if (Platform.OS !== "web") {
+      AsyncStorage.getItem(DRIVE_DETECT_HEARTBEAT_KEY)
+        .then((raw) => {
+          if (raw && Date.now() - parseInt(raw, 10) < HEARTBEAT_FRESH_MS) {
+            setDriveTaskRunning(true);
+          }
+        })
+        .catch(() => {});
+    }
     checkDriveTask();
     const interval = setInterval(checkDriveTask, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
