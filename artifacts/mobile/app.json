@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.omarthaher.fahrtdoc",
-      "buildNumber": "11",
+      "buildNumber": "22",
       "entitlements": {
         "com.apple.developer.carplay-driving-task": true
       },
