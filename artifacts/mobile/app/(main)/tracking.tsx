@@ -351,14 +351,6 @@ export default function TrackingScreen() {
             </Text>
           </View>
         )}
-        {!driveTaskRunning && Platform.OS !== "web" && (
-          <View style={[styles.warningBanner, { backgroundColor: warningLight, borderColor: warningColor }]}>
-            <Feather name="alert-triangle" size={14} color={warningColor} />
-            <Text style={[styles.warningText, { color: warningColor }]}>
-              {t("tracking.driveDetectStopped")}
-            </Text>
-          </View>
-        )}
 
         {/* Stats row */}
         <View style={styles.statsRow}>
