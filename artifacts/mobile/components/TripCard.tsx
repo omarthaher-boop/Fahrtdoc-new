@@ -14,6 +14,7 @@ import {
   View,
   Pressable,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -71,6 +72,7 @@ export default function TripCard({
   const [expanded, setExpanded] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
   const mountedRef = useRef(true);
+  const swipeableRef = useRef<Swipeable>(null);
 
   const [showNoteSheet, setShowNoteSheet] = useState(false);
   const [noteText, setNoteText] = useState(trip.note ?? "");
@@ -172,8 +174,65 @@ export default function TripCard({
     setShowNoteSheet(false);
   };
 
+  const renderRightActions = () => {
+    if (selectionMode) return null;
+    return (
+      <View style={styles.swipeActions}>
+        {onEdit && (
+          <TouchableOpacity
+            style={[styles.swipeBtn, styles.swipeBtnEdit, { backgroundColor: colors.primary }]}
+            onPress={() => {
+              swipeableRef.current?.close();
+              if (Platform.OS !== "web") Haptics.selectionAsync();
+              onEdit(trip);
+            }}
+            activeOpacity={0.85}
+          >
+            <Feather name="edit-2" size={20} color="#FFF" />
+            <Text style={styles.swipeBtnText}>{t("common.edit")}</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.swipeBtn, styles.swipeBtnDelete, { backgroundColor: colors.destructive }]}
+          onPress={() => {
+            swipeableRef.current?.close();
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            Alert.alert(
+              t("trip.delete.title"),
+              t("trip.delete.message"),
+              [
+                { text: t("trip.delete.cancel"), style: "cancel" },
+                {
+                  text: t("trip.delete.confirm"),
+                  style: "destructive",
+                  onPress: () => onDelete?.(trip.id),
+                },
+              ]
+            );
+          }}
+          activeOpacity={0.85}
+        >
+          <Feather name="trash-2" size={20} color="#FFF" />
+          <Text style={styles.swipeBtnText}>{t("trip.delete.confirm")}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <>
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={renderRightActions}
+        rightThreshold={40}
+        enabled={!selectionMode && Platform.OS !== "web"}
+        friction={2}
+        overshootRight={false}
+        containerStyle={styles.swipeContainer}
+        onSwipeableWillOpen={() => {
+          if (Platform.OS !== "web") Haptics.selectionAsync();
+        }}
+      >
       <Pressable
         onPress={selectionMode ? undefined : handleCardBodyPress}
         style={({ pressed }) => [
@@ -430,6 +489,7 @@ export default function TripCard({
           )}
         </View>
       </Pressable>
+      </Swipeable>
 
       {/* Note editing sheet */}
       <Modal
@@ -509,10 +569,40 @@ export default function TripCard({
 }
 
 const styles = StyleSheet.create({
+  swipeContainer: {
+    marginBottom: 10,
+    borderRadius: 14,
+  },
+  swipeActions: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: 0,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginLeft: 8,
+  },
+  swipeBtn: {
+    width: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  swipeBtnEdit: {
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
+  },
+  swipeBtnDelete: {
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  swipeBtnText: {
+    color: "#FFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   card: {
     flexDirection: "row",
     borderRadius: 14,
-    marginBottom: 10,
     overflow: "hidden",
     position: "relative",
   },
