@@ -1,0 +1,102 @@
+Behebe folgende konkrete Fehler für einen funktionierenden iOS/TestFlight Build.
+Geh jeden Punkt durch, korrigiere ihn, und bestätige am Ende welche Dateien 
+geändert wurden.
+
+────────────────────────────────────────────────
+FEHLER 1 – artifacts/mobile/components/ActiveTripMap.tsx
+────────────────────────────────────────────────
+Die Datei exportiert immer die Web-Version. Ersetze den Inhalt komplett mit:
+
+  export { default } from "./ActiveTripMap.native";
+
+Expo lädt automatisch .native.tsx auf iOS/Android und .web.tsx im Browser —
+die Haupt-Datei darf NICHT auf .web zeigen.
+
+────────────────────────────────────────────────
+FEHLER 2 – artifacts/mobile/utils/exportPDF.ts
+────────────────────────────────────────────────
+jsPDF funktioniert nicht auf iOS (keine Browser-APIs). Ersetze die gesamte 
+PDF-Generierung durch expo-print + expo-sharing:
+
+  import * as Print from "expo-print";
+  import * as Sharing from "expo-sharing";
+
+Erstelle den HTML-Content wie bisher (der HTML-Template-Teil kann bleiben),
+aber ersetze die jsPDF-Aufrufe durch:
+
+  const { uri } = await Print.printToFileAsync({ html: htmlContent });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: "application/pdf" });
+  }
+
+Entferne danach jspdf aus package.json.
+
+────────────────────────────────────────────────
+FEHLER 3 – artifacts/mobile/utils/exportPDF.ts (zweiter Teil)
+────────────────────────────────────────────────
+Ersetze:
+  import * as FileSystem from "expo-file-system/legacy";
+durch:
+  import * as FileSystem from "expo-file-system";
+
+────────────────────────────────────────────────
+FEHLER 4 – app.json: infoPlist
+────────────────────────────────────────────────
+Füge in ios.infoPlist hinzu:
+  "NSLocationAlwaysUsageDescription": "FahrtDoc benötigt Zugriff auf deinen 
+  Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen."
+
+────────────────────────────────────────────────
+FEHLER 5 – app.json: iOS Entitlements für CarPlay
+────────────────────────────────────────────────
+Füge in den ios-Block hinzu:
+  "entitlements": {
+    "com.apple.developer.carplay-driving-task": true
+  }
+
+────────────────────────────────────────────────
+FEHLER 6 – app.json: Google Maps iOS Key
+────────────────────────────────────────────────
+Füge in den ios-Block hinzu:
+  "config": {
+    "googleMapsApiKey": "$(GOOGLE_MAPS_IOS_API_KEY)"
+  }
+
+Füge GOOGLE_MAPS_IOS_API_KEY in eas.json preview + production env hinzu.
+
+────────────────────────────────────────────────
+FEHLER 7 – eas.json: Production iOS Build fehlt
+────────────────────────────────────────────────
+Füge im "production" Profil hinzu:
+  "ios": {
+    "simulator": false,
+    "resourceClass": "m-medium"
+  }
+
+Füge ausserdem diese env-Variablen im production-Profil hinzu:
+  "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
+  "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "$EXPO_PUBLIC_REVENUECAT_TEST_API_KEY"
+
+────────────────────────────────────────────────
+FEHLER 8 – eas.json: Hardcoded Replit-API-URL
+────────────────────────────────────────────────
+Die EXPO_PUBLIC_API_URL zeigt auf janeway.replit.dev — diese Domain schläft.
+Stelle sicher dass der Backend-Server dauerhaft läuft ODER ersetze die URL
+durch die produktive Domain. Als Sofortlösung: setze den Replit als "Always On"
+in den Replit-Einstellungen.
+
+────────────────────────────────────────────────
+Nach allen Änderungen führe aus:
+────────────────────────────────────────────────
+cd artifacts/mobile
+pnpm install
+
+Dann Build-Befehle:
+  eas build --platform ios --profile preview
+  (für TestFlight)
+
+  eas build --platform ios --profile production
+  (für App Store)
+
+  eas submit --platform ios --profile production
+  (für App Store submission)

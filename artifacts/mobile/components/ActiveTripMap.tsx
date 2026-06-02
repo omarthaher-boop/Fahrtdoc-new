@@ -1,1 +1,1 @@
-export { default } from "./ActiveTripMap.web";
+export { default } from "./ActiveTripMap.native";

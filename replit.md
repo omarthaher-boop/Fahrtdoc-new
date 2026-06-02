@@ -86,6 +86,10 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 - **Native `MapView` crasht ggf. den ganzen Screen** — `react-native-maps` wird über `TripRouteMap.native.tsx` (Liste, Save-Sheet, Detail) und `ActiveTripMap.native.tsx` (aktive Fahrt) gerendert. Ein Render-/Native-Fehler der Karte riss früher den gesamten Screen mit (z. B. Save-Sheet rendert `TripRouteMap` bedingungslos → Speichern unmöglich, App-Neustart nötig). Beide native Map-Komponenten kapseln die `MapView` jetzt intern in eine `ErrorBoundary` mit Fallback "Karte nicht verfügbar". JS-Level-Fehler (z. B. `requireNativeComponent`-Fehler) werden so abgefangen; reine native Crashes (Obj-C/Swift) bleiben unkatchbar.
 - **`btoa` ist in Hermes nicht garantiert** — PDF-Export (`utils/exportPDF.ts`) nutzt jetzt einen eigenen `bytesToBase64`-Encoder statt globalem `btoa` + char-für-char `binary`-String. Vermeidet sowohl die `btoa`-Abhängigkeit als auch einen mehrere MB großen Zwischen-String (OOM-Risiko bei großen Fahrtenlisten).
 
+- **`expo-file-system/legacy` ist in SDK 54 Pflicht für `cacheDirectory` und `EncodingType`** — In `expo-file-system ~19.x` wurden diese APIs aus dem Haupt-Export entfernt und leben nur noch in `/legacy`. Das Standard-`expo-file-system`-Import gibt TypeScript-Fehler `Property 'cacheDirectory' does not exist`. `exportPDF.ts` MUSS `import * as FileSystem from "expo-file-system/legacy"` verwenden.
+
+- **`ActiveTripMap.tsx` muss auf `.native` zeigen, nicht `.web`** — Metro lädt bei Native/iOS zuerst `.native.tsx`, dann `.tsx`. Zeigt `.tsx` auf `.web`, überschreibt das auf Plattformen ohne `.native.tsx`-Auflösung den falschen Export. Korrekt: `export { default } from "./ActiveTripMap.native"`.
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
