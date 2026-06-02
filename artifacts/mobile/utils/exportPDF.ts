@@ -232,6 +232,8 @@ function getDateRange(trips: Trip[], dateFrom: string, dateTo: string): string {
   return `${fmtDate(min.toISOString())} – ${fmtDate(max.toISOString())}`;
 }
 
+const MAX_TRIPS_PER_NATIVE_PDF = 100;
+
 const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -265,6 +267,15 @@ function bytesToBase64(bytes: Uint8Array): string {
       "=";
   }
   return out;
+}
+
+/**
+ * Hard-caps a string using substring() — avoids passing long strings to jsPDF,
+ * which internally calls String.prototype.split() and can SIGSEGV Hermes on iOS
+ * when processing hundreds of addresses.
+ */
+function safeText(s: string, maxLen: number): string {
+  return s.length <= maxLen ? s : s.substring(0, maxLen - 1) + "…";
 }
 
 async function getAppLogoBase64(): Promise<string | null> {
@@ -822,9 +833,9 @@ async function exportPDFWeb(
     const cells = [
       fmtDate(t.date),
       fmtType(t.type),
-      t.startAddr,
-      t.endAddr,
-      t.note ?? "",
+      safeText(t.startAddr, 80),
+      safeText(t.endAddr, 80),
+      safeText(t.note ?? "", 60),
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
@@ -833,7 +844,7 @@ async function exportPDFWeb(
     cells.forEach((cell, i) => {
       const isNum = i >= 5;
       const maxChars = Math.floor(colWidths[i] * 1.8);
-      const truncated = cell.length > maxChars ? cell.slice(0, maxChars - 1) + "…" : cell;
+      const truncated = cell.length > maxChars ? cell.substring(0, maxChars - 1) + "…" : cell;
       if (isNum) {
         doc.text(truncated, cellX + colWidths[i] - 4, y + 5.5, { align: "right" });
       } else {
@@ -864,14 +875,14 @@ async function exportPDFWeb(
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(90, 106, 154);
-        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${wp.addr}`;
-        const truncated = waypointLabel.length > maxChars ? waypointLabel.slice(0, maxChars - 1) + "…" : waypointLabel;
+        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${safeText(wp.addr, 70)}`;
+        const truncated = waypointLabel.length > maxChars ? waypointLabel.substring(0, maxChars - 1) + "…" : waypointLabel;
         doc.text(truncated, wpX, y + 5);
         if (hasNote) {
           doc.setFontSize(7);
           doc.setFont("helvetica", "italic");
           doc.setTextColor(136, 136, 136);
-          const noteTruncated = wp.note!.length > maxChars ? wp.note!.slice(0, maxChars - 1) + "…" : wp.note!;
+          const noteTruncated = safeText(wp.note!, 60);
           doc.text(`    ${noteTruncated}`, wpX, y + 10);
         }
         doc.setFontSize(8.5);
@@ -1131,9 +1142,9 @@ async function exportPDFNative(
     const cells = [
       fmtDate(t.date),
       fmtType(t.type),
-      t.startAddr,
-      t.endAddr,
-      t.note ?? "",
+      safeText(t.startAddr, 80),
+      safeText(t.endAddr, 80),
+      safeText(t.note ?? "", 60),
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
@@ -1142,7 +1153,7 @@ async function exportPDFNative(
     cells.forEach((cell, i) => {
       const isNum = i >= 5;
       const maxChars = Math.floor(colWidthsN[i] * 1.8);
-      const truncated = cell.length > maxChars ? cell.slice(0, maxChars - 1) + "…" : cell;
+      const truncated = cell.length > maxChars ? cell.substring(0, maxChars - 1) + "…" : cell;
       if (isNum) {
         doc.text(truncated, cellX + colWidthsN[i] - 4, y + 5.5, { align: "right" });
       } else {
@@ -1172,14 +1183,14 @@ async function exportPDFNative(
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(90, 106, 154);
-        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${wp.addr}`;
-        const truncated = waypointLabel.length > maxChars ? waypointLabel.slice(0, maxChars - 1) + "…" : waypointLabel;
+        const waypointLabel = `  ↳ Zwischenstopp ${wpIdx + 1}: ${safeText(wp.addr, 70)}`;
+        const truncated = waypointLabel.length > maxChars ? waypointLabel.substring(0, maxChars - 1) + "…" : waypointLabel;
         doc.text(truncated, wpX, y + 5);
         if (hasNote) {
           doc.setFontSize(7);
           doc.setFont("helvetica", "italic");
           doc.setTextColor(136, 136, 136);
-          const noteTruncated = wp.note!.length > maxChars ? wp.note!.slice(0, maxChars - 1) + "…" : wp.note!;
+          const noteTruncated = safeText(wp.note!, 60);
           doc.text(`    ${noteTruncated}`, wpX, y + 10);
         }
         doc.setFontSize(8.5);
@@ -1262,15 +1273,25 @@ export async function exportPDF(
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
     return;
   }
+  let tripsToExport = trips;
+  if (Platform.OS !== "web" && trips.length > MAX_TRIPS_PER_NATIVE_PDF) {
+    Alert.alert(
+      lang === "de" ? "Export begrenzt" : "Export limited",
+      lang === "de"
+        ? `Der Export enthält nur die aktuellsten ${MAX_TRIPS_PER_NATIVE_PDF} von ${trips.length} Fahrten. Für mehr Fahrten bitte den Zeitraum einschränken.`
+        : `Export contains only the most recent ${MAX_TRIPS_PER_NATIVE_PDF} of ${trips.length} trips. Please filter the date range to export more.`
+    );
+    tripsToExport = trips.slice(-MAX_TRIPS_PER_NATIVE_PDF);
+  }
   if (Platform.OS === "web") {
     try {
-      await exportPDFWeb(trips, user, dateFrom, dateTo, "Fahrtenbuch.pdf", undefined, lang);
+      await exportPDFWeb(tripsToExport, user, dateFrom, dateTo, "Fahrtenbuch.pdf", undefined, lang);
     } catch (err) {
       showExportErrorWeb(err, lang);
     }
   } else {
     try {
-      await exportPDFNative(trips, user, dateFrom, dateTo, "Fahrtenbuch exportieren", undefined, lang);
+      await exportPDFNative(tripsToExport, user, dateFrom, dateTo, "Fahrtenbuch exportieren", undefined, lang);
     } catch (err) {
       showExportError(err, lang, () => exportPDF(trips, user, dateFrom, dateTo, lang));
     }
@@ -1289,13 +1310,32 @@ export async function exportSplitPDF(
     return;
   }
 
-  const businessTrips = trips.filter((t) => t.type === "business");
-  const privateTrips = trips.filter((t) => t.type === "private");
+  const businessTripsAll = trips.filter((t) => t.type === "business");
+  const privateTripsAll = trips.filter((t) => t.type === "private");
 
-  if (businessTrips.length === 0 && privateTrips.length === 0) {
+  if (businessTripsAll.length === 0 && privateTripsAll.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
     return;
   }
+
+  const tooManyTrips =
+    Platform.OS !== "web" &&
+    (businessTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF ||
+      privateTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF);
+  if (tooManyTrips) {
+    Alert.alert(
+      lang === "de" ? "Export begrenzt" : "Export limited",
+      lang === "de"
+        ? `Der Export ist auf ${MAX_TRIPS_PER_NATIVE_PDF} Fahrten pro Datei begrenzt. Es werden jeweils die aktuellsten exportiert.`
+        : `Export is limited to ${MAX_TRIPS_PER_NATIVE_PDF} trips per file. The most recent will be exported.`
+    );
+  }
+  const businessTrips = tooManyTrips
+    ? businessTripsAll.slice(-MAX_TRIPS_PER_NATIVE_PDF)
+    : businessTripsAll;
+  const privateTrips = tooManyTrips
+    ? privateTripsAll.slice(-MAX_TRIPS_PER_NATIVE_PDF)
+    : privateTripsAll;
 
   if (Platform.OS === "web") {
     try {
