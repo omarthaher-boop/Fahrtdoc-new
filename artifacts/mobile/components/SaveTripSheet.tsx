@@ -57,6 +57,7 @@ export default function SaveTripSheet() {
 
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [gpsChecked, setGpsChecked] = useState(true);
   const [routeCheckedId, setRouteCheckedId] = useState<string | null>(null);
@@ -185,7 +186,14 @@ export default function SaveTripSheet() {
       if (route) dur = route.durationMin * 60;
     }
 
-    await finalizeTrip({ ...draftTrip, km, kmRoute, dur });
+    try {
+      setIsSaving(true);
+      await finalizeTrip({ ...draftTrip, km, kmRoute, dur });
+    } catch {
+      Alert.alert("Fehler", "Fahrt konnte nicht gespeichert werden. Bitte erneut versuchen.");
+    } finally {
+      setIsSaving(false);
+    }
   }, [draftTrip, gpsChecked, routeCheckedId, routes, useRouteDuration, finalizeTrip]);
 
   if (!pendingTrip) return null;
@@ -562,7 +570,8 @@ export default function SaveTripSheet() {
 
               {/* Action buttons */}
               <TouchableOpacity
-                style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary }]}
+                style={[styles.saveBtn, styles.saveBtnFull, { backgroundColor: colors.primary, opacity: (isSaving || loadingRoutes) ? 0.6 : 1 }]}
+                disabled={isSaving || loadingRoutes}
                 onPress={() => {
                   if (Platform.OS === "web") {
                     if (window.confirm(`${t("save.confirmTitle")}\n\n${t("save.confirmMessage")}`)) {
@@ -581,7 +590,11 @@ export default function SaveTripSheet() {
                 }}
                 testID="save-trip-confirm"
               >
-                <Feather name="check" size={15} color="#FFF" />
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Feather name="check" size={15} color="#FFF" />
+                )}
                 <Text style={styles.saveBtnText}>{t("common.save")}</Text>
               </TouchableOpacity>
 
