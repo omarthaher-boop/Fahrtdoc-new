@@ -1,0 +1,105 @@
+🍏 iOS build failed:
+Unknown error. See logs of the Install dependencies build phase for more information.
+omarthaher@Omars-MacBook-Pro mobile % cat ~/Fahrtdoc-new/artifacts/mobile/utils/locationTask.ts
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import * as TaskManager from "expo-task-manager";
+
+export const LOCATION_TASK_NAME = "DRIVELOG_BG_LOCATION";
+export const BG_POSITIONS_KEY = "fahrtdoc_bg_positions";
+
+export interface BgPosition {
+  lat: number;
+  lon: number;
+  ts: number;
+}
+
+const MAX_ACCURACY_M = 30;
+const MAX_STORED = 10000; // Limit to prevent storage overflow
+
+type TaskData = {
+  locations: {
+    coords: {
+      latitude: number;
+      longitude: number;
+      accuracy: number | null;
+      speed: number | null;
+    };
+    timestamp: number;
+  }[];
+};
+
+// Background tasks are not supported in Expo Go — skip registration there.
+if (Constants.appOwnership !== "expo") {
+  try {
+    TaskManager.defineTask(
+      LOCATION_TASK_NAME,
+      async ({ data, error }: TaskManager.TaskManagerTaskBody<TaskData>) => {
+        if (error) return;
+        const { locations } = data;
+        try {
+          const raw = await AsyncStorage.getItem(BG_POSITIONS_KEY);
+          let existing: BgPosition[] = raw ? (JSON.parse(raw) as BgPosition[]) : [];
+          for (const loc of locations) {
+            if (loc.coords.accuracy !== null && loc.coords.accuracy > MAX_ACCURACY_M) continue;
+            existing.push({
+              lat: loc.coords.latitude,
+              lon: loc.coords.longitude,
+              ts: loc.timestamp,
+            });
+          }
+          // Keep only the last MAX_STORED positions
+          if (existing.length > MAX_STORED) {
+            existing = existing.slice(-MAX_STORED);
+          }
+          await AsyncStorage.setItem(BG_POSITIONS_KEY, JSON.stringify(existing));
+        } catch {
+          // Storage errors are non-fatal
+        }
+      }
+    );
+  } catch {
+    // defineTask unavailable (e.g. Expo Go) — GPS tracking disabled
+  }
+}
+omarthaher@Omars-MacBook-Pro mobile % grep -A20 '"dependencies"' ~/Fahrtdoc-new/artifacts/mobile/package.json
+  "dependencies": {
+    "@react-native-community/netinfo": "^12.0.1",
+    "@types/leaflet": "^1.9.21",
+    "expo-crypto": "~15.0.9",
+    "expo-file-system": "~19.0.22",
+    "expo-keep-awake": "~15.0.8",
+    "expo-local-authentication": "~17.0.8",
+    "expo-notifications": "~0.29.14",
+    "expo-secure-store": "~15.0.8",
+    "expo-task-manager": "~14.0.9",
+    "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
+    "median-js-bridge": "^2.16.0",
+    "react-leaflet": "^5.0.0",
+    "react-native-maps": "^1.20.1",
+    "react-native-purchases": "^10.2.0"
+  }
+}
+omarthaher@Omars-MacBook-Pro mobile % eas build --platform ios --profile production --auto-submit
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+Environment variables loaded from the "production" build profile "env" configuration: EXPO_PUBLIC_API_URL, GOOGLE_MAPS_ANDROID_API_KEY.
+
+
+You've used 100% of your included build credits for this month.
+Additional usage beyond your limit will be charged at pay-as-you-go rates. See usage in billing.: https://expo.dev/accounts/omarthaher85/settings/billing
+
+✔ Using remote iOS credentials (Expo server)
+
+If you provide your Apple account credentials we will be able to generate all necessary build credentials and fully validate them.
+This is optional, but without Apple account access you will need to provide all the missing values manually and we can only run minimal validation on them.
+✖ Do you want to log in to your Apple account? … yes
+omarthaher@Omars-MacBook-Pro mobile % cd ~/Fahrtdoc-new/artifacts/mobile
+git reset --hard origin/main
+grep buildNumber app.json && grep bundleIdentifier app.json && grep keep-awake package.json
+HEAD is now at eecf576 fix: remove CarPlay entitlement for testable build, bump buildNumber to 23
+      "buildNumber": "23",
+      "bundleIdentifier": "com.omarthaher.fahrtdoc",
+    "expo-keep-awake": "~15.0.8",
+omarthaher@Omars-MacBook-Pro mobile % 
