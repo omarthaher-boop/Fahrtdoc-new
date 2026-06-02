@@ -138,11 +138,15 @@ export async function fetchServerTrips(token: string): Promise<ApiTrip[] | null>
 
 export async function serverCreateTrip(token: string, trip: ApiTrip): Promise<boolean> {
   try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
     const res = await fetch(`${API_BASE}/trips`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(trip),
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
     return res.ok;
   } catch {
     return false;
@@ -151,11 +155,15 @@ export async function serverCreateTrip(token: string, trip: ApiTrip): Promise<bo
 
 export async function serverUpdateTrip(token: string, id: string, changes: Partial<ApiTrip>): Promise<boolean> {
   try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
     const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(changes),
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
     return res.ok;
   } catch {
     return false;
@@ -164,10 +172,14 @@ export async function serverUpdateTrip(token: string, id: string, changes: Parti
 
 export async function serverDeleteTrip(token: string, id: string): Promise<boolean> {
   try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
     const res = await fetch(`${API_BASE}/trips/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
     return res.ok || res.status === 404;
   } catch {
     return false;
@@ -176,11 +188,15 @@ export async function serverDeleteTrip(token: string, id: string): Promise<boole
 
 export async function serverBatchUpsertTrips(token: string, trips: ApiTrip[]): Promise<boolean> {
   try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
     const res = await fetch(`${API_BASE}/trips/batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ trips }),
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
     return res.ok;
   } catch {
     return false;
