@@ -749,7 +749,7 @@ export default function ProfileScreen() {
       });
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
-        const ext = (asset.uri.split(".").pop() ?? "png").toLowerCase();
+        const ext = ((asset.uri ?? "").split(".").pop() ?? "png").toLowerCase();
         const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
         const dataUri = `data:${mime};base64,${asset.base64}`;
         setEditLogoUri(dataUri);
