@@ -21,6 +21,15 @@ import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
 import { fetchRoutes, RouteOption } from "@/utils/routeService";
 import { useCarPlayStopped, setCarPlayStopped } from "@/utils/carplayBridge";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+function MapFallback() {
+  return (
+    <View style={{ height: 140, alignItems: "center", justifyContent: "center" }}>
+      <Feather name="map" size={22} color="#9CA3AF" />
+    </View>
+  );
+}
 
 const fmtDur = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -199,7 +208,22 @@ export default function SaveTripSheet() {
   if (!pendingTrip) return null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={() => {}}>
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (isSaving) return;
+        Alert.alert(
+          "Fahrt verwerfen?",
+          "Die Fahrt wird nicht gespeichert.",
+          [
+            { text: "Abbrechen", style: "cancel" },
+            { text: "Verwerfen", style: "destructive", onPress: discardPendingTrip },
+          ]
+        );
+      }}
+    >
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -362,11 +386,13 @@ export default function SaveTripSheet() {
               {/* Route map */}
               {draftTrip && (
                 <View style={styles.mapWrapper}>
-                  <TripRouteMap
-                    trip={draftTrip}
-                    coords={pendingTripCoords ?? undefined}
-                    path={pendingTripPath ?? undefined}
-                  />
+                  <ErrorBoundary FallbackComponent={MapFallback}>
+                    <TripRouteMap
+                      trip={draftTrip}
+                      coords={pendingTripCoords ?? undefined}
+                      path={pendingTripPath ?? undefined}
+                    />
+                  </ErrorBoundary>
                 </View>
               )}
 
