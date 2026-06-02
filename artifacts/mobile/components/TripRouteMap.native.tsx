@@ -74,10 +74,12 @@ export default function TripRouteMap({
   trip,
   coords,
   path,
+  hideOnEmpty = false,
 }: {
   trip: Trip;
   coords?: DirectCoords;
   path?: { lat: number; lon: number }[];
+  hideOnEmpty?: boolean;
 }) {
   const colors = useColors();
   const mapRef = useRef<MapView>(null);
@@ -189,6 +191,7 @@ export default function TripRouteMap({
   }
 
   if (error || points.length === 0) {
+    if (hideOnEmpty) return null;
     return (
       <View
         style={[
