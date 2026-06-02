@@ -63,7 +63,7 @@
     "expo-crypto": "~15.0.9",
     "expo-dev-client": "~6.0.21",
     "expo-file-system": "~19.0.22",
-    "expo-keep-awake": "^56.0.3",
+    "expo-keep-awake": "~15.0.8",
     "expo-local-authentication": "~17.0.8",
     "expo-notifications": "~0.29.14",
     "expo-secure-store": "~15.0.8",
