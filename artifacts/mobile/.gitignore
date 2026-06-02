@@ -15,6 +15,9 @@ android/
 # But keep the pre-written native source templates
 !native/
 !native/**
+# Keep store assets that happen to live under an ios/ subdirectory
+!docs/store-assets/ios/
+!docs/store-assets/ios/**
 *.orig.*
 *.jks
 *.p8
