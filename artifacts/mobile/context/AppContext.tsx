@@ -15,7 +15,7 @@ import { serverDeleteAccount } from "@/lib/api";
 import { LOCATION_TASK_NAME, BG_POSITIONS_KEY, BgPosition } from "@/utils/locationTask";
 import { decimatePath } from "@/utils/decimatePath";
 import { geocodeAddress } from "@/utils/geocode";
-import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
+import { DRIVE_DETECT_TASK, DRIVE_TRIP_ACTIVE_KEY, cancelDriveWatchdog, clearDriveDetectStopped } from "@/utils/driveDetect";
 import {
   showTripNotification,
   hideTripNotification,
@@ -719,6 +719,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Returns true when the address string already contains a house number.
   // Heuristic: the street segment (before the first comma) contains a digit.
   function hasHouseNumber(addr: string): boolean {
+    if (!addr) return false;
     const street = addr.split(",")[0] ?? addr;
     return /\d/.test(street);
   }
@@ -1491,6 +1492,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const startTrip = useCallback(
     async (type: "business" | "private", startAddrOverride?: string) => {
       setGpsStatus("waiting");
+      clearDriveDetectStopped().catch(() => {});
       const tripId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
       const beginTracking = (lat: number, lon: number) => {
