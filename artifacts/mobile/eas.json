@@ -33,12 +33,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api"
+        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api",
+        "GOOGLE_MAPS_ANDROID_API_KEY": "$GOOGLE_MAPS_ANDROID_API_KEY"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api"
+        "EXPO_PUBLIC_API_URL": "https://f6b49634-ba25-46e4-a4ef-a83e890a9075-00-hsre8wwzxwlj.janeway.replit.dev/api",
+        "GOOGLE_MAPS_ANDROID_API_KEY": "$GOOGLE_MAPS_ANDROID_API_KEY"
       },
       "node": {
         "pnpm": {

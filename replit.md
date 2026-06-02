@@ -79,6 +79,8 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **esbuild darwin-Binaries NICHT aus pnpm-Overrides ausschließen** — `pnpm-workspace.yaml` enthält Overrides die unnötige Plattform-Pakete mit `"-"` ausschließen. `@esbuild/darwin-arm64` und `@esbuild/darwin-x64` dürfen NICHT ausgeschlossen werden — EAS baut auf macOS und braucht diese Binaries. Ohne sie: `[esbuild] Failed to find package` → Prebuild schlägt fehl.
 
+- **`react-native-maps` auf Android braucht einen Google Maps API Key** — `PROVIDER_DEFAULT` nutzt auf Android Google Maps SDK. Ohne API-Key werden keine Kartenkacheln angezeigt (grauer Hintergrund). Key-Wiring: `app.config.js` liest `process.env.GOOGLE_MAPS_ANDROID_API_KEY` → `android.config.googleMaps.apiKey`. In EAS (`eas.json`) ist `GOOGLE_MAPS_ANDROID_API_KEY: "$GOOGLE_MAPS_ANDROID_API_KEY"` für preview + production eingetragen. Key einrichten: (1) Google Cloud Console → Maps SDK for Android aktivieren → API-Key erstellen → auf `com.fahrtdoc.app` einschränken; (2) Key als Replit Secret `GOOGLE_MAPS_ANDROID_API_KEY` speichern; (3) Key in EAS Secrets unter `https://expo.dev/accounts/[account]/projects/fahrtdoc/secrets` hinterlegen.
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
