@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TripRouteMap from "@/components/TripRouteMap";
@@ -60,6 +61,7 @@ const forwardGeocode = async (address: string): Promise<{ lat: number; lon: numb
 export default function SaveTripSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const { pendingTrip, pendingTripCoords, pendingTripPath, finalizeTrip, discardPendingTrip } = useApp();
   const { t } = useLanguage();
   const stoppedViaCarPlay = useCarPlayStopped();
@@ -235,6 +237,7 @@ export default function SaveTripSheet() {
               {
                 backgroundColor: colors.card,
                 paddingBottom: insets.bottom + 24,
+                maxHeight: screenHeight * 0.92,
               },
             ]}
           >
@@ -669,11 +672,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   sheetWrapper: {
-    maxHeight: "92%",
+    flex: 1,
     justifyContent: "flex-end",
   },
   sheet: {
-    flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
