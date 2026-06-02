@@ -232,6 +232,41 @@ function getDateRange(trips: Trip[], dateFrom: string, dateTo: string): string {
   return `${fmtDate(min.toISOString())} – ${fmtDate(max.toISOString())}`;
 }
 
+const BASE64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/**
+ * Encodes bytes to base64 without depending on a global `btoa` (not guaranteed
+ * to exist in Hermes/React Native) and without allocating a multi-megabyte
+ * intermediate binary string. Used for writing the generated PDF to disk.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let out = "";
+  let i = 0;
+  const len = bytes.length;
+  for (; i + 2 < len; i += 3) {
+    const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+    out +=
+      BASE64_CHARS[(n >> 18) & 63] +
+      BASE64_CHARS[(n >> 12) & 63] +
+      BASE64_CHARS[(n >> 6) & 63] +
+      BASE64_CHARS[n & 63];
+  }
+  const rem = len - i;
+  if (rem === 1) {
+    const n = bytes[i] << 16;
+    out += BASE64_CHARS[(n >> 18) & 63] + BASE64_CHARS[(n >> 12) & 63] + "==";
+  } else if (rem === 2) {
+    const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
+    out +=
+      BASE64_CHARS[(n >> 18) & 63] +
+      BASE64_CHARS[(n >> 12) & 63] +
+      BASE64_CHARS[(n >> 6) & 63] +
+      "=";
+  }
+  return out;
+}
+
 async function getAppLogoBase64(): Promise<string | null> {
   try {
     if (Platform.OS === "web") {
@@ -1200,15 +1235,7 @@ async function exportPDFNative(
   // Save to temp file and share
   const pdfBytes = doc.output("arraybuffer") as ArrayBuffer;
   const uint8 = new Uint8Array(pdfBytes);
-  let binary = "";
-  const chunkSize = 1024;
-  for (let i = 0; i < uint8.length; i += chunkSize) {
-    const chunk = uint8.subarray(i, i + chunkSize);
-    for (let j = 0; j < chunk.length; j++) {
-      binary += String.fromCharCode(chunk[j]);
-    }
-  }
-  const pdfBase64 = btoa(binary);
+  const pdfBase64 = bytesToBase64(uint8);
   const pdfFilename = `Fahrtenbuch_${Date.now()}.pdf`;
   const cacheDir2 = FileSystem.cacheDirectory;
   if (!cacheDir2) throw new Error("cacheDirectory unavailable");

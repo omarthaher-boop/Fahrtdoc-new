@@ -1,10 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,12 +17,6 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Waypoint } from "@/context/AppContext";
-import {
-  DRIVE_DETECT_TASK,
-  recordDriveDetectStopped,
-  clearDriveDetectStopped,
-  checkAndSendDriveDetectStoppedNotif,
-} from "@/utils/driveDetect";
 import { useTripSourcePlatform } from "@/utils/carplayBridge";
 
 const fmtTime = (s: number) => {
@@ -72,84 +65,8 @@ export default function ActiveTripBanner() {
   const [pauseLocationLoading, setPauseLocationLoading] = useState(false);
   const [pauseNote, setPauseNote] = useState("");
   const [geocoding, setGeocoding] = useState(false);
-  const [driveTaskRunning, setDriveTaskRunning] = useState(true);
-  const [restarting, setRestarting] = useState(false);
   const [showWaypoints, setShowWaypoints] = useState(false);
   const noteInputRef = useRef<TextInput>(null);
-
-  const refreshDriveTaskStatus = useCallback(async () => {
-    if (Platform.OS === "web") return;
-    try {
-      const Location = await import("expo-location");
-      const running = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
-      setDriveTaskRunning(running);
-    } catch {
-      setDriveTaskRunning(false);
-    }
-  }, []);
-
-  const handleRestartDetect = useCallback(async () => {
-    if (Platform.OS === "web" || restarting) return;
-    setRestarting(true);
-    try {
-      const Location = await import("expo-location");
-      const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVE_DETECT_TASK);
-      if (!isRunning) {
-        await Location.startLocationUpdatesAsync(DRIVE_DETECT_TASK, {
-          accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 200,
-          timeInterval: 60000,
-          activityType: Location.ActivityType.OtherNavigation,
-          showsBackgroundLocationIndicator: false,
-          ...(Platform.OS === "android" && {
-            foregroundService: {
-              notificationTitle: "FahrtDoc",
-              notificationBody: language === "de" ? "Fahrt-Erkennung aktiv" : "Drive detection active",
-              notificationColor: "#2563EB",
-            },
-          }),
-        });
-      }
-      setDriveTaskRunning(true);
-    } catch {
-      // Non-fatal — status remains false, banner stays visible
-    } finally {
-      setRestarting(false);
-    }
-  }, [restarting, language]);
-
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    refreshDriveTaskStatus();
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        refreshDriveTaskStatus();
-      }
-    });
-    return () => subscription.remove();
-  }, [refreshDriveTaskStatus]);
-
-  useEffect(() => {
-    if (Platform.OS === "web" || !activeTrip) return;
-    const intervalId = setInterval(() => {
-      if (AppState.currentState === "active") {
-        refreshDriveTaskStatus();
-      }
-    }, 30_000);
-    return () => clearInterval(intervalId);
-  }, [activeTrip, refreshDriveTaskStatus]);
-
-  // Track how long drive detection has been stopped and fire a notification
-  // after 2 minutes so the user cannot silently miss missed trips.
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    if (!driveTaskRunning) {
-      recordDriveDetectStopped();
-      checkAndSendDriveDetectStoppedNotif(language);
-    } else {
-      clearDriveDetectStopped();
-    }
-  }, [driveTaskRunning, language]);
 
   // Auto-expand waypoint list when a new waypoint is added; collapse when trip resets
   useEffect(() => {
@@ -296,24 +213,6 @@ export default function ActiveTripBanner() {
             <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
               <Feather name="wifi-off" size={12} color={warningColor} />
               <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.gpsOff")}</Text>
-            </View>
-          )}
-
-          {!driveTaskRunning && Platform.OS !== "web" && (
-            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
-              <Feather name="alert-triangle" size={12} color={warningColor} />
-              <Text style={[styles.gpsOffText, { color: warningColor, flex: 1 }]}>{t("tracking.driveDetectStopped")}</Text>
-              <TouchableOpacity
-                onPress={handleRestartDetect}
-                disabled={restarting}
-                style={[styles.restartBtn, { backgroundColor: warningColor }]}
-              >
-                {restarting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.restartBtnText}>{t("tracking.restartDetect")}</Text>
-                )}
-              </TouchableOpacity>
             </View>
           )}
 

@@ -1,0 +1,2 @@
+- [Native map crashes](native-map-crashes.md) — react-native-maps can take down the whole screen; wrap each MapView in an ErrorBoundary, never render maps per-list-row eagerly.
+- [Hermes base64 / btoa](hermes-base64.md) — don't rely on global btoa in RN/Hermes; encode bytes→base64 manually for PDF/file writes.

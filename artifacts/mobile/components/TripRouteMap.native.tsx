@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import { Trip } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface Coord {
   lat: number;
@@ -66,6 +67,28 @@ function WaypointPin({ index }: { index: number }) {
   return (
     <View style={nativeStyles.waypointPin}>
       <Text style={nativeStyles.waypointText}>{index}</Text>
+    </View>
+  );
+}
+
+function MapUnavailable() {
+  const colors = useColors();
+  return (
+    <View
+      style={[
+        styles.map,
+        {
+          backgroundColor: colors.secondary,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        },
+      ]}
+    >
+      <Feather name="map" size={22} color={colors.mutedForeground} />
+      <Text style={[styles.placeholderText, { color: colors.mutedForeground }]}>
+        Karte nicht verfügbar
+      </Text>
     </View>
   );
 }
@@ -209,6 +232,7 @@ export default function TripRouteMap({
 
   return (
     <View style={[styles.mapContainer, { borderColor: colors.border }]}>
+      <ErrorBoundary FallbackComponent={MapUnavailable}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -255,6 +279,7 @@ export default function TripRouteMap({
           </Marker>
         ))}
       </MapView>
+      </ErrorBoundary>
 
       <View style={[styles.legend, { borderTopColor: colors.border }]}>
         <View style={styles.legendItem}>

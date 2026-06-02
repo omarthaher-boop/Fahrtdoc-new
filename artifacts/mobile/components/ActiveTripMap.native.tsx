@@ -1,11 +1,35 @@
+import { Feather } from "@expo/vector-icons";
 import React, { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useColors } from "@/hooks/useColors";
 
 interface Props {
   positions: { lat: number; lon: number }[];
   livePos: { lat: number; lon: number } | null;
+}
+
+function MapUnavailable() {
+  const colors = useColors();
+  return (
+    <View
+      style={[
+        styles.map,
+        {
+          backgroundColor: colors.secondary,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        },
+      ]}
+    >
+      <Feather name="map" size={22} color={colors.mutedForeground} />
+      <Text style={{ fontSize: 13, color: colors.mutedForeground }}>
+        Karte nicht verfügbar
+      </Text>
+    </View>
+  );
 }
 
 export default function ActiveTripMap({ positions, livePos }: Props) {
@@ -79,6 +103,7 @@ export default function ActiveTripMap({ positions, livePos }: Props) {
 
   return (
     <View style={styles.container}>
+      <ErrorBoundary FallbackComponent={MapUnavailable}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -132,6 +157,7 @@ export default function ActiveTripMap({ positions, livePos }: Props) {
           </Marker>
         )}
       </MapView>
+      </ErrorBoundary>
     </View>
   );
 }

@@ -81,6 +81,11 @@ Fahrtenbuch-App für iOS/Android: Fahrten automatisch aufzeichnen, Kilometernach
 
 - **`react-native-maps` auf Android braucht einen Google Maps API Key** — `PROVIDER_DEFAULT` nutzt auf Android Google Maps SDK. Ohne API-Key werden keine Kartenkacheln angezeigt (grauer Hintergrund). Key-Wiring: `app.config.js` liest `process.env.GOOGLE_MAPS_ANDROID_API_KEY` → `android.config.googleMaps.apiKey`. In EAS (`eas.json`) ist `GOOGLE_MAPS_ANDROID_API_KEY: "$GOOGLE_MAPS_ANDROID_API_KEY"` für preview + production eingetragen. Key einrichten: (1) Google Cloud Console → Maps SDK for Android aktivieren → API-Key erstellen → auf `com.fahrtdoc.app` einschränken; (2) Key als Replit Secret `GOOGLE_MAPS_ANDROID_API_KEY` speichern; (3) Key in EAS Secrets unter `https://expo.dev/accounts/[account]/projects/fahrtdoc/secrets` hinterlegen.
 
+## Gotchas — react-native-maps & native Crashes
+
+- **Native `MapView` crasht ggf. den ganzen Screen** — `react-native-maps` wird über `TripRouteMap.native.tsx` (Liste, Save-Sheet, Detail) und `ActiveTripMap.native.tsx` (aktive Fahrt) gerendert. Ein Render-/Native-Fehler der Karte riss früher den gesamten Screen mit (z. B. Save-Sheet rendert `TripRouteMap` bedingungslos → Speichern unmöglich, App-Neustart nötig). Beide native Map-Komponenten kapseln die `MapView` jetzt intern in eine `ErrorBoundary` mit Fallback "Karte nicht verfügbar". JS-Level-Fehler (z. B. `requireNativeComponent`-Fehler) werden so abgefangen; reine native Crashes (Obj-C/Swift) bleiben unkatchbar.
+- **`btoa` ist in Hermes nicht garantiert** — PDF-Export (`utils/exportPDF.ts`) nutzt jetzt einen eigenen `bytesToBase64`-Encoder statt globalem `btoa` + char-für-char `binary`-String. Vermeidet sowohl die `btoa`-Abhängigkeit als auch einen mehrere MB großen Zwischen-String (OOM-Risiko bei großen Fahrtenlisten).
+
 ## Gotchas — Git / GitHub Workflow
 
 - **Wenn `git pull` wegen lokaler Änderungen blockiert**: `git checkout -- . && git pull` ausführen.
