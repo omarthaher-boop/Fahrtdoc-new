@@ -1,7 +1,23 @@
 import { Platform, Alert, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
-import { jsPDF } from "jspdf";
+import type { jsPDF as JsPDFType } from "jspdf";
 import type { Trip, UserProfile } from "@/context/AppContext";
+
+function patchTextDecoderLatin1() {
+  if (Platform.OS === "web") return;
+  if (typeof global === "undefined" || !(global as any).TextDecoder) return;
+  if ((global as any).TextDecoder.__hpatched) return;
+  const Orig = (global as any).TextDecoder;
+  const Patched = function (label = "utf-8", opts?: TextDecoderOptions) {
+    const n = String(label).toLowerCase().replace(/[^a-z0-9]/g, "");
+    return new Orig(
+      n === "latin1" || n === "iso88591" || n === "windows1252" ? "utf-8" : label || "utf-8",
+      opts
+    );
+  };
+  (Patched as any).__hpatched = true;
+  (global as any).TextDecoder = Patched;
+}
 import type { Language } from "@/context/LanguageContext";
 
 // ─── Export error messages ────────────────────────────────────────────────────
@@ -545,7 +561,7 @@ function buildHTML(
 }
 
 function drawSignatureBlock(
-  doc: jsPDF,
+  doc: JsPDFType,
   y: number,
   margin: number,
   contentW: number,
@@ -598,6 +614,7 @@ async function exportPDFWeb(
   typeLabel?: string,
   lang: Language = "de"
 ): Promise<void> {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
@@ -947,6 +964,8 @@ async function exportPDFNative(
   typeLabel?: string,
   lang: Language = "de"
 ): Promise<void> {
+  patchTextDecoderLatin1();
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   const totalKm = trips.reduce((a, t) => a + t.km, 0);
