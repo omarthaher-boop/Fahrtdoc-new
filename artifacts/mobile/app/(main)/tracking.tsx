@@ -10,11 +10,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActiveTripMap from "@/components/ActiveTripMap";
@@ -60,6 +62,7 @@ const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> =>
 export default function TrackingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const { t } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, togglePause, livePos, gpsTracking } = useApp();
 
@@ -296,7 +299,7 @@ export default function TrackingScreen() {
       </View>
 
       {/* Map area */}
-      <View style={styles.mapArea}>
+      <View style={[styles.mapArea, { height: screenHeight * 0.42 }]}>
         {!showMap && (
           <View style={[styles.mapPlaceholder, { backgroundColor: colors.secondary }]}>
             <View style={[styles.mapPlaceholderIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -629,7 +632,7 @@ const styles = StyleSheet.create({
   },
   typePillText: { fontSize: 11, fontWeight: "600" },
   headerRight: { width: 36 },
-  mapArea: { flex: 1 },
+  mapArea: { overflow: "hidden" },
   mapPlaceholder: {
     flex: 1,
     alignItems: "center",
