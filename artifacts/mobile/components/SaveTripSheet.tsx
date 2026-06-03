@@ -237,7 +237,7 @@ export default function SaveTripSheet() {
               {
                 backgroundColor: colors.card,
                 paddingBottom: insets.bottom + 24,
-                maxHeight: screenHeight * 0.92,
+                height: screenHeight * 0.9,
               },
             ]}
           >
