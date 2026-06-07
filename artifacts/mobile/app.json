@@ -22,7 +22,21 @@
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
         "NSPhotoLibraryUsageDescription": "FahrtDoc benötigt Zugriff auf deine Fotos, um ein Firmenlogo für den PDF-Export auszuwählen.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationAlwaysUsageDescription": "FahrtDoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen."
+        "NSLocationAlwaysUsageDescription": "FahrtDoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen.",
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": true,
+          "UISceneConfigurations": {
+            "CPTemplateApplicationSceneSessionRoleApplication": [
+              {
+                "UISceneConfigurationName": "CarPlay",
+                "UISceneDelegateClassName": "$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate"
+              }
+            ]
+          }
+        }
+      },
+      "entitlements": {
+        "com.apple.developer.carplay-driving-task": true
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
