@@ -1524,7 +1524,7 @@ export default function ProfileScreen() {
                 : "System notifications can be managed in the device settings."}
             </Text>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Privacy Modal */}
@@ -1540,7 +1540,7 @@ export default function ProfileScreen() {
           <ScrollView contentContainerStyle={[styles.modalContent, { paddingTop: 16, paddingBottom: 40 }]}>
             <Text style={[styles.privacyText, { color: colors.foreground }]}>{PRIVACY_TEXT}</Text>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
@@ -1567,7 +1567,7 @@ export default function ProfileScreen() {
               />
             ))}
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Change Email Modal */}
