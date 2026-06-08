@@ -26,7 +26,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { DRIVE_DETECT_TASK, DRIVE_REMIND_KEY, DRIVE_DETECT_STOPPED_THRESHOLD_KEY, cancelDriveWatchdog } from "@/utils/driveDetect";
 
@@ -1330,6 +1330,7 @@ export default function ProfileScreen() {
 
       {/* Edit Profile Modal */}
       <Modal visible={editModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setEditModalVisible(false)}>
@@ -1349,10 +1350,12 @@ export default function ProfileScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* Vehicle Profile Modal */}
       <Modal visible={vehicleModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ width: 40 }} />
@@ -1391,10 +1394,12 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* Company Info Modal */}
       <Modal visible={companyModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ width: 40 }} />
@@ -1466,11 +1471,12 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* Notifications Modal */}
       <Modal visible={notifModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalScreen, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalScreen, { backgroundColor: colors.background }]} edges={["top"]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ width: 70 }} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("notif.title")}</Text>
@@ -1523,7 +1529,7 @@ export default function ProfileScreen() {
 
       {/* Privacy Modal */}
       <Modal visible={privacyModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalScreen, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalScreen, { backgroundColor: colors.background }]} edges={["top"]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ width: 70 }} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("privacy.title")}</Text>
@@ -1541,7 +1547,7 @@ export default function ProfileScreen() {
 
       {/* FAQ Modal */}
       <Modal visible={faqModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalScreen, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalScreen, { backgroundColor: colors.background }]} edges={["top"]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ width: 70 }} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("faq.title")}</Text>
@@ -1566,6 +1572,7 @@ export default function ProfileScreen() {
 
       {/* Change Email Modal */}
       <Modal visible={emModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={closeEmModal} disabled={emLoading}>
@@ -1652,10 +1659,12 @@ export default function ProfileScreen() {
             )}
           </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* Change Password Modal */}
       <Modal visible={pwModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <KeyboardAvoidingView style={[styles.modalScreen, { backgroundColor: colors.background }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={closePwModal} disabled={pwLoading}>
@@ -1719,6 +1728,7 @@ export default function ProfileScreen() {
             )}
           </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
