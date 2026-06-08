@@ -193,18 +193,32 @@ const fetchOsrmRoute = async (
   }
 };
 
-export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
+interface NominatimResult {
+  road: string;
+  houseNumber: string;
+  postcode: string;
+  city: string;
+}
+
+async function fetchNominatim(lat: number, lon: number, zoom: number): Promise<NominatimResult | null> {
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 4000);
+    const tid = setTimeout(() => ctrl.abort(), 6000);
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de&zoom=19&addressdetails=1&namedetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de&zoom=${zoom}&addressdetails=1&namedetails=1`,
       { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
     );
     clearTimeout(tid);
+    if (!r.ok) return null;
     const d = await r.json();
-    const road = d.address?.road || d.address?.pedestrian || d.address?.path || d.address?.street || "";
-    const houseNumber = d.address?.house_number || d.address?.housenumber || "";
+    const road =
+      d.address?.road || d.address?.pedestrian || d.address?.path || d.address?.street || "";
+    // house_number from structured fields first, then try display_name leading token
+    let houseNumber = d.address?.house_number || d.address?.housenumber || "";
+    if (!houseNumber && d.display_name) {
+      const firstToken = String(d.display_name).split(",")[0]?.trim() ?? "";
+      if (/^\d[\d\s\-a-zA-Z]{0,6}$/.test(firstToken)) houseNumber = firstToken;
+    }
     const postcode = d.address?.postcode || "";
     const city =
       d.address?.city ||
@@ -213,12 +227,35 @@ export const reverseGeocode = async (lat: number, lon: number): Promise<string> 
       d.address?.suburb ||
       d.address?.municipality ||
       "";
-    const street = houseNumber ? `${road} ${houseNumber}`.trim() : road;
-    const locality = [postcode, city].filter(Boolean).join(" ");
-    return [street, locality].filter(Boolean).join(", ") || `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    return { road, houseNumber, postcode, city };
   } catch {
-    return `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+    return null;
   }
+}
+
+function formatNominatimAddress(r: NominatimResult): string {
+  const street = r.houseNumber ? `${r.road} ${r.houseNumber}`.trim() : r.road;
+  const locality = [r.postcode, r.city].filter(Boolean).join(" ");
+  return [street, locality].filter(Boolean).join(", ");
+}
+
+export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
+  // First attempt: building level (zoom 19) — highest chance of finding house numbers
+  const r1 = await fetchNominatim(lat, lon, 19);
+  if (r1?.houseNumber) return formatNominatimAddress(r1);
+
+  // Second attempt: street level (zoom 18) — some house numbers only appear at this level
+  await new Promise<void>((resolve) => setTimeout(resolve, 800));
+  const r2 = await fetchNominatim(lat, lon, 18);
+  if (r2?.houseNumber) return formatNominatimAddress(r2);
+
+  // No house number found — return best street-level result available
+  const best = r2 ?? r1;
+  if (best) {
+    const result = formatNominatimAddress(best);
+    if (result) return result;
+  }
+  return `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
 };
 
 async function sha256Hex(text: string): Promise<string> {
@@ -724,6 +761,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return /\d/.test(street);
   }
 
+  // True when the address is a raw coordinate fallback (e.g. "52.1234°, 13.4567°")
+  // — these should always be replaced with whatever Nominatim returns.
+  function isRawCoordinates(addr: string): boolean {
+    if (!addr) return true;
+    return /^\d+\.\d+°/.test(addr.trim());
+  }
+
+  // True when the new address is meaningfully better than the current one.
+  // Accepts the update if: new address has a house number, OR current was raw coords/empty.
+  function isBetterAddress(current: string | undefined, next: string): boolean {
+    if (!next || isRawCoordinates(next)) return false; // never replace with coordinates
+    if (!current || isRawCoordinates(current)) return true; // any real address > raw coords
+    return hasHouseNumber(next) && !hasHouseNumber(current); // street+number > street only
+  }
+
   const refreshAddresses = useCallback(async () => {
     if (!user) return;
     setIsRefreshingAddresses(true);
@@ -735,11 +787,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const needsStart =
           trip.startLat !== undefined &&
           trip.startLon !== undefined &&
-          !hasHouseNumber(trip.startAddr);
+          (isRawCoordinates(trip.startAddr) || !hasHouseNumber(trip.startAddr));
         const needsEnd =
           trip.endLat !== undefined &&
           trip.endLon !== undefined &&
-          !hasHouseNumber(trip.endAddr);
+          (isRawCoordinates(trip.endAddr) || !hasHouseNumber(trip.endAddr));
 
         if (!needsStart && !needsEnd) continue;
 
@@ -747,12 +799,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (needsStart) {
           const addr = await reverseGeocode(trip.startLat!, trip.startLon!);
-          if (hasHouseNumber(addr)) update.startAddr = addr;
+          if (isBetterAddress(trip.startAddr, addr)) update.startAddr = addr;
           await new Promise<void>((r) => setTimeout(r, 1100));
         }
         if (needsEnd) {
           const addr = await reverseGeocode(trip.endLat!, trip.endLon!);
-          if (hasHouseNumber(addr)) update.endAddr = addr;
+          if (isBetterAddress(trip.endAddr, addr)) update.endAddr = addr;
           await new Promise<void>((r) => setTimeout(r, 1100));
         }
 
