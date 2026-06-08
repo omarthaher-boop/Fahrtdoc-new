@@ -632,11 +632,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const t = activeTripRef.current;
       if (!t) return;
       const sec = Math.max(0, Math.floor((Date.now() - t.startTime) / 1000));
-      const km = (t.distance || 0) / 1000;
+      const km = t.distance || 0;
       showTripNotification(t.type, sec, km).catch(() => {});
     };
     showNow();
-    const id = setInterval(showNow, 60_000);
+    const id = setInterval(showNow, 30_000);
     return () => {
       clearInterval(id);
       hideTripNotification().catch(() => {});
