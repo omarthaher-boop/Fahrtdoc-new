@@ -1559,6 +1559,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           positions: [{ lat, lon }],
         });
         AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
+        cancelDriveWatchdog().catch(() => {});
         if (!startAddrOverride) {
           reverseGeocode(lat, lon).then((addr) => {
             setActiveTrip((prev) =>
@@ -1613,6 +1614,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             positions: [],
           });
           AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
+          cancelDriveWatchdog().catch(() => {});
           return;
         }
 
