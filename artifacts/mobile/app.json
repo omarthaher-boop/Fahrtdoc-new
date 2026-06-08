@@ -24,9 +24,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationAlwaysUsageDescription": "FahrtDoc benötigt Zugriff auf deinen Standort im Hintergrund, um Fahrten vollständig aufzuzeichnen."
       },
-      "entitlements": {
-        "com.apple.developer.carplay-driving-task": true
-      },
+      "entitlements": {},
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
