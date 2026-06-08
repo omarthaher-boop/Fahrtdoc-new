@@ -396,7 +396,7 @@ function buildHTML(
   });
 
   const logoHtml = user?.logoUri
-    ? `<img src="${user.logoUri}" style="max-height:48px; max-width:160px; object-fit:contain; display:block; margin-bottom:6px;" alt="Logo" />`
+    ? `<img src="${user.logoUri}" style="max-height:56px; max-width:180px; object-fit:contain; display:block; margin: 0 auto 6px auto;" alt="Logo" />`
     : "";
   const headerLabel = user?.companyName ? user.companyName : "FahrtDoc";
   const subLabel = typeLabel ? typeLabel : "Fahrtenbuch";
@@ -416,13 +416,14 @@ function buildHTML(
       padding: 28px 32px;
     }
     .header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
       border-bottom: 2.5px solid #1A2B6B;
       padding-bottom: 16px;
       margin-bottom: 20px;
     }
+    .header-center { text-align: center; }
     .brand-name { font-size: 22pt; font-weight: 800; color: #1A2B6B; letter-spacing: -0.5px; }
     .brand-sub { font-size: 10pt; color: #5a6a9a; font-weight: 500; margin-top: 2px; }
     .meta { text-align: right; font-size: 10pt; color: #444; line-height: 1.6; }
@@ -494,7 +495,8 @@ function buildHTML(
 </head>
 <body>
   <div class="header">
-    <div>
+    <div></div>
+    <div class="header-center">
       ${logoHtml}
       <div class="brand-name">${headerLabel}</div>
       <div class="brand-sub">${subLabel}</div>
@@ -650,6 +652,7 @@ async function exportPDFWeb(
 
   const appLogo = await getAppLogoBase64();
 
+  let logoH = 0;
   if (user?.logoUri) {
     try {
       const loadImg = (src: string): Promise<HTMLImageElement> =>
@@ -661,15 +664,16 @@ async function exportPDFWeb(
         });
       const img = await loadImg(user.logoUri);
       const ratio = img.naturalWidth / img.naturalHeight;
-      const maxW = 40;
-      const maxH = 16;
+      const maxW = 48;
+      const maxH = 20;
       let w = maxW;
       let h = maxW / ratio;
       if (h > maxH) { h = maxH; w = maxH * ratio; }
       const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
       const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
-      doc.addImage(user.logoUri, fmt, margin, y, w, h);
-      y += h + 2;
+      doc.addImage(user.logoUri, fmt, pageW / 2 - w / 2, y, w, h);
+      logoH = h + 3;
+      y += logoH;
     } catch {
       // skip logo if loading fails
     }
@@ -678,12 +682,12 @@ async function exportPDFWeb(
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...navy);
-  doc.text(brandLabel, margin, y);
+  doc.text(brandLabel, pageW / 2, y, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(90, 106, 154);
-  doc.text(subLabel, margin, y + 6);
+  doc.text(subLabel, pageW / 2, y + 6, { align: "center" });
 
   // App logo top-right
   if (appLogo) {
@@ -704,7 +708,7 @@ async function exportPDFWeb(
       if (lw > maxW) { lw = maxW; lh = maxW / ratio; }
       const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
       const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
-      doc.addImage(appLogo, fmt, pageW - margin - lw, y - 4, lw, lh);
+      doc.addImage(appLogo, fmt, pageW - margin - lw, 20 - 4, lw, lh);
     } catch {
       // skip if loading fails
     }
@@ -716,7 +720,7 @@ async function exportPDFWeb(
   if (user?.name) metaLines.push(user.name);
   if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
   metaLines.push(`Zeitraum: ${dateRange}`);
-  const metaStartY = appLogo ? y + 12 : y;
+  const metaStartY = appLogo ? 20 + 12 : 20 + logoH;
   metaLines.forEach((line, i) => {
     doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
   });
@@ -998,13 +1002,17 @@ async function exportPDFNative(
 
   const appLogo = await getAppLogoBase64();
 
-  // User company logo (native: fixed dimensions, no DOM needed)
+  // User company logo — centered (native: fixed dimensions, no DOM needed)
+  let logoHN = 0;
   if (user?.logoUri) {
     try {
       const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
       const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
-      doc.addImage(user.logoUri, fmt, margin, y, 36, 14);
-      y += 16;
+      const logoW = 40;
+      const logoH = 16;
+      doc.addImage(user.logoUri, fmt, pageW / 2 - logoW / 2, y, logoW, logoH);
+      logoHN = logoH + 3;
+      y += logoHN;
     } catch {
       // skip logo if loading fails
     }
@@ -1013,19 +1021,19 @@ async function exportPDFNative(
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...navy);
-  doc.text(brandLabel, margin, y);
+  doc.text(brandLabel, pageW / 2, y, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(90, 106, 154);
-  doc.text(subLabel, margin, y + 6);
+  doc.text(subLabel, pageW / 2, y + 6, { align: "center" });
 
   // App logo top-right (native: fixed dimensions)
   if (appLogo) {
     try {
       const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
       const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
-      doc.addImage(appLogo, fmt, pageW - margin - 20, y - 4, 20, 14);
+      doc.addImage(appLogo, fmt, pageW - margin - 20, 20 - 4, 20, 14);
     } catch {
       // skip if loading fails
     }
@@ -1037,7 +1045,7 @@ async function exportPDFNative(
   if (user?.name) metaLines.push(user.name);
   if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
   metaLines.push(`Zeitraum: ${dateRange}`);
-  const metaStartY = appLogo ? y + 12 : y;
+  const metaStartY = appLogo ? 20 + 12 : 20 + logoHN;
   metaLines.forEach((line, i) => {
     doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
   });
