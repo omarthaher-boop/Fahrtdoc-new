@@ -39,7 +39,7 @@
       }
     },
     "production": {
-      "prebuildCommand": "expo prebuild --clean && bash scripts/setup-carplay-native.sh",
+      "prebuildCommand": "bash scripts/prebuild.sh",
       "ios": {
         "simulator": false,
         "resourceClass": "m-medium"
