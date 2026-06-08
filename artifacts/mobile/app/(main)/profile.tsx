@@ -91,94 +91,173 @@ const FAQ_DATA: { q: string; a: string }[] = [
   ];
 
 const PRIVACY_TEXT = `DATENSCHUTZERKLÄRUNG
+FahrtDoc – Fahrtendokumentation App
 
-Stand: Mai 2026
+Stand: 08.06.2026
+
 
 1. VERANTWORTLICHE STELLE
 
-Verantwortlich für die Verarbeitung deiner personenbezogenen Daten im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:
+Verantwortlich für die Verarbeitung Ihrer personenbezogenen Daten im Sinne des Schweizer Bundesgesetzes über den Datenschutz (nDSG) sowie der EU-Datenschutz-Grundverordnung (DSGVO) ist:
 
-www.centofai.com
-E-Mail: info@centofai.com
+CentofAI / Dr. Omar Thaher
+Arbon, Schweiz
+E-Mail: info@centof.ai
+Website: centof.ai
 
-2. WELCHE DATEN WIR ERHEBEN
 
-FahrtDoc verarbeitet folgende Kategorien personenbezogener Daten:
+2. ALLGEMEINES
 
-• Profildaten: Name, E-Mail-Adresse, Fahrzeugkennzeichen, Fahrzeugmarke und -modell
-• Fahrtdaten: Startort, Zielort, Datum, Uhrzeit, Dauer, Streckenlänge, Fahrtart (geschäftlich/privat), Notizen
-• Standortdaten: GPS-Koordinaten während einer Fahrt (nur während aktiver Aufzeichnung)
-• Technische Daten: App-Version, Geräteart, Betriebssystem (nur zur Fehlerdiagnose)
+Diese Datenschutzerklärung informiert Sie über Art, Umfang und Zweck der Verarbeitung personenbezogener Daten bei der Nutzung der mobilen Applikation FahrtDoc (nachfolgend «App»). Die App steht für iOS (Apple App Store) und Android (Google Play Store) zur Verfügung.
 
-3. ZWECK DER DATENVERARBEITUNG
+Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst und behandeln Ihre personenbezogenen Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften sowie dieser Datenschutzerklärung.
 
-Wir verarbeiten deine Daten ausschließlich zu folgenden Zwecken:
 
-• Führung und Verwaltung deines elektronischen Fahrtenbuchs
-• Automatische Erkennung und Aufzeichnung von Fahrten (mit deiner Zustimmung)
-• Synchronisation deiner Daten zwischen Geräten
-• Erstellung von Export-Dokumenten für steuerliche Zwecke (PDF, CSV)
-• Bereitstellung des Kunden-Supports
+3. ERHOBENE UND VERARBEITETE DATEN
 
-Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) sowie Art. 6 Abs. 1 lit. a DSGVO (Einwilligung) für die Standortverarbeitung.
+3.1 Standort- und GPS-Daten
 
-4. STANDORTDATEN UND DRITTANBIETER
+Die App erhebt Standortdaten ausschliesslich während aktiver Fahrten, um die zurückgelegte Strecke, Kilometer, Fahrtdauer sowie Start- und Zielorte zu dokumentieren. Standortdaten werden nicht im Hintergrund erfasst, wenn keine Fahrt aktiv ist.
 
-Für die Fahrtaufzeichnung greift die App auf deinen Gerätestandort zu. Standortdaten werden:
+Gespeichert werden:
+• GPS-Koordinaten (Start, Zwischenpunkte, Ziel)
+• Fahrtdauer und -distanz
+• Zeitstempel der Fahrt
+• Automatisch ermittelte Ortsnamen (Start und Ziel)
 
-• Lokal auf deinem Gerät und auf unseren gesicherten Servern gespeichert
-• Nicht an Dritte verkauft oder zu Werbezwecken genutzt
-• Für technische Hilfsfunktionen temporär an folgende Drittanbieter übertragen:
+3.2 Biometrische Authentifizierungsdaten
 
-ADRESSAUFLÖSUNG – OpenStreetMap Nominatim
-Betreiber: OpenStreetMap Foundation, 132 Maney Hill Road, Sutton Coldfield, West Midlands B72 1JU, Vereinigtes Königreich
-Zweck: Umwandlung von GPS-Koordinaten in lesbare Adressen (Reverse Geocoding)
-Übertragene Daten: GPS-Koordinaten (Breiten- und Längengrad) des Fahrtbeginns und -endes – ohne Benutzerkennzeichnung oder Account-Bezug
-Datenschutz: https://osmfoundation.org/wiki/Privacy_Policy
-Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO
+FahrtDoc unterstützt Face ID und Fingerabdruck-Authentifizierung zur Sicherung des App-Zugangs. Diese biometrischen Daten werden ausschliesslich auf Ihrem Gerät verarbeitet und niemals an externe Server übermittelt. Die Verarbeitung erfolgt vollständig durch das Betriebssystem (iOS/Android) ohne Zugriff durch unsere App.
 
-ROUTENBERECHNUNG – OSRM (Open Source Routing Machine)
-Betreiber: OpenStreetMap Foundation (Projektserver router.project-osrm.org)
-Zweck: Berechnung alternativer Routenoptionen (kürzeste/schnellste Strecke) beim Speichern einer Fahrt
-Übertragene Daten: GPS-Koordinaten von Start- und Zielpunkt der Fahrt – ohne Benutzerkennzeichnung oder Account-Bezug
-Datenschutz: https://osmfoundation.org/wiki/Privacy_Policy
-Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO
+3.3 Exportierte Daten
 
-Wichtig: Beide Dienste erhalten ausschließlich anonyme Koordinaten. Es werden keine Namen, E-Mail-Adressen oder sonstigen personenbezogenen Daten übertragen. Die Koordinaten werden von den Diensten nicht dauerhaft gespeichert und nicht zur Profilbildung verwendet.
+Fahrtenprotokolle können als PDF- oder CSV-Dateien exportiert werden. Diese Dateien verlassen die App erst, wenn Sie den Export aktiv auslösen. Die Speicherung und Weitergabe dieser Exporte liegt in Ihrer Verantwortung.
 
-Du kannst die Standortberechtigung jederzeit in den Geräteinstellungen widerrufen. Das automatische Tracking ist dann nicht verfügbar.
+3.4 Zahlungs- und Abonnementdaten
 
-5. DATENSPEICHERUNG UND LÖSCHUNG
+Bei der Nutzung kostenpflichtiger Funktionen werden Zahlungsabwicklung und Abonnementverwaltung durch RevenueCat Inc. (USA) vorgenommen. FahrtDoc hat keinen direkten Zugriff auf Ihre Zahlungsmitteldetails. Es werden lediglich Abonnementstatus, Transaktions-IDs und anonymisierte Nutzer-IDs verarbeitet.
 
-Fahrtdaten werden bis zu 10 Jahre aufbewahrt, da das Steuerrecht (§ 147 AO) eine entsprechende Aufbewahrungspflicht für steuerrelevante Unterlagen vorsieht. Profildaten werden nach Kontolöschung innerhalb von 30 Tagen gelöscht.
+3.5 Technische Daten / Backend
 
-Du kannst einzelne Fahrten jederzeit selbst löschen. Dein komplettes Konto kannst du unter Profil → „Konto löschen" sofort und dauerhaft löschen. Dabei werden alle deine Fahrten, Profildaten und Kontoinformationen unwiderruflich gelöscht.
+Zur Bereitstellung der App-Funktionen wird ein Backend-Server auf der Plattform Railway (Railway Corp., USA) betrieben. Dort können folgende Daten anfallen:
+• Anonymisierte Gerätekennungen
+• Technische Verbindungsdaten (IP-Adresse, Zeitstempel)
+• Fehlerprotokolle zur Qualitätssicherung
 
-6. DATENSICHERHEIT
 
-Alle gespeicherten Daten werden nach dem Stand der Technik verschlüsselt. Die Übertragung zwischen App und Server erfolgt ausschließlich über verschlüsselte HTTPS-Verbindungen. Wir ergreifen technische und organisatorische Maßnahmen, um deine Daten vor unbefugtem Zugriff zu schützen.
+4. RECHTSGRUNDLAGEN DER VERARBEITUNG
 
-7. DEINE RECHTE
+Die Verarbeitung Ihrer Daten erfolgt auf folgenden Rechtsgrundlagen:
 
-Als betroffene Person hast du folgende Rechte:
+• Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO / Art. 31 Abs. 2 lit. a nDSG): Für die Kernfunktionen der App (Fahrterfassung, Fahrtenbuch)
+• Einwilligung (Art. 6 Abs. 1 lit. a DSGVO / Art. 31 Abs. 1 nDSG): Für die Standortnutzung, soweit Sie diese beim ersten App-Start erteilen
+• Berechtigte Interessen (Art. 6 Abs. 1 lit. f DSGVO): Für technische Optimierung, Fehlerbehebung und Sicherheit
 
-• Auskunftsrecht (Art. 15 DSGVO): Du kannst jederzeit Auskunft über deine gespeicherten Daten verlangen.
-• Recht auf Berichtigung (Art. 16 DSGVO): Unrichtige Daten können korrigiert werden.
-• Recht auf Löschung (Art. 17 DSGVO): Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzliche Aufbewahrungspflicht entgegensteht.
+
+5. ZWECKE DER DATENVERARBEITUNG
+
+Ihre Daten werden ausschliesslich für folgende Zwecke verwendet:
+
+• Automatische Erfassung und Dokumentation von Fahrten
+• Erstellung und Verwaltung des persönlichen Fahrtenbuchs
+• Export der Fahrtendaten als PDF oder CSV
+• Bereitstellung der Abonnement-Funktionen über RevenueCat
+• Technischer Betrieb, Sicherheit und Fehlerdiagnose
+
+
+6. SPEICHERDAUER
+
+Fahrtendaten werden lokal auf Ihrem Gerät gespeichert und verbleiben dort, bis Sie diese aktiv löschen. Für steuerrechtlich relevante Fahrtenprotokolle empfehlen wir eine Aufbewahrungsdauer von mindestens 10 Jahren gemäss schweizerischem und europäischem Steuerrecht.
+
+Backend-seitige technische Protokolldaten werden nach spätestens 90 Tagen automatisch gelöscht.
+
+
+7. DRITTANBIETER UND DATENWEITERGABE
+
+7.1 RevenueCat Inc.
+
+RevenueCat, 633 Tasman Drive, San Jose, CA 95134, USA, verwaltet Abonnements und In-App-Käufe. RevenueCat ist nach dem EU-US Data Privacy Framework zertifiziert.
+Weitere Informationen: https://www.revenuecat.com/privacy
+
+7.2 Railway Corp.
+
+Der Backend-Server wird auf der Infrastruktur von Railway Corp., USA, betrieben. Die Datenverarbeitung erfolgt auf Basis von Standardvertragsklauseln der EU-Kommission gemäss Art. 46 DSGVO.
+
+7.3 Apple Inc. / Google LLC
+
+Die App wird über den Apple App Store (Apple Inc., USA) und den Google Play Store (Google LLC, USA) vertrieben. Dabei gelten die Datenschutzrichtlinien von Apple (https://www.apple.com/privacy/) bzw. Google (https://policies.google.com/privacy). Diese Anbieter erheben im Rahmen des App-Downloads und -betriebs eigene Daten.
+
+7.4 Keine anderweitige Datenweitergabe
+
+Wir verkaufen Ihre Daten nicht und geben diese nicht zu Werbezwecken an Dritte weiter. Eine Weitergabe erfolgt nur, soweit dies gesetzlich vorgeschrieben ist oder Sie ausdrücklich eingewilligt haben.
+
+
+8. DATENSICHERHEIT
+
+Wir setzen technische und organisatorische Massnahmen ein, um Ihre Daten zu schützen:
+
+• Verschlüsselte Datenübertragung via TLS 1.3
+• AES-256-Verschlüsselung für gespeicherte Daten
+• Biometrische Absicherung des App-Zugangs (Face ID / Fingerabdruck)
+• Kein Verkauf oder Sharing Ihrer Fahrtdaten
+• Minimale Datenerhebung nach dem Grundsatz «Privacy by Design»
+
+
+9. IHRE RECHTE ALS BETROFFENE PERSON
+
+9.1 Rechte nach DSGVO (EU-Nutzer)
+
+• Auskunftsrecht (Art. 15 DSGVO)
+• Recht auf Berichtigung (Art. 16 DSGVO)
+• Recht auf Löschung («Recht auf Vergessenwerden», Art. 17 DSGVO)
 • Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO)
-• Recht auf Datenübertragbarkeit (Art. 20 DSGVO): Export deiner Fahrten als CSV oder PDF jederzeit möglich.
+• Recht auf Datenübertragbarkeit (Art. 20 DSGVO)
 • Widerspruchsrecht (Art. 21 DSGVO)
-• Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3 DSGVO)
+• Recht auf Beschwerde bei einer Datenschutzbehörde (Art. 77 DSGVO)
 
-Zur Ausübung deiner Rechte wende dich an: info@centofai.com
+9.2 Rechte nach nDSG (Schweizer Nutzer)
 
-8. BESCHWERDERECHT
+• Auskunftsrecht (Art. 25 nDSG)
+• Recht auf Berichtigung und Löschung (Art. 32 nDSG)
+• Recht auf Einschränkung der Verarbeitung
+• Recht auf Datenherausgabe und -übertragung
+• Beschwerderecht beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten (EDÖB)
 
-Du hast das Recht, eine Beschwerde bei der zuständigen Datenschutzaufsichtsbehörde einzureichen. Zuständig ist der Berliner Beauftragte für Datenschutz und Informationsfreiheit.
+Zur Ausübung Ihrer Rechte wenden Sie sich bitte an: datenschutz@centofai.com
 
-9. ÄNDERUNGEN DIESER ERKLÄRUNG
 
-Wir behalten uns vor, diese Datenschutzerklärung bei wesentlichen Änderungen der App oder der Rechtslage anzupassen. Die jeweils aktuelle Version ist in der App unter Profil → Datenschutz abrufbar.`;
+10. DATENLÖSCHUNG IN DER APP
+
+Sie können Ihre Fahrtdaten jederzeit direkt in der App löschen. Die Löschfunktion ist in den App-Einstellungen zugänglich. Nach der Löschung sind die Daten unwiderruflich entfernt. Eine Wiederherstellung ist nicht möglich.
+
+
+11. MINDERJÄHRIGE
+
+FahrtDoc richtet sich nicht an Kinder unter 16 Jahren. Wir erheben wissentlich keine personenbezogenen Daten von Minderjährigen. Sollten uns bekannt werden, dass Daten von Minderjährigen erhoben wurden, löschen wir diese umgehend.
+
+
+12. INTERNATIONALE DATENÜBERMITTLUNG
+
+Einige unserer Dienstleister haben ihren Sitz in den USA. Die Datenübermittlung in Drittländer erfolgt auf Basis geeigneter Garantien gemäss Art. 46 DSGVO (Standardvertragsklauseln) bzw. Art. 16 nDSG (angemessenes Schutzniveau oder geeignete Garantien). Weitere Informationen erhalten Sie auf Anfrage.
+
+
+13. ÄNDERUNGEN DIESER DATENSCHUTZERKLÄRUNG
+
+Wir behalten uns vor, diese Datenschutzerklärung bei Bedarf anzupassen, um technischen Änderungen oder gesetzlichen Anforderungen Rechnung zu tragen. Die aktuell gültige Version ist stets in der App und auf unserer Website abrufbar. Bei wesentlichen Änderungen werden Sie innerhalb der App informiert.
+
+
+14. KONTAKT UND BESCHWERDEN
+
+Bei Fragen zum Datenschutz oder zur Ausübung Ihrer Rechte:
+E-Mail: info@centof.ai
+Website: centof.ai
+
+Beschwerden können Sie auch bei der zuständigen Datenschutzbehörde einreichen:
+• Schweiz: Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter (EDÖB), www.edoeb.admin.ch
+• EU: Zuständige Datenschutzbehörde Ihres EU-Mitgliedstaats
+
+
+Zuletzt aktualisiert: 08.06.2026 | CentofAI / FahrtDoc`;
 
 type Colors = ReturnType<typeof useColors>;
 
