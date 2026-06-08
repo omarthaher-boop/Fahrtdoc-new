@@ -216,9 +216,10 @@ if (Constants.appOwnership !== "expo") {
           const langKey = (langRaw[1] === "en" ? "en" : "de") as keyof typeof translations;
           const driveDict = translations[langKey];
 
-          // Watchdog: keep rescheduling while a trip is active so if the task
-          // is killed by the OS the notification fires automatically.
-          if (tripActive) {
+          // Watchdog: only relevant when no trip is active.
+          // During an active trip the drive-detect task is intentionally stopped
+          // → cancel any pending watchdog so it doesn't fire a false-positive alert.
+          if (!tripActive) {
             await rescheduleWatchdog();
           } else {
             await cancelDriveWatchdog();
