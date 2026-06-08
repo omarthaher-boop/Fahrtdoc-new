@@ -39,7 +39,7 @@
       }
     },
     "production": {
-      "prebuildCommand": "bash scripts/prebuild.sh",
+      "prebuildCommand": "prebuild --clean",
       "ios": {
         "simulator": false,
         "resourceClass": "m-medium"
