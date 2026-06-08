@@ -398,8 +398,7 @@ function buildHTML(
   const logoHtml = user?.logoUri
     ? `<img src="${user.logoUri}" style="max-height:56px; max-width:180px; object-fit:contain; display:block; margin: 0 auto 6px auto;" alt="Logo" />`
     : "";
-  const headerLabel = user?.companyName ? user.companyName : "FahrtDoc";
-  const subLabel = typeLabel ? typeLabel : "Fahrtenbuch";
+  const companyName = user?.companyName ?? "";
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -417,15 +416,16 @@ function buildHTML(
     }
     .header {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: start;
       border-bottom: 2.5px solid #1A2B6B;
-      padding-bottom: 16px;
+      padding-bottom: 14px;
       margin-bottom: 20px;
     }
+    .header-left { text-align: left; padding-top: 4px; }
     .header-center { text-align: center; }
     .brand-name { font-size: 22pt; font-weight: 800; color: #1A2B6B; letter-spacing: -0.5px; }
-    .brand-sub { font-size: 10pt; color: #5a6a9a; font-weight: 500; margin-top: 2px; }
+    .company-name { font-size: 13pt; font-weight: 700; color: #1A2B6B; margin-top: 4px; }
     .meta { text-align: right; font-size: 10pt; color: #444; line-height: 1.6; }
     .meta strong { color: #111; font-weight: 700; }
     .summary {
@@ -495,16 +495,16 @@ function buildHTML(
 </head>
 <body>
   <div class="header">
-    <div></div>
+    <div class="header-left">
+      <div class="brand-name">FahrtDoc</div>
+    </div>
     <div class="header-center">
       ${logoHtml}
-      <div class="brand-name">${headerLabel}</div>
-      <div class="brand-sub">${subLabel}</div>
+      ${companyName ? `<div class="company-name">${escHtml(companyName)}</div>` : ""}
     </div>
     <div class="meta">
-      ${appLogoBase64 ? `<img src="${appLogoBase64}" style="max-height:44px; max-width:100px; object-fit:contain; display:block; margin-left:auto; margin-bottom:6px;" alt="FahrtDoc" />` : ""}
-      ${user ? `<strong>${user.name}</strong><br>` : ""}
-      ${user?.plate ? `Kennzeichen: <strong>${user.plate}</strong><br>` : ""}
+      ${user ? `<strong>${escHtml(user.name)}</strong><br>` : ""}
+      ${user?.plate ? `Kennzeichen: <strong>${escHtml(user.plate)}</strong><br>` : ""}
       Zeitraum: <strong>${dateRange}</strong>
     </div>
   </div>
