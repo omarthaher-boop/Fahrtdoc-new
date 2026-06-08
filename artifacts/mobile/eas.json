@@ -39,7 +39,7 @@
       }
     },
     "production": {
-      "prebuildCommand": "prebuild --clean",
+      "prebuildCommand": "prebuild --clean --no-install",
       "ios": {
         "simulator": false,
         "resourceClass": "m-medium"
