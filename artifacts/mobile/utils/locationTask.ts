@@ -11,7 +11,10 @@ export interface BgPosition {
   ts: number;
 }
 
-const MAX_ACCURACY_M = 30;
+// Background GPS is inherently less accurate than foreground (OS throttles it).
+// 50 m allows the OS to deliver positions even in weak-signal scenarios while
+// still filtering out obviously bad fixes (e.g. cell-tower-only ~200 m accuracy).
+const MAX_ACCURACY_M = 50;
 
 type TaskData = {
   locations: {
