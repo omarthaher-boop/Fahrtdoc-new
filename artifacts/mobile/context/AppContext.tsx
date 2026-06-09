@@ -71,7 +71,7 @@ export interface ActiveTrip {
   type: "business" | "private";
   startAddr: string;
   distance: number;
-  positions: { lat: number; lon: number }[];
+  positions: { lat: number; lon: number; ts: number }[];
   waypoints?: Waypoint[];
   note?: string;
 }
@@ -139,7 +139,7 @@ interface AppContextType {
   totalPausedMs: number;
   gpsTracking: boolean;
   gpsStatus: "ok" | "denied" | "waiting";
-  livePos: { lat: number; lon: number } | null;
+  livePos: { lat: number; lon: number; speed?: number | null; heading?: number | null } | null;
   startTrip: (type: "business" | "private", startAddrOverride?: string) => Promise<void>;
   stopTrip: () => Promise<Trip | null>;
   setActiveTripNote: (note: string) => void;
@@ -168,20 +168,26 @@ const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const fetchOsrmRoute = async (
-  startLat: number,
-  startLon: number,
-  endLat: number,
-  endLon: number
+/** Route distance using actual GPS waypoints (decimated) for accuracy. */
+const fetchOsrmRouteWithPath = async (
+  positions: { lat: number; lon: number }[]
 ): Promise<number | null> => {
+  if (positions.length < 2) return null;
   try {
+    // Decimate to ≤25 waypoints so the URL stays short
+    const step = Math.max(1, Math.floor(positions.length / 25));
+    const pts: { lat: number; lon: number }[] = [];
+    for (let i = 0; i < positions.length; i += step) pts.push(positions[i]);
+    const last = positions[positions.length - 1];
+    if (pts[pts.length - 1] !== last) pts.push(last);
+
+    const coords = pts.map((p) => `${p.lon},${p.lat}`).join(";");
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 5000);
-    const url = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=false`;
-    const r = await fetch(url, {
-      signal: ctrl.signal,
-      headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" },
-    });
+    const tid = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`,
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+    );
     clearTimeout(tid);
     const d = await r.json();
     if (d.code === "Ok" && Array.isArray(d.routes) && d.routes.length > 0) {
@@ -192,6 +198,27 @@ const fetchOsrmRoute = async (
     return null;
   }
 };
+
+/** Snap a coordinate to the nearest road via OSRM. Returns null on any failure. */
+async function osrmNearestSnap(lat: number, lon: number): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch(
+      `https://router.project-osrm.org/nearest/v1/driving/${lon},${lat}?number=1`,
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+    );
+    clearTimeout(tid);
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d.code === "Ok" && d.waypoints?.[0]?.location) {
+      return { lat: d.waypoints[0].location[1], lon: d.waypoints[0].location[0] };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 interface NominatimResult {
   road: string;
@@ -214,7 +241,12 @@ async function fetchNominatim(lat: number, lon: number, zoom: number): Promise<N
     const road =
       d.address?.road || d.address?.pedestrian || d.address?.path || d.address?.street || "";
     // house_number from structured fields first, then try display_name leading token
-    let houseNumber = d.address?.house_number || d.address?.housenumber || "";
+    let houseNumber =
+      d.address?.house_number ||
+      d.address?.housenumber ||
+      d.address?.house ||
+      d.address?.["addr:housenumber"] ||
+      "";
     if (!houseNumber && d.display_name) {
       const firstToken = String(d.display_name).split(",")[0]?.trim() ?? "";
       if (/^\d[\d\s\-a-zA-Z]{0,6}$/.test(firstToken)) houseNumber = firstToken;
@@ -240,16 +272,30 @@ function formatNominatimAddress(r: NominatimResult): string {
 }
 
 export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
-  // First attempt: building level (zoom 19) — highest chance of finding house numbers
+  // Attempt 1: building level (zoom 19) — highest chance of finding house numbers
   const r1 = await fetchNominatim(lat, lon, 19);
   if (r1?.houseNumber) return formatNominatimAddress(r1);
 
-  // Second attempt: street level (zoom 18) — some house numbers only appear at this level
-  await new Promise<void>((resolve) => setTimeout(resolve, 800));
+  // Attempt 2: street level (zoom 18)
+  await new Promise<void>((resolve) => setTimeout(resolve, 400));
   const r2 = await fetchNominatim(lat, lon, 18);
   if (r2?.houseNumber) return formatNominatimAddress(r2);
 
-  // No house number found — return best street-level result available
+  // Attempt 3: snap GPS point to nearest road, then retry geocoding.
+  // GPS often places the coordinate on the road rather than at the building entrance,
+  // which prevents Nominatim from returning the house number. The snapped point
+  // lies on the road edge where building addresses are indexed.
+  await new Promise<void>((resolve) => setTimeout(resolve, 200));
+  const snapped = await osrmNearestSnap(lat, lon);
+  if (snapped) {
+    const r3 = await fetchNominatim(snapped.lat, snapped.lon, 19);
+    if (r3?.houseNumber) return formatNominatimAddress(r3);
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    const r4 = await fetchNominatim(snapped.lat, snapped.lon, 18);
+    if (r4?.houseNumber) return formatNominatimAddress(r4);
+  }
+
+  // Best available result (no house number found)
   const best = r2 ?? r1;
   if (best) {
     const result = formatNominatimAddress(best);
@@ -470,7 +516,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
   const [totalPausedMs, setTotalPausedMs] = useState(0);
   const [gpsStatus, setGpsStatus] = useState<"ok" | "denied" | "waiting">("waiting");
-  const [livePos, setLivePos] = useState<{ lat: number; lon: number } | null>(null);
+  const [livePos, setLivePos] = useState<{ lat: number; lon: number; speed?: number | null; heading?: number | null } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [pendingTrip, setPendingTrip] = useState<Trip | null>(null);
   const [pendingTripCoords, setPendingTripCoords] = useState<{ startLat: number; startLon: number; endLat: number; endLon: number } | null>(null);
@@ -1556,7 +1602,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           type,
           startAddr: startAddrOverride ?? "",
           distance: 0,
-          positions: [{ lat, lon }],
+          positions: [{ lat, lon, ts: Date.now() }],
         });
         AsyncStorage.setItem(DRIVE_TRIP_ACTIVE_KEY, "true").catch(() => {});
         cancelDriveWatchdog().catch(() => {});
@@ -1583,7 +1629,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             if (pos.coords.accuracy > MAX_GPS_ACCURACY_M) return;
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
-            setLivePos({ lat, lon });
+            setLivePos({ lat, lon, speed: pos.coords.speed, heading: pos.coords.heading });
             setActiveTrip((prev) => {
               if (!prev) return prev;
               const last = prev.positions[prev.positions.length - 1];
@@ -1592,7 +1638,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               return {
                 ...prev,
                 distance: prev.distance + d,
-                positions: [...prev.positions, { lat, lon }],
+                positions: [...prev.positions, { lat, lon, ts: Date.now() }],
               };
             });
           },
@@ -1689,7 +1735,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             if (loc.coords.accuracy !== null && loc.coords.accuracy > MAX_GPS_ACCURACY_M) return;
             const lat = loc.coords.latitude;
             const lon = loc.coords.longitude;
-            setLivePos({ lat, lon });
+            setLivePos({ lat, lon, speed: loc.coords.speed, heading: loc.coords.heading });
             setActiveTrip((prev) => {
               if (!prev) return prev;
               const last = prev.positions[prev.positions.length - 1];
@@ -1699,7 +1745,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               return {
                 ...prev,
                 distance: prev.distance + d,
-                positions: [...prev.positions, { lat, lon }],
+                positions: [...prev.positions, { lat, lon, ts: loc.timestamp }],
               };
             });
           }
@@ -1743,26 +1789,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Non-fatal
       }
 
-      // Read background positions and recalculate distance
+      // Merge foreground + background positions by timestamp, then recalculate distance.
+      // Taking Math.max of two separate tracks misses gaps in each — a proper time-sorted
+      // merge fills those gaps so the distance matches reality.
       try {
         const bgRaw = await AsyncStorage.getItem(BG_POSITIONS_KEY);
-        if (bgRaw) {
-          const bgPositions = JSON.parse(bgRaw) as BgPosition[];
-          if (bgPositions.length > 1) {
-            let bgDist = 0;
-            for (let i = 1; i < bgPositions.length; i++) {
-              const d = haversine(
-                bgPositions[i - 1].lat,
-                bgPositions[i - 1].lon,
-                bgPositions[i].lat,
-                bgPositions[i].lon
-              );
-              if (d >= MIN_MOVE_KM) bgDist += d;
-            }
-            // Background track may be more complete (captures positions during backgrounding)
-            finalDistance = Math.max(finalDistance, bgDist);
+        const bgPositions: BgPosition[] = bgRaw ? (JSON.parse(bgRaw) as BgPosition[]) : [];
+
+        // Convert foreground positions to BgPosition format (ts already added)
+        const fgPositions: BgPosition[] = activeTrip.positions.map((p) => ({
+          lat: p.lat,
+          lon: p.lon,
+          ts: p.ts,
+        }));
+
+        // Merge and sort by timestamp
+        const merged = [...fgPositions, ...bgPositions].sort((a, b) => a.ts - b.ts);
+
+        // Deduplicate: skip points within 2 m of the previous to avoid double-counting
+        const deduped: BgPosition[] = [];
+        for (const p of merged) {
+          const prev = deduped[deduped.length - 1];
+          if (!prev || haversine(prev.lat, prev.lon, p.lat, p.lon) >= 0.002) {
+            deduped.push(p);
           }
         }
+
+        // Recalculate haversine over merged track
+        if (deduped.length > 1) {
+          let mergedDist = 0;
+          for (let i = 1; i < deduped.length; i++) {
+            const d = haversine(deduped[i - 1].lat, deduped[i - 1].lon, deduped[i].lat, deduped[i].lon);
+            if (d >= MIN_MOVE_KM) mergedDist += d;
+          }
+          finalDistance = Math.max(finalDistance, mergedDist);
+        }
+
         await AsyncStorage.removeItem(BG_POSITIONS_KEY);
       } catch {
         // Non-fatal — use in-memory distance
@@ -1808,9 +1870,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Async: calculate shortest road route via OSRM and store in trip
-    if (firstPos && last) {
-      fetchOsrmRoute(firstPos.lat, firstPos.lon, last.lat, last.lon).then((kmRoute) => {
+    // Async: calculate road route using actual GPS waypoints for accuracy
+    if (activeTrip.positions.length >= 2) {
+      fetchOsrmRouteWithPath(activeTrip.positions).then((kmRoute) => {
         if (kmRoute !== null) {
           setPendingTrip((prev) => (prev ? { ...prev, kmRoute } : null));
         }
