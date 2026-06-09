@@ -555,7 +555,7 @@ function buildHTML(
   </table>
   ${user?.signatureBlock ? buildSignatureBlockHTML(lang) : ""}
   <div class="footer">
-    <span>${headerLabel} · ${subLabel}-Export</span>
+    <span>FahrtDoc · ${typeLabel ?? "Fahrtenbuch"}-Export</span>
     <span>Erstellt am ${exportedAt}</span>
   </div>
 </body>
