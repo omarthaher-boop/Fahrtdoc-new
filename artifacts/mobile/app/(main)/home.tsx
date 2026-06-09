@@ -346,12 +346,6 @@ export default function HomeScreen() {
                 disabled={starting}
                 testID="start-business"
               >
-                {suggestedType === "business" && (
-                  <View style={styles.suggestedBadge}>
-                    <Feather name="zap" size={9} color="#FFFFFF" />
-                    <Text style={styles.suggestedBadgeText}>{t("home.suggested")}</Text>
-                  </View>
-                )}
                 <View style={[styles.quickIcon, { backgroundColor: "#6366F1" }]}>
                   <Feather name="briefcase" size={22} color="#FFFFFF" />
                 </View>
@@ -370,12 +364,6 @@ export default function HomeScreen() {
                 disabled={starting}
                 testID="start-private"
               >
-                {suggestedType === "private" && (
-                  <View style={[styles.suggestedBadge, { backgroundColor: "#22C55E" }]}>
-                    <Feather name="zap" size={9} color="#FFFFFF" />
-                    <Text style={styles.suggestedBadgeText}>{t("home.suggested")}</Text>
-                  </View>
-                )}
                 <View style={[styles.quickIcon, { backgroundColor: "#22C55E" }]}>
                   <Feather name="user" size={22} color="#FFFFFF" />
                 </View>
@@ -672,23 +660,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
-  },
-  suggestedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    alignSelf: "flex-start",
-    backgroundColor: "#6366F1",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  suggestedBadgeText: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
   },
   quickIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontSize: 14, fontWeight: "700" },
