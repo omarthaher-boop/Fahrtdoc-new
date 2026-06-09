@@ -25,11 +25,33 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
 
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function computeBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * (180 / Math.PI) + 360) % 360;
+}
+
 const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  const sc = s % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sc).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
 const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> => {
@@ -66,6 +88,10 @@ export default function TrackingScreen() {
   const { t } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, togglePause, livePos, gpsTracking } = useApp();
 
+  const [speedKmh, setSpeedKmh] = useState<number | null>(null);
+  const [heading, setHeading] = useState<number | null>(null);
+  const prevPosRef = useRef<{ lat: number; lon: number; ts: number } | null>(null);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const mapFadeAnim = useRef(new Animated.Value(0)).current;
   const mapShownRef = useRef(false);
@@ -79,6 +105,29 @@ export default function TrackingScreen() {
   const [noteExpanded, setNoteExpanded] = useState(!!(activeTrip?.note));
   const noteInputRef = useRef<TextInput>(null);
   const tripNoteInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!livePos) return;
+    const now = Date.now();
+    const prev = prevPosRef.current;
+    if (prev) {
+      const dtS = (now - prev.ts) / 1000;
+      if (dtS > 0.5 && dtS < 60) {
+        if (livePos.speed != null && livePos.speed >= 0) {
+          setSpeedKmh(Math.round(livePos.speed * 3.6));
+        } else {
+          const distM = haversineMeters(prev.lat, prev.lon, livePos.lat, livePos.lon);
+          setSpeedKmh(Math.round((distM / dtS) * 3.6));
+        }
+        if (livePos.heading != null) {
+          setHeading(livePos.heading);
+        } else {
+          setHeading(computeBearing(prev.lat, prev.lon, livePos.lat, livePos.lon));
+        }
+      }
+    }
+    prevPosRef.current = { lat: livePos.lat, lon: livePos.lon, ts: now };
+  }, [livePos]);
 
   const refreshDriveTaskStatus = useCallback(async () => {
     if (Platform.OS === "web") return;
@@ -321,7 +370,7 @@ export default function TrackingScreen() {
         )}
         {showMap && (
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: mapFadeAnim }]}>
-            <ActiveTripMap positions={activeTrip.positions} livePos={livePos} />
+            <ActiveTripMap positions={activeTrip.positions} livePos={livePos} heading={heading} />
           </Animated.View>
         )}
       </View>
@@ -375,6 +424,24 @@ export default function TrackingScreen() {
             </Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
               {t("tracking.screen.distance")}
+            </Text>
+          </View>
+
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+
+          <View style={styles.statBlock}>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>
+              {speedKmh !== null ? (
+                <>
+                  {speedKmh}
+                  <Text style={[styles.statUnit, { color: colors.mutedForeground }]}> km/h</Text>
+                </>
+              ) : (
+                <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>—</Text>
+              )}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+              {t("tracking.screen.speed")}
             </Text>
           </View>
 
