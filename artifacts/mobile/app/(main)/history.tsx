@@ -124,8 +124,10 @@ export default function HistoryScreen() {
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
   const [kategorie, setKategorie] = useState<'alle' | 'geschaeftlich' | 'privat'>('alle');
   const [zeitraum, setZeitraum] = useState<'3m' | '6m' | 'vb'>('3m');
-  const [gruppierungEinheit, setGruppierungEinheit] = useState<'monat' | 'quartal'>('monat');
-  const [gruppierungJahr, setGruppierungJahr] = useState<string>(new Date().getFullYear().toString());
+  const [filterMonat, setFilterMonat] = useState<number | null>(null);
+  const [gruppierungJahr, setGruppierungJahr] = useState<string | null>(null);
+  const [showMonatDropdown, setShowMonatDropdown] = useState(false);
+  const [showJahrDropdown, setShowJahrDropdown] = useState(false);
   const [vonDatum, setVonDatum] = useState('');
   const [bisDatum, setBisDatum] = useState('');
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
@@ -192,7 +194,7 @@ export default function HistoryScreen() {
             if (saved.zeitraum !== undefined) setZeitraum(saved.zeitraum);
             if (typeof saved.vonDatum === "string") setVonDatum(saved.vonDatum);
             if (typeof saved.bisDatum === "string") setBisDatum(saved.bisDatum);
-            if (saved.gruppierungEinheit !== undefined) setGruppierungEinheit(saved.gruppierungEinheit);
+            if (saved.filterMonat !== undefined) setFilterMonat(saved.filterMonat);
             if (saved.gruppierungJahr !== undefined) setGruppierungJahr(saved.gruppierungJahr);
             if (saved.periodFilter !== undefined) setPeriodFilter(saved.periodFilter);
             if (saved.typeFilter !== undefined) setTypeFilter(saved.typeFilter);
@@ -200,7 +202,7 @@ export default function HistoryScreen() {
             if (typeof saved.dateTo === "string") setDateTo(saved.dateTo);
             if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
             if (saved.selectedMonth !== undefined) setSelectedMonth(saved.selectedMonth);
-            if (saved.gruppierungJahr !== undefined) {
+            if (saved.gruppierungJahr) {
               const yr = parseInt(saved.gruppierungJahr);
               setSelectedYear(isNaN(yr) ? null : yr);
             }
@@ -239,9 +241,9 @@ export default function HistoryScreen() {
     }
     AsyncStorage.setItem(
       FILTER_STORAGE_KEY,
-      JSON.stringify({ kategorie, zeitraum, vonDatum, bisDatum, gruppierungEinheit, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth })
+      JSON.stringify({ kategorie, zeitraum, vonDatum, bisDatum, filterMonat, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth })
     ).catch(() => {});
-  }, [filtersLoaded, kategorie, zeitraum, vonDatum, bisDatum, gruppierungEinheit, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth]);
+  }, [filtersLoaded, kategorie, zeitraum, vonDatum, bisDatum, filterMonat, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth]);
 
   useEffect(() => {
     if (!selectionLoaded) return;
@@ -266,8 +268,8 @@ export default function HistoryScreen() {
     setZeitraum('3m');
     setVonDatum('');
     setBisDatum('');
-    setGruppierungEinheit('monat');
-    setGruppierungJahr(new Date().getFullYear().toString());
+    setFilterMonat(null);
+    setGruppierungJahr(null);
     setPeriodFilter("all");
     setTypeFilter("all");
     setDateFrom("");
@@ -280,7 +282,7 @@ export default function HistoryScreen() {
   };
 
   const isFiltersActive =
-    kategorie !== 'alle' || zeitraum !== '3m' || !!vonDatum || !!bisDatum;
+    kategorie !== 'alle' || zeitraum !== '3m' || !!vonDatum || !!bisDatum || filterMonat !== null || !!gruppierungJahr;
 
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
@@ -304,7 +306,7 @@ export default function HistoryScreen() {
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     trips.forEach((t) => years.add(new Date(t.date).getFullYear()));
-    return Array.from(years).sort((a, b) => b - a).slice(0, 4);
+    return Array.from(years).sort((a, b) => b - a).slice(0, 10);
   }, [trips]);
 
   const cutoff = useMemo(() => {
@@ -325,6 +327,7 @@ export default function HistoryScreen() {
         if (d < cutoff) return false;
       }
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
+      if (filterMonat !== null && d.getMonth() !== filterMonat) return false;
       if (typeof dateFrom === "string" && dateFrom.includes(".")) {
         const [dd, mm, yyyy] = dateFrom.split(".").map(Number);
         if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
@@ -341,7 +344,7 @@ export default function HistoryScreen() {
       }
       return true;
     });
-  }, [trips, cutoff, typeFilter, dateFrom, dateTo, selectedYear]);
+  }, [trips, cutoff, typeFilter, dateFrom, dateTo, selectedYear, filterMonat]);
 
   // Free users: show only the most recent FREE_TRIP_LIMIT trips (when SUBSCRIPTION_ENABLED)
   const filteredForDisplay = useMemo(() => {
@@ -421,9 +424,8 @@ export default function HistoryScreen() {
     : t("history.pickMonth");
 
   const groups = useMemo(() => {
-    if (gruppierungEinheit === 'quartal') return groupByQuarter(filteredBySearch, locale);
     return groupByMonth(filteredBySearch, locale);
-  }, [filteredBySearch, gruppierungEinheit, locale]);
+  }, [filteredBySearch, locale]);
 
   const isDateRangeActive = !!dateFrom || !!dateTo;
 
@@ -868,67 +870,105 @@ export default function HistoryScreen() {
           )}
         </View>
 
-        {/* Row 3: Gruppierung */}
+        {/* Row 3: Gruppierung — zwei Dropdowns Monat + Jahr */}
         <View style={{ backgroundColor: '#fff8ec', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
+          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.6 }}>
             {language === 'de' ? 'Gruppierung' : 'Grouping'}
           </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {/* Einheit */}
-            <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
-              {(['monat', 'quartal'] as const).map((val) => {
-                const active = gruppierungEinheit === val;
-                const label = val === 'monat'
-                  ? (language === 'de' ? 'Monat' : 'Month')
-                  : (language === 'de' ? 'Quartal' : 'Quarter');
-                return (
-                  <TouchableOpacity
-                    key={val}
-                    onPress={() => { setGruppierungEinheit(val); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                    style={{
-                      flex: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center',
-                      backgroundColor: active ? '#d97706' : '#FFFFFF',
-                      borderWidth: 0.5, borderColor: active ? '#d97706' : '#eee',
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+
+            {/* Dropdown: Monat */}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
+                {language === 'de' ? 'Monat' : 'Month'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setShowMonatDropdown(p => !p); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: filterMonat !== null ? '#d97706' : '#ddd', backgroundColor: filterMonat !== null ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '500', color: filterMonat !== null ? '#92400e' : '#666', flex: 1 }}>
+                  {filterMonat !== null
+                    ? new Date(2000, filterMonat, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })
+                    : (language === 'de' ? 'Alle' : 'All')}
+                </Text>
+                <Feather name={showMonatDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
+              </TouchableOpacity>
+              {showMonatDropdown && (
+                <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                    <TouchableOpacity
+                      onPress={() => { setFilterMonat(null); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === null ? '#fef3c7' : 'transparent' }}
+                    >
+                      <Text style={{ fontSize: 13, color: filterMonat === null ? '#92400e' : '#444', fontWeight: filterMonat === null ? '600' : '400' }}>
+                        {language === 'de' ? 'Alle Monate' : 'All months'}
+                      </Text>
+                    </TouchableOpacity>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => { setFilterMonat(i); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === i ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                      >
+                        <Text style={{ fontSize: 13, color: filterMonat === i ? '#92400e' : '#444', fontWeight: filterMonat === i ? '600' : '400' }}>
+                          {new Date(2000, i, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
-            {/* Jahr */}
-            <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
-              {([
-                ['alle', t("history.all")],
-                [String(new Date().getFullYear()), String(new Date().getFullYear())],
-                [String(new Date().getFullYear() - 1), String(new Date().getFullYear() - 1)],
-              ] as const).map(([yr, label]) => {
-                const active = gruppierungJahr === yr;
-                return (
-                  <TouchableOpacity
-                    key={yr}
-                    onPress={() => {
-                      setGruppierungJahr(yr);
-                      const parsedYear = yr === 'alle' ? null : parseInt(yr);
-                      setSelectedYear(parsedYear);
-                      if (yr !== 'alle') { setPeriodFilter('all'); setDateFrom(''); setDateTo(''); }
-                      if (Platform.OS !== 'web') Haptics.selectionAsync();
-                    }}
-                    style={{
-                      flex: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center',
-                      backgroundColor: active ? '#d97706' : '#FFFFFF',
-                      borderWidth: 0.5, borderColor: active ? '#d97706' : '#eee',
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+
+            {/* Dropdown: Jahr */}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
+                {language === 'de' ? 'Jahr' : 'Year'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setShowJahrDropdown(p => !p); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: gruppierungJahr ? '#d97706' : '#ddd', backgroundColor: gruppierungJahr ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '500', color: gruppierungJahr ? '#92400e' : '#666', flex: 1 }}>
+                  {gruppierungJahr ?? (language === 'de' ? 'Alle' : 'All')}
+                </Text>
+                <Feather name={showJahrDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
+              </TouchableOpacity>
+              {showJahrDropdown && (
+                <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                    <TouchableOpacity
+                      onPress={() => { setGruppierungJahr(null); setSelectedYear(null); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: !gruppierungJahr ? '#fef3c7' : 'transparent' }}
+                    >
+                      <Text style={{ fontSize: 13, color: !gruppierungJahr ? '#92400e' : '#444', fontWeight: !gruppierungJahr ? '600' : '400' }}>
+                        {language === 'de' ? 'Alle Jahre' : 'All years'}
+                      </Text>
+                    </TouchableOpacity>
+                    {availableYears.map((yr) => (
+                      <TouchableOpacity
+                        key={yr}
+                        onPress={() => {
+                          setGruppierungJahr(String(yr));
+                          setSelectedYear(yr);
+                          setPeriodFilter('all');
+                          setDateFrom(''); setDateTo('');
+                          setZeitraum('vb');
+                          setShowJahrDropdown(false);
+                          if (Platform.OS !== 'web') Haptics.selectionAsync();
+                        }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: gruppierungJahr === String(yr) ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                      >
+                        <Text style={{ fontSize: 13, color: gruppierungJahr === String(yr) ? '#92400e' : '#444', fontWeight: gruppierungJahr === String(yr) ? '600' : '400' }}>
+                          {yr}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
+
           </View>
         </View>
 
