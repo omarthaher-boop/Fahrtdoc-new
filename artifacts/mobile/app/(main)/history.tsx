@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EditTripModal from "@/components/EditTripModal";
+import PDFHeaderPreview from "@/components/PDFHeaderPreview";
 import TripCard from "@/components/TripCard";
 import TripDetailModal from "@/components/TripDetailModal";
 import { useApp, Trip } from "@/context/AppContext";
@@ -107,6 +108,9 @@ export default function HistoryScreen() {
   // Selection state — declared here so the persist effect below can reference them
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Search query state
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Saved selections state
   const [savedSelections, setSavedSelections] = useState<SavedSelection[]>([]);
@@ -292,16 +296,59 @@ export default function HistoryScreen() {
     return Math.max(0, filtered.length - FREE_TRIP_LIMIT);
   }, [filtered, isSubscribed]);
 
+  // Search filter applied on top of subscription/date/type filters
+  const filteredBySearch = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return filteredForDisplay;
+    return filteredForDisplay.filter((trip) => {
+      const typeLabel = trip.type === "business"
+        ? t("tripType.business").toLowerCase()
+        : t("tripType.private").toLowerCase();
+      const dateStr = new Date(trip.date).toLocaleDateString(
+        language === "en" ? "en-US" : "de-DE",
+        { day: "2-digit", month: "2-digit", year: "numeric" }
+      ).toLowerCase();
+      return (
+        (trip.startAddr ?? "").toLowerCase().includes(q) ||
+        (trip.endAddr ?? "").toLowerCase().includes(q) ||
+        (trip.note ?? "").toLowerCase().includes(q) ||
+        typeLabel.includes(q) ||
+        dateStr.includes(q)
+      );
+    });
+  }, [filteredForDisplay, searchQuery, t, language]);
+
   // Which trips the stats card and export act on
   const selectedTrips = useMemo(
-    () => filteredForDisplay.filter((t) => selectedIds.has(t.id)),
-    [filteredForDisplay, selectedIds]
+    () => filteredBySearch.filter((trip) => selectedIds.has(trip.id)),
+    [filteredBySearch, selectedIds]
   );
   // In selection mode: use checked trips (even if empty). Outside selection mode: use all filtered trips.
-  const displayTrips = selectionMode ? selectedTrips : filteredForDisplay;
+  const displayTrips = selectionMode ? selectedTrips : filteredBySearch;
 
   const statsKm = useMemo(() => displayTrips.reduce((a, b) => a + b.km, 0), [displayTrips]);
   const statsDur = useMemo(() => displayTrips.reduce((a, b) => a + b.dur, 0), [displayTrips]);
+
+  // Trips that will actually be exported — mirrors the filter in doExport()
+  // so the PDF header preview shows the exact same count and stats.
+  const previewTrips = useMemo(() => {
+    return displayTrips.filter((trip) => {
+      const d = new Date(trip.date);
+      if (typeof exportModalDateFrom === "string" && exportModalDateFrom.includes(".")) {
+        const [dd, mm, yyyy] = exportModalDateFrom.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          if (d < new Date(yyyy, mm - 1, dd)) return false;
+        }
+      }
+      if (typeof exportModalDateTo === "string" && exportModalDateTo.includes(".")) {
+        const [dd, mm, yyyy] = exportModalDateTo.split(".").map(Number);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yyyy)) {
+          if (d >= new Date(yyyy, mm - 1, dd + 1)) return false;
+        }
+      }
+      return true;
+    });
+  }, [displayTrips, exportModalDateFrom, exportModalDateTo]);
 
   const locale = language === "en" ? "en-US" : "de-DE";
 
@@ -315,8 +362,8 @@ export default function HistoryScreen() {
     : t("history.pickMonth");
 
   const groups = useMemo(
-    () => groupByDate(filteredForDisplay, t("history.today"), t("history.yesterday"), locale),
-    [filteredForDisplay, t, locale]
+    () => groupByDate(filteredBySearch, t("history.today"), t("history.yesterday"), locale),
+    [filteredBySearch, t, locale]
   );
 
   const isDateRangeActive = !!dateFrom || !!dateTo;
@@ -346,7 +393,7 @@ export default function HistoryScreen() {
 
   const selectAll = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    setSelectedIds(new Set(filtered.map((t) => t.id)));
+    setSelectedIds(new Set(filteredBySearch.map((trip) => trip.id)));
   };
 
   const clearSelection = () => {
@@ -450,7 +497,7 @@ export default function HistoryScreen() {
       ...lines,
       "-".repeat(50),
       "",
-      `FahrtDoc | www.centofai.com`,
+      `FahrtDoc | www.centof.ai`,
       `Exportiert am: ${exportedAt}`,
     ].join("\n");
     const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -918,6 +965,28 @@ export default function HistoryScreen() {
       </View>
 
       {/* Selection bar — directly above trip list */}
+      <View style={[styles.searchBarRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder={t("history.searchPlaceholder")}
+            placeholderTextColor={colors.mutedForeground}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="never"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.searchClearBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <View style={[styles.selectionHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <TouchableOpacity onPress={toggleSelectionMode} style={styles.selectionToggle}>
           <Feather
@@ -927,7 +996,7 @@ export default function HistoryScreen() {
           />
           <Text style={[styles.selectionToggleText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
             {selectionMode && selectedIds.size > 0
-              ? `${selectedIds.size} ${t("history.of")} ${filtered.length} ${t("history.selected")}`
+              ? `${selectedIds.size} ${t("history.of")} ${filteredBySearch.length} ${t("history.selected")}`
               : t("history.selection")}
           </Text>
         </TouchableOpacity>
@@ -1005,6 +1074,7 @@ export default function HistoryScreen() {
                   onDelete={deleteTrip}
                   onEdit={handleEdit}
                   onView={handleView}
+                  onCardPress={handleView}
                   selectionMode={selectionMode}
                   selected={selectedIds.has(tripItem.id)}
                   onToggleSelect={toggleTrip}
@@ -1156,6 +1226,16 @@ export default function HistoryScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* PDF header preview — only when PDF is selected */}
+              {exportModalFormat === "pdf" && (
+                <PDFHeaderPreview
+                  user={user}
+                  trips={previewTrips}
+                  dateFrom={exportModalDateFrom}
+                  dateTo={exportModalDateTo}
+                />
+              )}
 
               {/* Date range */}
               <Text style={[styles.exportModalLabel, { color: colors.mutedForeground }]}>
@@ -1938,5 +2018,30 @@ const styles = StyleSheet.create({
   loadMenuCloseBtnText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  searchBarRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  searchClearBtn: {
+    marginLeft: 6,
+    padding: 2,
   },
 });
