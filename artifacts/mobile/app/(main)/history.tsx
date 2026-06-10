@@ -67,6 +67,29 @@ function fmtDateLabel(
   return d.toLocaleDateString(locale, { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 }
 
+function groupByMonth(trips: Trip[], locale: string): { label: string; trips: Trip[] }[] {
+  const map = new Map<string, Trip[]>();
+  for (const t of trips) {
+    const d = new Date(t.date);
+    const label = d.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(t);
+  }
+  return Array.from(map.entries()).map(([label, trips]) => ({ label, trips }));
+}
+
+function groupByQuarter(trips: Trip[], locale: string): { label: string; trips: Trip[] }[] {
+  const map = new Map<string, Trip[]>();
+  for (const t of trips) {
+    const d = new Date(t.date);
+    const q = Math.floor(d.getMonth() / 3) + 1;
+    const label = `Q${q} ${d.getFullYear()}`;
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(t);
+  }
+  return Array.from(map.entries()).map(([label, trips]) => ({ label, trips }));
+}
+
 function groupByDate(
   trips: Trip[],
   todayLabel: string,
@@ -98,7 +121,13 @@ export default function HistoryScreen() {
   const [dateTo, setDateTo] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
+  const [kategorie, setKategorie] = useState<'alle' | 'geschaeftlich' | 'privat'>('alle');
+  const [zeitraum, setZeitraum] = useState<'3m' | '6m' | 'vb'>('3m');
+  const [gruppierungEinheit, setGruppierungEinheit] = useState<'monat' | 'quartal'>('monat');
+  const [gruppierungJahr, setGruppierungJahr] = useState<string>(new Date().getFullYear().toString());
+  const [vonDatum, setVonDatum] = useState('');
+  const [bisDatum, setBisDatum] = useState('');
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
@@ -159,12 +188,22 @@ export default function HistoryScreen() {
         if (filterRaw) {
           try {
             const saved = JSON.parse(filterRaw);
+            if (saved.kategorie !== undefined) setKategorie(saved.kategorie);
+            if (saved.zeitraum !== undefined) setZeitraum(saved.zeitraum);
+            if (typeof saved.vonDatum === "string") setVonDatum(saved.vonDatum);
+            if (typeof saved.bisDatum === "string") setBisDatum(saved.bisDatum);
+            if (saved.gruppierungEinheit !== undefined) setGruppierungEinheit(saved.gruppierungEinheit);
+            if (saved.gruppierungJahr !== undefined) setGruppierungJahr(saved.gruppierungJahr);
             if (saved.periodFilter !== undefined) setPeriodFilter(saved.periodFilter);
             if (saved.typeFilter !== undefined) setTypeFilter(saved.typeFilter);
             if (typeof saved.dateFrom === "string") setDateFrom(saved.dateFrom);
             if (typeof saved.dateTo === "string") setDateTo(saved.dateTo);
             if (saved.showDateRange !== undefined) setShowDateRange(saved.showDateRange);
             if (saved.selectedMonth !== undefined) setSelectedMonth(saved.selectedMonth);
+            if (saved.gruppierungJahr !== undefined) {
+              const yr = parseInt(saved.gruppierungJahr);
+              setSelectedYear(isNaN(yr) ? null : yr);
+            }
           } catch {}
         }
         if (selectionRaw) {
@@ -200,9 +239,9 @@ export default function HistoryScreen() {
     }
     AsyncStorage.setItem(
       FILTER_STORAGE_KEY,
-      JSON.stringify({ periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth })
+      JSON.stringify({ kategorie, zeitraum, vonDatum, bisDatum, gruppierungEinheit, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth })
     ).catch(() => {});
-  }, [filtersLoaded, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth]);
+  }, [filtersLoaded, kategorie, zeitraum, vonDatum, bisDatum, gruppierungEinheit, gruppierungJahr, periodFilter, typeFilter, dateFrom, dateTo, showDateRange, selectedMonth]);
 
   useEffect(() => {
     if (!selectionLoaded) return;
@@ -223,6 +262,12 @@ export default function HistoryScreen() {
   const resetFilters = () => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     skipNextPersistRef.current = true;
+    setKategorie('alle');
+    setZeitraum('3m');
+    setVonDatum('');
+    setBisDatum('');
+    setGruppierungEinheit('monat');
+    setGruppierungJahr(new Date().getFullYear().toString());
     setPeriodFilter("all");
     setTypeFilter("all");
     setDateFrom("");
@@ -230,12 +275,12 @@ export default function HistoryScreen() {
     setShowDateRange(false);
     setSelectedMonth(null);
     setShowMonthPicker(false);
-    setSelectedYear(null);
+    setSelectedYear(new Date().getFullYear());
     AsyncStorage.removeItem(FILTER_STORAGE_KEY).catch(() => {});
   };
 
   const isFiltersActive =
-    periodFilter !== "all" || typeFilter !== "all" || !!dateFrom || !!dateTo || selectedYear !== null;
+    kategorie !== 'alle' || zeitraum !== '3m' || !!vonDatum || !!bisDatum;
 
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
@@ -375,10 +420,10 @@ export default function HistoryScreen() {
     ? new Date(selectedMonth.year, selectedMonth.month, 1).toLocaleString(locale, { month: "short", year: "numeric" })
     : t("history.pickMonth");
 
-  const groups = useMemo(
-    () => groupByDate(filteredBySearch, t("history.today"), t("history.yesterday"), locale),
-    [filteredBySearch, t, locale]
-  );
+  const groups = useMemo(() => {
+    if (gruppierungEinheit === 'quartal') return groupByQuarter(filteredBySearch, locale);
+    return groupByMonth(filteredBySearch, locale);
+  }, [filteredBySearch, gruppierungEinheit, locale]);
 
   const isDateRangeActive = !!dateFrom || !!dateTo;
 
@@ -713,208 +758,181 @@ export default function HistoryScreen() {
         </Text>
       </Animated.View>
 
-      {/* Filter Row 1: period */}
-      <View style={[styles.filterRow1Wrap, { backgroundColor: colors.background }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {PERIOD_OPTIONS.map((o) => {
-            const active = periodFilter === o.value && selectedYear === null;
-            return (
-              <TouchableOpacity
-                key={String(o.value)}
-                onPress={() => {
-                  setPeriodFilter(o.value);
-                  setSelectedYear(null);
-                  if (selectedMonth) { setSelectedMonth(null); setDateFrom(""); setDateTo(""); }
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                }}
-                style={[
-                  styles.pill,
-                  {
-                    backgroundColor: active ? "#1A2B6B" : colors.card,
-                    borderColor: active ? "#1A2B6B" : colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.pillText, { color: active ? "#FFFFFF" : colors.mutedForeground }]}>
-                  {o.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+      {/* 3-Row Filter Block */}
+      <View style={{ marginHorizontal: 12, marginBottom: 6, gap: 7 }}>
 
-          {/* Year quick-select pills */}
-          {availableYears.map((yr) => {
-            const active = selectedYear === yr;
-            return (
-              <TouchableOpacity
-                key={`yr-${yr}`}
-                onPress={() => {
-                  setSelectedYear(active ? null : yr);
-                  if (!active) {
-                    setPeriodFilter("all");
-                    setSelectedMonth(null);
-                    setDateFrom("");
-                    setDateTo("");
-                  }
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                }}
-                style={[
-                  styles.pill,
-                  styles.pillWithIcon,
-                  {
-                    backgroundColor: active ? colors.primary : colors.card,
-                    borderColor: active ? colors.primary : colors.border,
-                  },
-                ]}
-              >
-                <Feather name="calendar" size={12} color={active ? "#FFFFFF" : colors.mutedForeground} />
-                <Text style={[styles.pillText, { color: active ? "#FFFFFF" : colors.mutedForeground }]}>
-                  {yr}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          {/* Month picker pill */}
-          <TouchableOpacity
-            onPress={() => {
-              setShowMonthPicker((p) => !p);
-              setShowDateRange(false);
-              if (Platform.OS !== "web") Haptics.selectionAsync();
-            }}
-            style={[
-              styles.pill,
-              styles.pillWithIcon,
-              {
-                backgroundColor: selectedMonth ? "#1A2B6B" : colors.card,
-                borderColor: selectedMonth ? "#1A2B6B" : colors.border,
-              },
-            ]}
-          >
-            <Feather name="calendar" size={13} color={selectedMonth ? "#FFFFFF" : colors.mutedForeground} />
-            <Text style={[styles.pillText, { color: selectedMonth ? "#FFFFFF" : colors.mutedForeground }]}>
-              {activeMonthLabel}
-            </Text>
-            {selectedMonth ? (
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setSelectedMonth(null);
-                  setDateFrom("");
-                  setDateTo("");
-                  setShowMonthPicker(false);
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                <Feather name="x" size={12} color="#FFFFFF" />
-              </TouchableOpacity>
-            ) : (
-              <Feather name="chevron-down" size={12} color={colors.mutedForeground} />
-            )}
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-      {/* Filter Row 2: type + date range + selection toggle */}
-      <View style={[styles.filterRow2Wrap, { backgroundColor: colors.background }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {/* Date Range */}
-          <TouchableOpacity
-            onPress={() => { setShowDateRange((p) => !p); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
-            style={[
-              styles.pill,
-              styles.pillWithIcon,
-              {
-                backgroundColor: (showDateRange || isDateRangeActive) ? colors.accent : colors.card,
-                borderColor: (showDateRange || isDateRangeActive) ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            <Feather name="calendar" size={13} color={(showDateRange || isDateRangeActive) ? colors.primary : colors.mutedForeground} />
-            <Text style={[styles.pillText, { color: (showDateRange || isDateRangeActive) ? colors.primary : colors.mutedForeground }]}>
-              {t("history.dateRange")}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Business / Private */}
-          {(["business", "private"] as const).map((tripType) => {
-            const active = typeFilter === tripType;
-            return (
-              <TouchableOpacity
-                key={tripType}
-                onPress={() => { setTypeFilter(typeFilter === tripType ? "all" : tripType); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
-                style={[
-                  styles.pill,
-                  styles.pillWithIcon,
-                  {
-                    backgroundColor: active ? colors.accent : colors.card,
-                    borderColor: active ? colors.primary : colors.border,
-                  },
-                ]}
-              >
-                <Feather
-                  name={tripType === "business" ? "briefcase" : "user"}
-                  size={13}
-                  color={active ? colors.primary : colors.mutedForeground}
-                />
-                <Text style={[styles.pillText, { color: active ? colors.primary : colors.mutedForeground }]}>
-                  {tripType === "business" ? t("tripType.business") : t("tripType.private")}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-        </ScrollView>
-      </View>
-
-      {/* Date range picker */}
-      {showDateRange && (
-        <View style={[styles.dateRangePanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.dateRangeRow}>
-            <View style={styles.dateField}>
-              <Text style={[styles.dateFieldLabel, { color: colors.mutedForeground }]}>{t("history.from")}</Text>
-              <View style={[styles.dateInput, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Feather name="calendar" size={13} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.dateInputText, { color: colors.foreground }]}
-                  value={dateFrom}
-                  onChangeText={setDateFrom}
-                  placeholder={t("history.datePlaceholder")}
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
-                />
-              </View>
-            </View>
-            <View style={[styles.dateArrow, { backgroundColor: colors.border }]}>
-              <Feather name="arrow-right" size={14} color={colors.mutedForeground} />
-            </View>
-            <View style={styles.dateField}>
-              <Text style={[styles.dateFieldLabel, { color: colors.mutedForeground }]}>{t("history.to")}</Text>
-              <View style={[styles.dateInput, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Feather name="calendar" size={13} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.dateInputText, { color: colors.foreground }]}
-                  value={dateTo}
-                  onChangeText={setDateTo}
-                  placeholder={t("history.datePlaceholder")}
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
-                />
-              </View>
-            </View>
+        {/* Row 1: Kategorie */}
+        <View style={{ backgroundColor: '#f0f4ff', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
+            {language === 'de' ? 'Kategorie' : 'Category'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {([
+              ['alle', t("history.all")],
+              ['geschaeftlich', t("tripType.business")],
+              ['privat', t("tripType.private")],
+            ] as const).map(([val, label]) => {
+              const active = kategorie === val;
+              return (
+                <TouchableOpacity
+                  key={val}
+                  onPress={() => {
+                    setKategorie(val);
+                    setTypeFilter(val === 'alle' ? 'all' : val === 'geschaeftlich' ? 'business' : 'private');
+                    if (Platform.OS !== 'web') Haptics.selectionAsync();
+                  }}
+                  style={{
+                    flex: 1, borderRadius: 20, paddingVertical: 9, alignItems: 'center',
+                    backgroundColor: active ? '#1a1a2e' : '#FFFFFF',
+                    borderWidth: 0.5, borderColor: active ? '#1a1a2e' : '#ddd',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          {isDateRangeActive && (
-            <TouchableOpacity
-              onPress={() => { setDateFrom(""); setDateTo(""); setSelectedMonth(null); }}
-              style={[styles.clearDateBtn, { borderColor: colors.destructive }]}
-            >
-              <Feather name="x" size={12} color={colors.destructive} />
-              <Text style={[styles.clearDateText, { color: colors.destructive }]}>{t("history.clearFilter")}</Text>
-            </TouchableOpacity>
+        </View>
+
+        {/* Row 2: Zeitraum */}
+        <View style={{ backgroundColor: '#edf7f2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
+            {language === 'de' ? 'Zeitraum' : 'Period'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {([
+              ['3m', t("history.threeMonths")],
+              ['6m', t("history.sixMonths")],
+              ['vb', t("history.dateRange")],
+            ] as const).map(([val, label]) => {
+              const active = zeitraum === val;
+              return (
+                <TouchableOpacity
+                  key={val}
+                  onPress={() => {
+                    setZeitraum(val);
+                    setGruppierungJahr('alle');
+                    setSelectedYear(null);
+                    if (val === '3m') { setPeriodFilter(3); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                    else if (val === '6m') { setPeriodFilter(6); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                    else { setPeriodFilter('all'); }
+                    if (Platform.OS !== 'web') Haptics.selectionAsync();
+                  }}
+                  style={{
+                    flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center',
+                    backgroundColor: active ? '#1a7f5a' : '#FFFFFF',
+                    borderWidth: 0.5, borderColor: active ? '#1a7f5a' : '#ddd',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {zeitraum === 'vb' && (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.from")}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
+                  <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
+                    value={vonDatum}
+                    onChangeText={(v) => { setVonDatum(v); setDateFrom(v); }}
+                    placeholder={t("history.datePlaceholder")}
+                    placeholderTextColor="#bbb"
+                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                  />
+                </View>
+              </View>
+              <Feather name="arrow-right" size={14} color="#aaa" style={{ marginBottom: 9 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.to")}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
+                  <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
+                    value={bisDatum}
+                    onChangeText={(v) => { setBisDatum(v); setDateTo(v); }}
+                    placeholder={t("history.datePlaceholder")}
+                    placeholderTextColor="#bbb"
+                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                  />
+                </View>
+              </View>
+            </View>
           )}
         </View>
-      )}
+
+        {/* Row 3: Gruppierung */}
+        <View style={{ backgroundColor: '#fff8ec', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
+            {language === 'de' ? 'Gruppierung' : 'Grouping'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* Einheit */}
+            <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
+              {(['monat', 'quartal'] as const).map((val) => {
+                const active = gruppierungEinheit === val;
+                const label = val === 'monat'
+                  ? (language === 'de' ? 'Monat' : 'Month')
+                  : (language === 'de' ? 'Quartal' : 'Quarter');
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => { setGruppierungEinheit(val); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                    style={{
+                      flex: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center',
+                      backgroundColor: active ? '#d97706' : '#FFFFFF',
+                      borderWidth: 0.5, borderColor: active ? '#d97706' : '#eee',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {/* Jahr */}
+            <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
+              {([
+                ['alle', t("history.all")],
+                [String(new Date().getFullYear()), String(new Date().getFullYear())],
+                [String(new Date().getFullYear() - 1), String(new Date().getFullYear() - 1)],
+              ] as const).map(([yr, label]) => {
+                const active = gruppierungJahr === yr;
+                return (
+                  <TouchableOpacity
+                    key={yr}
+                    onPress={() => {
+                      setGruppierungJahr(yr);
+                      const parsedYear = yr === 'alle' ? null : parseInt(yr);
+                      setSelectedYear(parsedYear);
+                      if (yr !== 'alle') { setPeriodFilter('all'); setDateFrom(''); setDateTo(''); }
+                      if (Platform.OS !== 'web') Haptics.selectionAsync();
+                    }}
+                    style={{
+                      flex: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center',
+                      backgroundColor: active ? '#d97706' : '#FFFFFF',
+                      borderWidth: 0.5, borderColor: active ? '#d97706' : '#eee',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+      </View>
 
       {/* Stats summary card */}
       <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
