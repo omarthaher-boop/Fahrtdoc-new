@@ -497,7 +497,7 @@ export default function HistoryScreen() {
       ...lines,
       "-".repeat(50),
       "",
-      `FahrtDoc | www.centof.ai`,
+      `FahrtDoc | centof.ai`,
       `Exportiert am: ${exportedAt}`,
     ].join("\n");
     const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
