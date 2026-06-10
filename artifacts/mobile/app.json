@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.omarthaher.fahrtdoc",
-      "buildNumber": "33",
+      "buildNumber": "34",
       "infoPlist": {
         "UIBackgroundModes": ["location"],
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
