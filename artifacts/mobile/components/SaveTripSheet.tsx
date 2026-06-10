@@ -75,7 +75,7 @@ export default function SaveTripSheet() {
   const [routeCheckedId, setRouteCheckedId] = useState<string | null>(null);
   const [useRouteDuration, setUseRouteDuration] = useState(false);
   const [draftTrip, setDraftTrip] = useState<Trip | null>(null);
-  const [editingField, setEditingField] = useState<"end" | number | null>(null);
+  const [editingField, setEditingField] = useState<"start" | "end" | number | null>(null);
   const [fieldDraftValue, setFieldDraftValue] = useState("");
   const [routeOverrideEnd, setRouteOverrideEnd] = useState<{ lat: number; lon: number } | null>(null);
   const [gpsCaptureField, setGpsCaptureField] = useState<"start" | "end" | number | null>(null);
@@ -169,7 +169,7 @@ export default function SaveTripSheet() {
     if (pendingTrip) setDraftTrip(pendingTrip);
   }, [pendingTrip]);
 
-  const startFieldEdit = (field: "end" | number, currentValue: string) => {
+  const startFieldEdit = (field: "start" | "end" | number, currentValue: string) => {
     setEditingField(field);
     setFieldDraftValue(currentValue);
   };
@@ -184,7 +184,10 @@ export default function SaveTripSheet() {
     isConfirmingRef.current = true;
     setEditingField(null);
 
-    if (field === "end") {
+    if (field === "start") {
+      const newAddr = fieldDraftValue.trim() || draftTrip.startAddr;
+      setDraftTrip((prev) => (prev ? { ...prev, startAddr: newAddr } : null));
+    } else if (field === "end") {
       const newAddr = fieldDraftValue.trim() || draftTrip.endAddr;
       setDraftTrip((prev) => (prev ? { ...prev, endAddr: newAddr } : null));
 
@@ -322,22 +325,57 @@ export default function SaveTripSheet() {
                 {/* Start address */}
                 <View style={styles.addrRow}>
                   <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
-                  <Text
-                    style={[styles.addrText, { color: colors.foreground }]}
-                    numberOfLines={1}
-                  >
-                    {draftTrip?.startAddr || "—"}
-                  </Text>
-                  {gpsCaptureField === "start" ? (
-                    <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                  {editingField === "start" ? (
+                    <>
+                      <TextInput
+                        style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
+                        value={fieldDraftValue}
+                        onChangeText={setFieldDraftValue}
+                        onSubmitEditing={confirmFieldEdit}
+                        onBlur={confirmFieldEdit}
+                        autoFocus
+                        returnKeyType="done"
+                        blurOnSubmit
+                      />
+                      {gpsCaptureField === "start" ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => captureCurrentAddr("start")}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={{ marginLeft: 4 }}
+                        >
+                          <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
-                    <TouchableOpacity
-                      onPress={() => captureCurrentAddr("start")}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ marginLeft: 4 }}
-                    >
-                      <Feather name="crosshair" size={13} color={colors.mutedForeground} />
-                    </TouchableOpacity>
+                    <>
+                      <Text
+                        style={[styles.addrText, { color: colors.foreground, flex: 1 }]}
+                        numberOfLines={1}
+                      >
+                        {draftTrip?.startAddr || "—"}
+                      </Text>
+                      {gpsCaptureField === "start" ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => captureCurrentAddr("start")}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={{ marginLeft: 4 }}
+                        >
+                          <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => startFieldEdit("start", draftTrip?.startAddr ?? "")}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ marginLeft: 6 }}
+                      >
+                        <Feather name="edit-2" size={12} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    </>
                   )}
                 </View>
 
