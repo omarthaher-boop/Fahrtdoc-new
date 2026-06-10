@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,9 +15,10 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { Trip, Waypoint } from "@/context/AppContext";
+import { Trip, Waypoint, reverseGeocode } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import TripRouteMap from "@/components/TripRouteMap";
+import FullScreenMapModal from "@/components/FullScreenMapModal";
 import LocationPickerModal from "@/components/LocationPickerModal";
 import { geocodeAddress } from "@/utils/geocode";
 
@@ -36,6 +38,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   const colors = useColors();
   const { t } = useLanguage();
   const [type, setType] = useState<"business" | "private">("business");
+  const [purpose, setPurpose] = useState("");
   const [startAddr, setStartAddr] = useState("");
   const [endAddr, setEndAddr] = useState("");
   const [km, setKm] = useState("");
@@ -46,6 +49,39 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   const [pinnedStart, setPinnedStart] = useState<Coord | null>(null);
   const [pinnedEnd, setPinnedEnd] = useState<Coord | null>(null);
   const [pickerFor, setPickerFor] = useState<"start" | "end" | null>(null);
+  const [mapFullScreen, setMapFullScreen] = useState(false);
+  const [gpsCaptureFor, setGpsCaptureFor] = useState<"start" | "end" | number | null>(null);
+
+  const captureGps = async (field: "start" | "end" | number) => {
+    if (gpsCaptureFor !== null) return;
+    setGpsCaptureFor(field);
+    try {
+      const Location = await import("expo-location");
+      await Location.requestForegroundPermissionsAsync();
+      let pos = await Location.getLastKnownPositionAsync({ maxAge: 30000, requiredAccuracy: 100 });
+      if (!pos) pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (!pos) return;
+      const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+      if (!addr) return;
+      const coord = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      if (field === "start") {
+        setStartAddr(addr);
+        setPinnedStart(coord);
+        syncMapTrip({ startAddr: addr, startLat: coord.lat, startLon: coord.lon });
+      } else if (field === "end") {
+        setEndAddr(addr);
+        setPinnedEnd(coord);
+        syncMapTrip({ endAddr: addr, endLat: coord.lat, endLon: coord.lon });
+      } else {
+        const idx = field as number;
+        handleWaypointChange(idx, addr);
+      }
+    } catch {
+      // ignore — user can type manually
+    } finally {
+      setGpsCaptureFor(null);
+    }
+  };
 
   const onSaveRef = useRef(onSave);
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
@@ -53,6 +89,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
   useEffect(() => {
     if (trip) {
       setType(trip.type);
+      setPurpose(trip.purpose ?? "");
       setStartAddr(trip.startAddr);
       setEndAddr(trip.endAddr);
       setKm(trip.km.toFixed(1));
@@ -154,6 +191,7 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
 
     onSave(trip.id, {
       type,
+      purpose: type === "business" ? (purpose.trim() || undefined) : undefined,
       startAddr: resolvedStartAddr,
       endAddr: resolvedEndAddr,
       km: isNaN(kmNum) ? trip.km : kmNum,
@@ -194,6 +232,26 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
               {mapTrip && (
                 <View style={styles.mapWrapper}>
                   <TripRouteMap trip={mapTrip} path={mapTrip.path} hideOnEmpty />
+                  {/* Full-coverage transparent overlay — tapping anywhere on the map expands it */}
+                  <TouchableOpacity
+                    style={styles.mapTapOverlay}
+                    onPress={() => setMapFullScreen(true)}
+                    activeOpacity={1}
+                  />
+                  {/* Visible expand icon in the corner as an affordance */}
+                  <TouchableOpacity
+                    style={[styles.expandBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setMapFullScreen(true)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Feather name="maximize-2" size={13} color={colors.foreground} />
+                  </TouchableOpacity>
+                  <FullScreenMapModal
+                    trip={mapTrip}
+                    path={mapTrip.path}
+                    visible={mapFullScreen}
+                    onClose={() => setMapFullScreen(false)}
+                  />
                 </View>
               )}
 
@@ -221,6 +279,26 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Purpose — only shown for business trips */}
+              {type === "business" && (
+                <View style={styles.fieldGroup}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("edit.purpose")}</Text>
+                  <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="briefcase" size={14} color={colors.primary} />
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      value={purpose}
+                      onChangeText={setPurpose}
+                      placeholder={t("edit.purposePlaceholder")}
+                      placeholderTextColor={colors.mutedForeground}
+                      returnKeyType="done"
+                      blurOnSubmit
+                      maxLength={200}
+                    />
+                  </View>
+                </View>
+              )}
 
               {/* Start address */}
               <View style={styles.fieldGroup}>
@@ -253,6 +331,16 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     placeholder={t("edit.startAddr")}
                     placeholderTextColor={colors.mutedForeground}
                   />
+                  {gpsCaptureFor === "start" ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={styles.pinBtn} />
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.pinBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                      onPress={() => captureGps("start")}
+                    >
+                      <Feather name="crosshair" size={15} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[
                       styles.pinBtn,
@@ -287,6 +375,16 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                       placeholder={t("edit.addrPlaceholder")}
                       placeholderTextColor={colors.mutedForeground}
                     />
+                    {gpsCaptureFor === idx ? (
+                      <ActivityIndicator size="small" color={colors.primary} style={styles.pinBtn} />
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.pinBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                        onPress={() => captureGps(idx)}
+                      >
+                        <Feather name="crosshair" size={15} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                   <View style={[styles.noteRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                     <Feather name="file-text" size={13} color={colors.mutedForeground} />
@@ -332,6 +430,16 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     placeholder={t("edit.endAddr")}
                     placeholderTextColor={colors.mutedForeground}
                   />
+                  {gpsCaptureFor === "end" ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={styles.pinBtn} />
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.pinBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                      onPress={() => captureGps("end")}
+                    >
+                      <Feather name="crosshair" size={15} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[
                       styles.pinBtn,
@@ -544,7 +652,23 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 6,
   },
-  mapWrapper: { marginBottom: 16 },
+  mapWrapper: { marginBottom: 16, position: "relative" },
+  mapTapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  expandBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
   twoColRow: { flexDirection: "row", gap: 12 },
   saveBtn: {
     flexDirection: "row",
