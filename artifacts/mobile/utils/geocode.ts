@@ -12,7 +12,7 @@ export async function geocodeAddress(addr: string): Promise<{ lat: number; lon: 
       `?q=${encodeURIComponent(addr)}&format=json&limit=1`;
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { "Accept-Language": "de", "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" },
+      headers: { "Accept-Language": "de", "User-Agent": "FahrtDoc/2.4 (info@centof.ai)" },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{ lat: string; lon: string }>;
