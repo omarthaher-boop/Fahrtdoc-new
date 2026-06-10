@@ -123,7 +123,7 @@ export default function HistoryScreen() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
   const [kategorie, setKategorie] = useState<'alle' | 'geschaeftlich' | 'privat'>('alle');
-  const [zeitraum, setZeitraum] = useState<'3m' | '6m' | 'vb'>('3m');
+  const [zeitraum, setZeitraum] = useState<'3m' | '6m' | 'vb' | null>(null);
   const [filterMonat, setFilterMonat] = useState<number | null>(null);
   const [gruppierungJahr, setGruppierungJahr] = useState<string | null>(null);
   const [showMonatDropdown, setShowMonatDropdown] = useState(false);
@@ -265,7 +265,7 @@ export default function HistoryScreen() {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     skipNextPersistRef.current = true;
     setKategorie('alle');
-    setZeitraum('3m');
+    setZeitraum(null);
     setVonDatum('');
     setBisDatum('');
     setFilterMonat(null);
@@ -282,7 +282,7 @@ export default function HistoryScreen() {
   };
 
   const isFiltersActive =
-    kategorie !== 'alle' || zeitraum !== '3m' || !!vonDatum || !!bisDatum || filterMonat !== null || !!gruppierungJahr;
+    kategorie !== 'alle' || zeitraum !== null || !!vonDatum || !!bisDatum || filterMonat !== null || !!gruppierungJahr;
 
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
@@ -779,8 +779,9 @@ export default function HistoryScreen() {
                 <TouchableOpacity
                   key={val}
                   onPress={() => {
-                    setKategorie(val);
-                    setTypeFilter(val === 'alle' ? 'all' : val === 'geschaeftlich' ? 'business' : 'private');
+                    const next = (active && val !== 'alle') ? 'alle' : val;
+                    setKategorie(next);
+                    setTypeFilter(next === 'alle' ? 'all' : next === 'geschaeftlich' ? 'business' : 'private');
                     if (Platform.OS !== 'web') Haptics.selectionAsync();
                   }}
                   style={{
@@ -814,12 +815,18 @@ export default function HistoryScreen() {
                 <TouchableOpacity
                   key={val}
                   onPress={() => {
-                    setZeitraum(val);
-                    setGruppierungJahr('alle');
-                    setSelectedYear(null);
-                    if (val === '3m') { setPeriodFilter(3); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
-                    else if (val === '6m') { setPeriodFilter(6); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
-                    else { setPeriodFilter('all'); }
+                    if (active) {
+                      setZeitraum(null);
+                      setPeriodFilter('all');
+                      setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum('');
+                      setGruppierungJahr(null); setSelectedYear(null);
+                    } else {
+                      setZeitraum(val);
+                      setGruppierungJahr(null); setSelectedYear(null);
+                      if (val === '3m') { setPeriodFilter(3); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                      else if (val === '6m') { setPeriodFilter(6); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                      else { setPeriodFilter('all'); }
+                    }
                     if (Platform.OS !== 'web') Haptics.selectionAsync();
                   }}
                   style={{
@@ -937,33 +944,36 @@ export default function HistoryScreen() {
               {showJahrDropdown && (
                 <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
                   <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                    <TouchableOpacity
-                      onPress={() => { setGruppierungJahr(null); setSelectedYear(null); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: !gruppierungJahr ? '#fef3c7' : 'transparent' }}
-                    >
-                      <Text style={{ fontSize: 13, color: !gruppierungJahr ? '#92400e' : '#444', fontWeight: !gruppierungJahr ? '600' : '400' }}>
-                        {language === 'de' ? 'Alle Jahre' : 'All years'}
-                      </Text>
-                    </TouchableOpacity>
-                    {availableYears.map((yr) => (
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((yr, idx) => (
                       <TouchableOpacity
                         key={yr}
                         onPress={() => {
-                          setGruppierungJahr(String(yr));
-                          setSelectedYear(yr);
-                          setPeriodFilter('all');
-                          setDateFrom(''); setDateTo('');
-                          setZeitraum('vb');
+                          if (gruppierungJahr === String(yr)) {
+                            setGruppierungJahr(null); setSelectedYear(null);
+                          } else {
+                            setGruppierungJahr(String(yr));
+                            setSelectedYear(yr);
+                            setPeriodFilter('all');
+                            setDateFrom(''); setDateTo('');
+                          }
                           setShowJahrDropdown(false);
                           if (Platform.OS !== 'web') Haptics.selectionAsync();
                         }}
-                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: gruppierungJahr === String(yr) ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: gruppierungJahr === String(yr) ? '#fef3c7' : 'transparent', borderTopWidth: idx === 0 ? 0 : 0.5, borderTopColor: '#f0f0f0' }}
                       >
                         <Text style={{ fontSize: 13, color: gruppierungJahr === String(yr) ? '#92400e' : '#444', fontWeight: gruppierungJahr === String(yr) ? '600' : '400' }}>
                           {yr}
                         </Text>
                       </TouchableOpacity>
                     ))}
+                    <TouchableOpacity
+                      onPress={() => { setGruppierungJahr(null); setSelectedYear(null); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: !gruppierungJahr ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                    >
+                      <Text style={{ fontSize: 13, color: !gruppierungJahr ? '#92400e' : '#444', fontWeight: !gruppierungJahr ? '600' : '400' }}>
+                        {language === 'de' ? 'Alle Jahre' : 'All years'}
+                      </Text>
+                    </TouchableOpacity>
                   </ScrollView>
                 </View>
               )}
