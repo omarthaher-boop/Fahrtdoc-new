@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Modal,
@@ -58,6 +59,7 @@ export default function HomeScreen() {
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
   const driveTaskRunning = useDriveTaskRunning();
   const dotScale = useRef(new Animated.Value(1)).current;
+  const dotOpacity = useRef(new Animated.Value(1)).current;
   const [showPillTooltip, setShowPillTooltip] = useState(false);
   const pillTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pillBg = useRef(new Animated.Value(0)).current;
@@ -79,6 +81,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!driveTaskRunning) {
       dotScale.setValue(1);
+      dotOpacity.setValue(1);
       pillBg.setValue(0);
       return;
     }
@@ -90,6 +93,11 @@ export default function HomeScreen() {
             duration: 700,
             useNativeDriver: true,
           }),
+          Animated.timing(dotOpacity, {
+            toValue: 0.4,
+            duration: 700,
+            useNativeDriver: true,
+          }),
           Animated.timing(pillBg, {
             toValue: 1,
             duration: 700,
@@ -98,6 +106,11 @@ export default function HomeScreen() {
         ]),
         Animated.parallel([
           Animated.timing(dotScale, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dotOpacity, {
             toValue: 1,
             duration: 700,
             useNativeDriver: true,
@@ -112,7 +125,7 @@ export default function HomeScreen() {
     );
     pulse.start();
     return () => pulse.stop();
-  }, [driveTaskRunning, dotScale, pillBg]);
+  }, [driveTaskRunning, dotScale, dotOpacity, pillBg]);
 
   useEffect(() => {
     if (!driveTaskRunning) {
@@ -140,7 +153,41 @@ export default function HomeScreen() {
 
   const [modalStartAddr, setModalStartAddr] = useState("");
   const [modalStartAddrLoading, setModalStartAddrLoading] = useState(false);
+  const [modalGpsRetrying, setModalGpsRetrying] = useState(false);
   const startAddrInputRef = useRef<TextInput>(null);
+
+  const fetchModalGps = async () => {
+    if (modalStartAddrLoading || modalGpsRetrying) return;
+    setModalGpsRetrying(true);
+    try {
+      if (Platform.OS === "web") {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation?.getCurrentPosition(
+            async (pos) => {
+              const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+              if (addr) setModalStartAddr(addr);
+              resolve();
+            },
+            () => resolve(),
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 10000 }
+          );
+        });
+      } else {
+        const Location = await import("expo-location");
+        await Location.requestForegroundPermissionsAsync();
+        let pos = await Location.getLastKnownPositionAsync({ maxAge: 30000, requiredAccuracy: 100 });
+        if (!pos) pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (pos) {
+          const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          if (addr) setModalStartAddr(addr);
+        }
+      }
+    } catch {
+      // user can type manually
+    } finally {
+      setModalGpsRetrying(false);
+    }
+  };
 
   const PILL_TOOLTIP_KEY = "aktivPillTooltipSeen";
 
@@ -298,7 +345,7 @@ export default function HomeScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Animated.View style={[styles.driveActivePill, { backgroundColor: pillBgColor }]}>
-                    <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }] }]} />
+                    <Animated.View style={[styles.driveActiveDot, { transform: [{ scale: dotScale }], opacity: dotOpacity }]} />
                     <Text style={styles.driveActiveText}>Aktiv · {fmtTracking(trackingElapsed)}</Text>
                   </Animated.View>
                 </TouchableOpacity>
@@ -534,6 +581,13 @@ export default function HomeScreen() {
                 {modalStartAddr.length > 0 && (
                   <TouchableOpacity onPress={() => setModalStartAddr("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Feather name="x" size={13} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                )}
+                {modalGpsRetrying ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ width: 18 }} />
+                ) : (
+                  <TouchableOpacity onPress={fetchModalGps} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Feather name="crosshair" size={14} color={modalStartAddrLoading ? colors.border : colors.mutedForeground} />
                   </TouchableOpacity>
                 )}
               </View>
