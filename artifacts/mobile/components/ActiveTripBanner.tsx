@@ -32,7 +32,7 @@ const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> =>
     const tid = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`,
-      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centof.ai)" } }
     );
     clearTimeout(tid);
     const d = await r.json();
@@ -66,6 +66,8 @@ export default function ActiveTripBanner() {
   const [pauseNote, setPauseNote] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [showWaypoints, setShowWaypoints] = useState(false);
+  const [waypointContentHeight, setWaypointContentHeight] = useState(0);
+  const waypointExpandAnim = useRef(new Animated.Value(0)).current;
   const noteInputRef = useRef<TextInput>(null);
 
   // Auto-expand waypoint list when a new waypoint is added; collapse when trip resets
@@ -73,6 +75,15 @@ export default function ActiveTripBanner() {
     const count = activeTrip?.waypoints?.length ?? 0;
     setShowWaypoints(count > 0);
   }, [activeTrip?.waypoints?.length]);
+
+  // Animate waypoint list open/closed; re-runs if measured height changes while open
+  useEffect(() => {
+    Animated.timing(waypointExpandAnim, {
+      toValue: showWaypoints ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [showWaypoints, waypointExpandAnim]);
 
   useEffect(() => {
     if (!activeTrip || paused) {
@@ -264,35 +275,50 @@ export default function ActiveTripBanner() {
             )}
           </View>
 
-          {showWaypoints && (activeTrip.waypoints?.length ?? 0) > 0 && (
-            <View style={[styles.waypointList, { borderColor: colors.border, backgroundColor: colors.background }]}>
-              {activeTrip.waypoints!.map((wp, i) => (
-                <View
-                  key={wp.timestamp}
-                  style={[
-                    styles.waypointItem,
-                    i < activeTrip.waypoints!.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                  ]}
-                >
-                  <View style={[styles.waypointBullet, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.waypointBulletText}>{i + 1}</Text>
+          {(activeTrip.waypoints?.length ?? 0) > 0 && (
+            <Animated.View
+              style={[
+                styles.waypointList,
+                { borderColor: colors.border, backgroundColor: colors.background },
+                {
+                  height: waypointExpandAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, waypointContentHeight > 0 ? waypointContentHeight : 1],
+                  }),
+                  opacity: waypointExpandAnim,
+                  overflow: "hidden",
+                },
+              ]}
+            >
+              <View onLayout={(e) => setWaypointContentHeight(e.nativeEvent.layout.height)}>
+                {activeTrip.waypoints!.map((wp, i) => (
+                  <View
+                    key={wp.timestamp}
+                    style={[
+                      styles.waypointItem,
+                      i < activeTrip.waypoints!.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <View style={[styles.waypointBullet, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.waypointBulletText}>{i + 1}</Text>
+                    </View>
+                    <View style={styles.waypointContent}>
+                      <Text style={[styles.waypointAddr, { color: colors.foreground }]} numberOfLines={1}>
+                        {wp.addr}
+                      </Text>
+                      {wp.note ? (
+                        <View style={styles.waypointNoteRow}>
+                          <Feather name="edit-2" size={10} color={colors.primary} />
+                          <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                            {wp.note}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  <View style={styles.waypointContent}>
-                    <Text style={[styles.waypointAddr, { color: colors.foreground }]} numberOfLines={1}>
-                      {wp.addr}
-                    </Text>
-                    {wp.note ? (
-                      <View style={styles.waypointNoteRow}>
-                        <Feather name="edit-2" size={10} color={colors.primary} />
-                        <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
-                          {wp.note}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            </Animated.View>
           )}
         </View>
         <View style={styles.actions}>
