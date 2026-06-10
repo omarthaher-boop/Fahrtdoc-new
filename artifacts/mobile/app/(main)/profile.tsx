@@ -223,7 +223,7 @@ Wir setzen technische und organisatorische Massnahmen ein, um Ihre Daten zu sch�
 • Recht auf Datenherausgabe und -übertragung
 • Beschwerderecht beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten (EDÖB)
 
-Zur Ausübung Ihrer Rechte wenden Sie sich bitte an: datenschutz@centof.ai
+Zur Ausübung Ihrer Rechte wenden Sie sich bitte an: info@centof.ai
 
 
 10. DATENLÖSCHUNG IN DER APP
