@@ -60,7 +60,7 @@ const reverseGeocodeLocal = async (lat: number, lon: number): Promise<string> =>
     const tid = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`,
-      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centof.ai)" } }
     );
     clearTimeout(tid);
     const d = await r.json();
@@ -94,6 +94,7 @@ export default function TrackingScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const mapFadeAnim = useRef(new Animated.Value(0)).current;
+  const mapDimAnim = useRef(new Animated.Value(1)).current;
   const mapShownRef = useRef(false);
   const [showPauseSheet, setShowPauseSheet] = useState(false);
   const [pauseLocation, setPauseLocation] = useState("");
@@ -201,6 +202,14 @@ export default function TrackingScreen() {
       mapShownRef.current = false;
     }
   }, [showMap, mapFadeAnim]);
+
+  useEffect(() => {
+    Animated.timing(mapDimAnim, {
+      toValue: paused ? 0.45 : 1,
+      duration: 350,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [paused, mapDimAnim]);
 
   if (!activeTrip) return null;
 
@@ -369,8 +378,18 @@ export default function TrackingScreen() {
           </View>
         )}
         {showMap && (
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: mapFadeAnim }]}>
-            <ActiveTripMap positions={activeTrip.positions} livePos={livePos} heading={heading} />
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { opacity: Animated.multiply(mapFadeAnim, mapDimAnim) },
+            ]}
+          >
+            <ActiveTripMap
+              positions={activeTrip.positions}
+              livePos={livePos}
+              heading={heading}
+              paused={paused}
+            />
           </Animated.View>
         )}
       </View>
@@ -443,6 +462,11 @@ export default function TrackingScreen() {
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
               {t("tracking.screen.speed")}
             </Text>
+            {livePos?.accuracy != null && livePos.accuracy > 15 && (
+              <Text style={[styles.accuracyBadge, { color: colors.mutedForeground }]}>
+                ±{Math.round(livePos.accuracy)} m
+              </Text>
+            )}
           </View>
 
           {(activeTrip.waypoints?.length ?? 0) > 0 && (
@@ -751,6 +775,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 26, fontWeight: "800", fontVariant: ["tabular-nums" as const] },
   statUnit: { fontSize: 14, fontWeight: "500" },
   statLabel: { fontSize: 11, fontWeight: "500" },
+  accuracyBadge: { fontSize: 10, fontWeight: "400", marginTop: 1 },
   statDivider: { width: 1, height: 40 },
   startAddrRow: {
     flexDirection: "row",
