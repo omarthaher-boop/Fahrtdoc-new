@@ -36,6 +36,7 @@ const SAVED_SELECTIONS_KEY = "@drivelog_saved_selections";
 type SavedSelection = { id: string; name: string; tripIds: string[] };
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
+
 type TypeFilter = "all" | "business" | "private";
 
 const fmtDur = (s: number) => {
@@ -97,6 +98,7 @@ export default function HistoryScreen() {
   const [dateTo, setDateTo] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
@@ -228,11 +230,12 @@ export default function HistoryScreen() {
     setShowDateRange(false);
     setSelectedMonth(null);
     setShowMonthPicker(false);
+    setSelectedYear(null);
     AsyncStorage.removeItem(FILTER_STORAGE_KEY).catch(() => {});
   };
 
   const isFiltersActive =
-    periodFilter !== "all" || typeFilter !== "all" || !!dateFrom || !!dateTo;
+    periodFilter !== "all" || typeFilter !== "all" || !!dateFrom || !!dateTo || selectedYear !== null;
 
   // Export loading state
   const [exportingPDF, setExportingPDF] = useState(false);
@@ -253,18 +256,29 @@ export default function HistoryScreen() {
     { label: t("history.thisYear"), value: 12 },
   ];
 
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    trips.forEach((t) => years.add(new Date(t.date).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a).slice(0, 4);
+  }, [trips]);
+
   const cutoff = useMemo(() => {
+    if (selectedYear !== null) return new Date(0);
     if (periodFilter === "all") return new Date(0);
     const d = new Date();
     if (periodFilter === 12) return new Date(d.getFullYear(), 0, 1);
     d.setMonth(d.getMonth() - periodFilter);
     return d;
-  }, [periodFilter]);
+  }, [periodFilter, selectedYear]);
 
   const filtered = useMemo(() => {
     return trips.filter((t) => {
       const d = new Date(t.date);
-      if (d < cutoff) return false;
+      if (selectedYear !== null) {
+        if (d.getFullYear() !== selectedYear) return false;
+      } else {
+        if (d < cutoff) return false;
+      }
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
       if (typeof dateFrom === "string" && dateFrom.includes(".")) {
         const [dd, mm, yyyy] = dateFrom.split(".").map(Number);
@@ -282,7 +296,7 @@ export default function HistoryScreen() {
       }
       return true;
     });
-  }, [trips, cutoff, typeFilter, dateFrom, dateTo]);
+  }, [trips, cutoff, typeFilter, dateFrom, dateTo, selectedYear]);
 
   // Free users: show only the most recent FREE_TRIP_LIMIT trips (when SUBSCRIPTION_ENABLED)
   const filteredForDisplay = useMemo(() => {
@@ -449,6 +463,7 @@ export default function HistoryScreen() {
     const fmt = (d: Date) =>
       `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
     setSelectedMonth({ year, month });
+    setSelectedYear(null);
     setDateFrom(fmt(first));
     setDateTo(fmt(last));
     setPeriodFilter("all");
@@ -702,12 +717,13 @@ export default function HistoryScreen() {
       <View style={[styles.filterRow1Wrap, { backgroundColor: colors.background }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {PERIOD_OPTIONS.map((o) => {
-            const active = periodFilter === o.value;
+            const active = periodFilter === o.value && selectedYear === null;
             return (
               <TouchableOpacity
                 key={String(o.value)}
                 onPress={() => {
                   setPeriodFilter(o.value);
+                  setSelectedYear(null);
                   if (selectedMonth) { setSelectedMonth(null); setDateFrom(""); setDateTo(""); }
                   if (Platform.OS !== "web") Haptics.selectionAsync();
                 }}
@@ -721,6 +737,39 @@ export default function HistoryScreen() {
               >
                 <Text style={[styles.pillText, { color: active ? "#FFFFFF" : colors.mutedForeground }]}>
                   {o.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Year quick-select pills */}
+          {availableYears.map((yr) => {
+            const active = selectedYear === yr;
+            return (
+              <TouchableOpacity
+                key={`yr-${yr}`}
+                onPress={() => {
+                  setSelectedYear(active ? null : yr);
+                  if (!active) {
+                    setPeriodFilter("all");
+                    setSelectedMonth(null);
+                    setDateFrom("");
+                    setDateTo("");
+                  }
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
+                }}
+                style={[
+                  styles.pill,
+                  styles.pillWithIcon,
+                  {
+                    backgroundColor: active ? colors.primary : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Feather name="calendar" size={12} color={active ? "#FFFFFF" : colors.mutedForeground} />
+                <Text style={[styles.pillText, { color: active ? "#FFFFFF" : colors.mutedForeground }]}>
+                  {yr}
                 </Text>
               </TouchableOpacity>
             );
@@ -746,7 +795,7 @@ export default function HistoryScreen() {
             <Text style={[styles.pillText, { color: selectedMonth ? "#FFFFFF" : colors.mutedForeground }]}>
               {activeMonthLabel}
             </Text>
-            {selectedMonth && (
+            {selectedMonth ? (
               <TouchableOpacity
                 onPress={(e) => {
                   e.stopPropagation();
@@ -760,6 +809,8 @@ export default function HistoryScreen() {
               >
                 <Feather name="x" size={12} color="#FFFFFF" />
               </TouchableOpacity>
+            ) : (
+              <Feather name="chevron-down" size={12} color={colors.mutedForeground} />
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -966,8 +1017,8 @@ export default function HistoryScreen() {
 
       {/* Selection bar — directly above trip list */}
       <View style={[styles.searchBarRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 1.5 }]}>
+          <Feather name="search" size={15} color={colors.primary} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
             placeholder={t("history.searchPlaceholder")}
@@ -2027,10 +2078,9 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
     paddingHorizontal: 10,
-    height: 36,
+    height: 40,
   },
   searchIcon: {
     marginRight: 6,
