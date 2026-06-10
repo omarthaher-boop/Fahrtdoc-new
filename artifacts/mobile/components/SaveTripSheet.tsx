@@ -45,7 +45,7 @@ const forwardGeocode = async (address: string): Promise<{ lat: number; lon: numb
     const tid = setTimeout(() => ctrl.abort(), 5000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
-      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centofai.com)" } }
+      { signal: ctrl.signal, headers: { "User-Agent": "FahrtDoc/2.4 (info@centof.ai)" } }
     );
     clearTimeout(tid);
     const data = await r.json();
@@ -569,6 +569,34 @@ export default function SaveTripSheet() {
                     ) : null;
                   })()}
                 </TouchableOpacity>
+              )}
+
+              {/* Trip purpose — only shown for business trips */}
+              {draftTrip?.type === "business" && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                    {t("save.purposeSection")}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.noteInput,
+                      {
+                        backgroundColor: colors.secondary,
+                        borderColor: colors.border,
+                        color: colors.foreground,
+                      },
+                    ]}
+                    placeholder={t("save.purposePlaceholder")}
+                    placeholderTextColor={colors.mutedForeground}
+                    value={draftTrip?.purpose ?? ""}
+                    onChangeText={(text) =>
+                      setDraftTrip((prev) => (prev ? { ...prev, purpose: text || undefined } : null))
+                    }
+                    returnKeyType="done"
+                    blurOnSubmit
+                    maxLength={200}
+                  />
+                </>
               )}
 
               {/* Trip note */}
