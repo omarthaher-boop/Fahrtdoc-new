@@ -15,9 +15,10 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TripRouteMap from "@/components/TripRouteMap";
-import { Trip, useApp } from "@/context/AppContext";
+import { Trip, useApp, reverseGeocode } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
 import { fetchRoutes, RouteOption } from "@/utils/routeService";
@@ -77,7 +78,54 @@ export default function SaveTripSheet() {
   const [editingField, setEditingField] = useState<"end" | number | null>(null);
   const [fieldDraftValue, setFieldDraftValue] = useState("");
   const [routeOverrideEnd, setRouteOverrideEnd] = useState<{ lat: number; lon: number } | null>(null);
+  const [gpsCaptureField, setGpsCaptureField] = useState<"start" | "end" | number | null>(null);
   const isConfirmingRef = useRef(false);
+
+  const captureCurrentAddr = async (field: "start" | "end" | number) => {
+    if (gpsCaptureField !== null) return;
+    setGpsCaptureField(field);
+    try {
+      const Location = await import("expo-location");
+      await Location.requestForegroundPermissionsAsync();
+      let pos = await Location.getLastKnownPositionAsync({ maxAge: 30000, requiredAccuracy: 100 });
+      if (!pos) pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (!pos) return;
+      const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+      if (!addr) return;
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      if (field === "start") {
+        setDraftTrip((prev) => prev ? { ...prev, startAddr: addr } : null);
+      } else if (field === "end") {
+        setDraftTrip((prev) => prev ? { ...prev, endAddr: addr } : null);
+        if (pendingTripCoords) {
+          setRouteOverrideEnd({ lat, lon });
+          setLoadingRoutes(true);
+          setRouteError(null);
+          fetchRoutes(pendingTripCoords.startLat, pendingTripCoords.startLon, lat, lon)
+            .then((r) => {
+              setRoutes(r);
+              const s = r.find((x) => x.isShortest) ?? r[0];
+              if (s) setRouteCheckedId(s.id);
+            })
+            .catch(() => setRouteError(t("save.routeError")))
+            .finally(() => setLoadingRoutes(false));
+        }
+      } else {
+        const idx = field as number;
+        setDraftTrip((prev) => {
+          if (!prev) return null;
+          const wps = [...(prev.waypoints ?? [])];
+          if (wps[idx]) wps[idx] = { ...wps[idx], addr };
+          return { ...prev, waypoints: wps };
+        });
+      }
+    } catch {
+      // ignore — user can edit manually
+    } finally {
+      setGpsCaptureField(null);
+    }
+  };
 
   useEffect(() => {
     if (!pendingTrip) {
@@ -271,7 +319,7 @@ export default function SaveTripSheet() {
                   { backgroundColor: colors.secondary, borderColor: colors.border },
                 ]}
               >
-                {/* Start address (read-only) */}
+                {/* Start address */}
                 <View style={styles.addrRow}>
                   <View style={[styles.addrDot, { backgroundColor: colors.primary }]} />
                   <Text
@@ -280,6 +328,17 @@ export default function SaveTripSheet() {
                   >
                     {draftTrip?.startAddr || "—"}
                   </Text>
+                  {gpsCaptureField === "start" ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => captureCurrentAddr("start")}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ marginLeft: 4 }}
+                    >
+                      <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Waypoints (editable) */}
@@ -292,16 +351,29 @@ export default function SaveTripSheet() {
                         {`${t("waypoint.label")} ${idx + 1}: `}
                       </Text>
                       {editingField === idx ? (
-                        <TextInput
-                          style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
-                          value={fieldDraftValue}
-                          onChangeText={setFieldDraftValue}
-                          onSubmitEditing={confirmFieldEdit}
-                          onBlur={confirmFieldEdit}
-                          autoFocus
-                          returnKeyType="done"
-                          blurOnSubmit
-                        />
+                        <>
+                          <TextInput
+                            style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
+                            value={fieldDraftValue}
+                            onChangeText={setFieldDraftValue}
+                            onSubmitEditing={confirmFieldEdit}
+                            onBlur={confirmFieldEdit}
+                            autoFocus
+                            returnKeyType="done"
+                            blurOnSubmit
+                          />
+                          {gpsCaptureField === idx ? (
+                            <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                          ) : (
+                            <TouchableOpacity
+                              onPress={() => captureCurrentAddr(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={{ marginLeft: 4 }}
+                            >
+                              <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                            </TouchableOpacity>
+                          )}
+                        </>
                       ) : (
                         <>
                           <Text
@@ -310,9 +382,21 @@ export default function SaveTripSheet() {
                           >
                             {wp.addr}
                           </Text>
+                          {gpsCaptureField === idx ? (
+                            <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                          ) : (
+                            <TouchableOpacity
+                              onPress={() => captureCurrentAddr(idx)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={{ marginLeft: 4 }}
+                            >
+                              <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                            </TouchableOpacity>
+                          )}
                           <TouchableOpacity
                             onPress={() => startFieldEdit(idx, wp.addr)}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ marginLeft: 6 }}
                           >
                             <Feather name="edit-2" size={12} color={colors.mutedForeground} />
                           </TouchableOpacity>
@@ -330,16 +414,29 @@ export default function SaveTripSheet() {
                     style={[styles.addrDotHollow, { borderColor: colors.mutedForeground }]}
                   />
                   {editingField === "end" ? (
-                    <TextInput
-                      style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
-                      value={fieldDraftValue}
-                      onChangeText={setFieldDraftValue}
-                      onSubmitEditing={confirmFieldEdit}
-                      onBlur={confirmFieldEdit}
-                      autoFocus
-                      returnKeyType="done"
-                      blurOnSubmit
-                    />
+                    <>
+                      <TextInput
+                        style={[styles.addrInput, { color: colors.foreground, borderColor: colors.primary }]}
+                        value={fieldDraftValue}
+                        onChangeText={setFieldDraftValue}
+                        onSubmitEditing={confirmFieldEdit}
+                        onBlur={confirmFieldEdit}
+                        autoFocus
+                        returnKeyType="done"
+                        blurOnSubmit
+                      />
+                      {gpsCaptureField === "end" ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => captureCurrentAddr("end")}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={{ marginLeft: 4 }}
+                        >
+                          <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
                     <>
                       <Text
@@ -348,9 +445,21 @@ export default function SaveTripSheet() {
                       >
                         {draftTrip?.endAddr || t("save.addressLoading")}
                       </Text>
+                      {gpsCaptureField === "end" ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => captureCurrentAddr("end")}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={{ marginLeft: 4 }}
+                        >
+                          <Feather name="crosshair" size={13} color={colors.mutedForeground} />
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         onPress={() => startFieldEdit("end", draftTrip?.endAddr ?? "")}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ marginLeft: 6 }}
                       >
                         <Feather name="edit-2" size={12} color={colors.mutedForeground} />
                       </TouchableOpacity>
