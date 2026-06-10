@@ -484,7 +484,7 @@ export default function TripCard({
 
           {!selectionMode && (
             <Animated.View style={[styles.mapSection, mapAnimStyle]}>
-              {mapMounted && <TripRouteMap trip={trip} />}
+              {mapMounted && <TripRouteMap trip={trip} path={trip.path} />}
             </Animated.View>
           )}
         </View>
