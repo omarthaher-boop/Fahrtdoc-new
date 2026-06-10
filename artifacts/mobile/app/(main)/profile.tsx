@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   isBiometricAvailable,
   authenticateWithBiometrics,
@@ -84,7 +84,7 @@ const FAQ_DATA: { q: string; a: string }[] = [
     { q: "Wie lange werden meine Daten gespeichert?", a: "Fahrtdaten werden bis zu 10 Jahre aufbewahrt, da das Finanzamt die Aufbewahrung steuerrelevanter Unterlagen ueber diesen Zeitraum verlangen kann." },
     { q: "Warum braucht die App Hintergrund-Zugriff?", a: "Fuer das automatische Tracking muss die App auch im Hintergrund auf den Standort zugreifen koennen. Ohne diese Berechtigung koennen Fahrten nur erkannt werden, wenn die App im Vordergrund ist." },
     { q: "Welche Version der App habe ich?", a: `Du nutzt FahrtDoc Version ${APP_VERSION}. Die aktuelle Versionsnummer findest du auch unter Profil -> Support -> App-Version.` },
-    { q: "Wie kontaktiere ich den Support?", a: "Du erreichst unseren Support unter info@centofai.com oder ueber das Kontaktformular in der App. Wir antworten in der Regel innerhalb von 1-2 Werktagen." },
+    { q: "Wie kontaktiere ich den Support?", a: "Du erreichst unseren Support unter info@centof.ai oder ueber das Kontaktformular in der App. Wir antworten in der Regel innerhalb von 1-2 Werktagen." },
     { q: "Wie klassifiziere ich Fahrten als geschaeftlich oder privat?", a: "Beim manuellen Start einer Fahrt kannst du die Fahrtart direkt auswaehlen. Bei automatisch erkannten Fahrten wird der Standardwert aus deinen Einstellungen uebernommen." },
     { q: "Kann ich Fahrten rueckwirkend aendern?", a: "Ja, du kannst bereits abgeschlossene Fahrten in der Fahrtenliste oeffnen und bearbeiten. Aenderungen werden sofort gespeichert und bei bestehender Verbindung synchronisiert." },
     { q: "Was ist der Unterschied zwischen automatischem und manuellem Tracking?", a: "Beim manuellen Tracking startest und beendest du Fahrten selbst. Das automatische Tracking erkennt Fahrten selbststaendig anhand von Bewegungsmustern, GPS und Fahrzeugsensoren." },
@@ -223,7 +223,7 @@ Wir setzen technische und organisatorische Massnahmen ein, um Ihre Daten zu sch�
 • Recht auf Datenherausgabe und -übertragung
 • Beschwerderecht beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten (EDÖB)
 
-Zur Ausübung Ihrer Rechte wenden Sie sich bitte an: datenschutz@centofai.com
+Zur Ausübung Ihrer Rechte wenden Sie sich bitte an: datenschutz@centof.ai
 
 
 10. DATENLÖSCHUNG IN DER APP
@@ -440,7 +440,7 @@ export default function ProfileScreen() {
   const { scrollTo } = useLocalSearchParams<{ scrollTo?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const trackingSectionRef = useRef<View>(null);
-  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, syncStatus, activeTrip, paused, togglePause, setTrackingPref, refreshAddresses, isRefreshingAddresses } = useApp();
+  const { user, logout, deleteAccount, updateProfile, updateCompanyInfo, updateVehicleData, updatePassword, requestPasswordChangeCode, confirmPasswordChange, requestEmailChangeCode, confirmEmailChange, syncStatus, activeTrip, paused, togglePause, setTrackingPref, refreshAddresses, isRefreshingAddresses, trips } = useApp();
   const { isSubscribed, customerInfo, restore, isRestoring } = useSubscription();
   const { themePreference, setThemePreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -507,6 +507,30 @@ export default function ProfileScreen() {
 
   const [signatureBlock, setSignatureBlockState] = useState(user?.signatureBlock ?? false);
   const [addrRefreshDone, setAddrRefreshDone] = useState(false);
+
+  function _profileHasHouseNumber(addr: string): boolean {
+    if (!addr) return false;
+    const street = addr.split(",")[0] ?? addr;
+    return /\d/.test(street);
+  }
+  function _profileIsRawCoordinates(addr: string): boolean {
+    if (!addr) return true;
+    return /^\d+\.\d+°/.test(addr.trim());
+  }
+
+  const missingHouseNumberCount = useMemo(() => {
+    return trips.filter((trip) => {
+      const needsStart =
+        trip.startLat !== undefined &&
+        trip.startLon !== undefined &&
+        (_profileIsRawCoordinates(trip.startAddr ?? "") || !_profileHasHouseNumber(trip.startAddr ?? ""));
+      const needsEnd =
+        trip.endLat !== undefined &&
+        trip.endLon !== undefined &&
+        (_profileIsRawCoordinates(trip.endAddr ?? "") || !_profileHasHouseNumber(trip.endAddr ?? ""));
+      return needsStart || needsEnd;
+    }).length;
+  }, [trips]);
 
   useEffect(() => {
     if (scrollTo === "tracking") {
@@ -1187,12 +1211,25 @@ export default function ProfileScreen() {
                 <Feather name="map-pin" size={16} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("row.refreshAddresses")}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={[styles.listLabel, { color: colors.foreground }]}>{t("row.refreshAddresses")}</Text>
+                  {!isRefreshingAddresses && !addrRefreshDone && missingHouseNumberCount > 0 && (
+                    <View style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, minWidth: 20, alignItems: "center" }}>
+                      <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700", lineHeight: 16 }}>
+                        {missingHouseNumberCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.listDesc, { color: colors.mutedForeground }]}>
                   {isRefreshingAddresses
                     ? t("row.refreshAddresses.running")
                     : addrRefreshDone
                     ? t("row.refreshAddresses.done")
+                    : missingHouseNumberCount > 0
+                    ? (missingHouseNumberCount === 1
+                        ? t("row.refreshAddresses.missing_one")
+                        : t("row.refreshAddresses.missing_other").replace("{{n}}", String(missingHouseNumberCount)))
                     : t("row.refreshAddresses.desc")}
                 </Text>
               </View>
