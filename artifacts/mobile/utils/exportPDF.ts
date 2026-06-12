@@ -140,7 +140,7 @@ function buildCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, d
     "",
   ].filter((line, i) => i === 0 || line !== "");
 
-  const dataHeaders = ["Datum", "Typ", "Startadresse", "Zieladresse", "Kilometer", "GPS-Route (km)", "Dauer", "Zweck / Notiz"];
+  const dataHeaders = ["Datum", "Typ", "Startadresse", "Zieladresse", "Reisezweck", "Kilometer", "GPS-Route (km)", "Dauer", "Notiz"];
   const rows: string[] = [...header.map((h) => csvCell(h)), dataHeaders.join(",")];
 
   for (const t of trips) {
@@ -149,16 +149,17 @@ function buildCSV(trips: Trip[], user?: UserProfile | null, dateFrom?: string, d
       month: "2-digit",
       year: "numeric",
     });
-    const type = t.type === "business" ? "Geschäftlich" : "Privat";
+    const type = t.type === "business" ? "Geschäftlich" : t.type === "arbeitsweg" ? "Arbeitsweg" : "Privat";
+    const purposeCell = t.type === "business" ? (t.purpose || "–") : "";
     rows.push(
-      [date, type, t.startAddr, t.endAddr, t.km.toFixed(1), t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "", fmtDur(t.dur), t.note ?? ""]
+      [date, type, t.startAddr, t.endAddr, purposeCell, t.km.toFixed(1), t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "", fmtDur(t.dur), t.note ?? ""]
         .map(csvCell)
         .join(",")
     );
 
     (t.waypoints ?? []).forEach((wp, i) => {
       rows.push(
-        ["", `Zwischenstopp ${i + 1}`, wp.addr, "", "", "", "", wp.note ?? ""]
+        ["", `Zwischenstopp ${i + 1}`, wp.addr, "", "", "", "", "", wp.note ?? ""]
           .map(csvCell)
           .join(",")
       );
@@ -231,11 +232,9 @@ const fmtDate = (iso: string): string =>
     year: "numeric",
   });
 
-const fmtType = (type: "business" | "private"): string =>
-  type === "business" ? "Geschäftl." : "Privat";
+const fmtType = (type: "business" | "private" | "arbeitsweg"): string =>
+  type === "business" ? "Geschäftl." : type === "arbeitsweg" ? "Arbeitsweg" : "Privat";
 
-const escHtml = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function getDateRange(trips: Trip[], dateFrom: string, dateTo: string): string {
   if (trips.length === 0) return "–";
@@ -317,250 +316,6 @@ async function getAppLogoBase64(): Promise<string | null> {
   }
 }
 
-function buildSignatureBlockHTML(lang: Language): string {
-  const confirmText = lang === "de"
-    ? "Ich bestätige die Richtigkeit der vorstehenden Angaben."
-    : "I confirm the accuracy of the above records.";
-  const placeDate = lang === "de" ? "Ort, Datum" : "Place, Date";
-  const signature = lang === "de" ? "Unterschrift" : "Signature";
-  return `
-  <div class="sig-block">
-    <p class="sig-confirm">${confirmText}</p>
-    <div class="sig-fields">
-      <div class="sig-field">
-        <div class="sig-line"></div>
-        <div class="sig-label">${placeDate}</div>
-      </div>
-      <div class="sig-field">
-        <div class="sig-line"></div>
-        <div class="sig-label">${signature}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function buildHTML(
-  trips: Trip[],
-  user: UserProfile | null,
-  dateFrom: string,
-  dateTo: string,
-  typeLabel?: string,
-  appLogoBase64?: string | null,
-  lang: Language = "de"
-): string {
-  const totalKm = trips.reduce((a, t) => a + t.km, 0);
-  const totalDur = trips.reduce((a, t) => a + t.dur, 0);
-  const dateRange = getDateRange(trips, dateFrom, dateTo);
-
-  const bizTrips = trips.filter((t) => t.type === "business");
-  const prvTrips = trips.filter((t) => t.type === "private");
-  const bizKm = bizTrips.reduce((a, t) => a + t.km, 0);
-  const prvKm = prvTrips.reduce((a, t) => a + t.km, 0);
-  const bizKmPct = totalKm > 0 ? Math.round((bizKm / totalKm) * 100) : 0;
-  const prvKmPct = totalKm > 0 ? 100 - bizKmPct : 0;
-
-  const totalKmRoute = trips.some((t) => t.kmRoute !== undefined)
-    ? trips.reduce((a, t) => a + (t.kmRoute ?? 0), 0)
-    : null;
-
-  const rows = trips
-    .map((t) => {
-      const waypointRows = (t.waypoints ?? [])
-        .map(
-          (wp, i) => {
-            const noteHtml = wp.note
-              ? `<br><span style="font-style:italic;color:#888;font-size:8.5pt;">${escHtml(wp.note)}</span>`
-              : "";
-            return `<tr class="waypoint-row"><td></td><td></td><td colspan="3" style="padding-left:22px;color:#5a6a9a;font-size:9pt;">&#8627; Zwischenstopp ${i + 1}: ${wp.addr}${noteHtml}</td><td></td><td></td><td></td></tr>`;
-          }
-        )
-        .join("");
-      return `
-      <tr>
-        <td>${fmtDate(t.date)}</td>
-        <td class="${t.type === "business" ? "badge-business" : "badge-private"}">${fmtType(t.type)}</td>
-        <td>${escHtml(t.startAddr)}</td>
-        <td>${escHtml(t.endAddr)}</td>
-        <td>${t.note ? `<span style="font-size:9pt;color:#444;">${escHtml(t.note)}</span>` : "<span style=\"color:#bbb;\">–</span>"}</td>
-        <td class="num">${t.km.toFixed(1)}</td>
-        <td class="num">${t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "–"}</td>
-        <td class="num">${fmtDur(t.dur)}</td>
-      </tr>${waypointRows}`;
-    })
-    .join("");
-
-  const exportedAt = new Date().toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-
-  const logoHtml = user?.logoUri
-    ? `<img src="${user.logoUri}" style="max-height:56px; max-width:180px; object-fit:contain; display:block; margin: 0 auto 6px auto;" alt="Logo" />`
-    : "";
-  const companyName = user?.companyName ?? "";
-
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8" />
-  <title>Fahrtenbuch</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      font-size: 11pt;
-      color: #111;
-      background: #fff;
-      padding: 28px 32px;
-    }
-    .header {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      align-items: start;
-      border-bottom: 2.5px solid #1A2B6B;
-      padding-bottom: 14px;
-      margin-bottom: 20px;
-    }
-    .header-left { text-align: left; padding-top: 4px; }
-    .header-center { text-align: center; }
-    .brand-name { font-size: 22pt; font-weight: 800; color: #1A2B6B; letter-spacing: -0.5px; }
-    .company-name { font-size: 13pt; font-weight: 700; color: #1A2B6B; margin-top: 4px; }
-    .meta { text-align: right; font-size: 10pt; color: #444; line-height: 1.6; }
-    .meta strong { color: #111; font-weight: 700; }
-    .summary {
-      display: flex;
-      gap: 24px;
-      margin-bottom: 18px;
-      background: #f0f3fa;
-      border-radius: 8px;
-      padding: 12px 16px;
-    }
-    .summary-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; color: #666; font-weight: 600; }
-    .summary-value { font-size: 14pt; font-weight: 800; color: #1A2B6B; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-    thead tr { background: #1A2B6B; color: #fff; }
-    thead th { padding: 8px 10px; text-align: left; font-weight: 700; font-size: 9.5pt; }
-    thead th.num { text-align: right; }
-    tbody tr { border-bottom: 1px solid #e8eaf0; }
-    tbody tr:nth-child(even) { background: #f8f9fc; }
-    tbody td { padding: 7px 10px; vertical-align: top; line-height: 1.4; }
-    td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    .badge-business {
-      display: inline-block; background: #e8edf9; color: #1A2B6B;
-      border-radius: 4px; padding: 1px 6px; font-weight: 700; font-size: 9pt;
-    }
-    .badge-private {
-      display: inline-block; background: #f0f0f0; color: #555;
-      border-radius: 4px; padding: 1px 6px; font-weight: 600; font-size: 9pt;
-    }
-    tfoot tr { background: #1A2B6B; color: #fff; }
-    tfoot td { padding: 9px 10px; font-weight: 800; font-size: 10.5pt; }
-    tfoot td.num { text-align: right; }
-    .footer {
-      margin-top: 24px; font-size: 9pt; color: #888;
-      display: flex; justify-content: space-between;
-      border-top: 1px solid #e0e4f0; padding-top: 12px;
-    }
-    .sig-block {
-      margin-top: 28px; border-top: 1px solid #d0d5e8; padding-top: 16px;
-    }
-    .sig-confirm {
-      font-size: 9pt; color: #555; font-style: italic; margin-bottom: 18px;
-    }
-    .sig-fields {
-      display: flex; gap: 48px;
-    }
-    .sig-field { flex: 1; }
-    .sig-line {
-      border-bottom: 1.5px solid #333; height: 36px; margin-bottom: 5px;
-    }
-    .sig-label {
-      font-size: 8pt; color: #888; letter-spacing: 0.3px;
-    }
-    .stats-section {
-      display: flex; gap: 0; margin-bottom: 16px;
-      border: 1px solid #e0e4f0; border-radius: 8px; overflow: hidden;
-    }
-    .stats-col { flex: 1; padding: 12px 16px; }
-    .stats-col + .stats-col { border-left: 1px solid #e0e4f0; background: #fafbfd; }
-    .stats-label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; color: #666; font-weight: 700; margin-bottom: 4px; }
-    .stats-km { font-size: 15pt; font-weight: 800; color: #1A2B6B; }
-    .stats-sub { font-size: 8.5pt; color: #888; margin-top: 2px; margin-bottom: 7px; }
-    .stats-bar-wrap { height: 5px; background: #e8eaf0; border-radius: 3px; overflow: hidden; }
-    .stats-bar-biz { height: 100%; background: #1A2B6B; border-radius: 3px; }
-    .stats-bar-prv { height: 100%; background: #aab6d8; border-radius: 3px; }
-    @media print { body { padding: 0; } @page { size: A4 landscape; margin: 1.2cm 1.5cm; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <div class="brand-name">FahrtDoc</div>
-    </div>
-    <div class="header-center">
-      ${logoHtml}
-      ${companyName ? `<div class="company-name">${escHtml(companyName)}</div>` : ""}
-    </div>
-    <div class="meta">
-      ${user ? `<strong>${escHtml(user.name)}</strong><br>` : ""}
-      ${user?.plate ? `Kennzeichen: <strong>${escHtml(user.plate)}</strong><br>` : ""}
-      Zeitraum: <strong>${dateRange}</strong>
-    </div>
-  </div>
-  <div class="summary">
-    <div>
-      <div class="summary-label">Fahrten</div>
-      <div class="summary-value">${trips.length}</div>
-    </div>
-    <div>
-      <div class="summary-label">Gesamtstrecke</div>
-      <div class="summary-value">${totalKm.toFixed(1)} km</div>
-    </div>
-    <div>
-      <div class="summary-label">Fahrzeit gesamt</div>
-      <div class="summary-value">${fmtDur(totalDur)}</div>
-    </div>
-  </div>
-  <div class="stats-section">
-    <div class="stats-col">
-      <div class="stats-label">Geschäftlich</div>
-      <div class="stats-km">${bizKm.toFixed(1)} km</div>
-      <div class="stats-sub">${bizTrips.length} Fahrten &middot; ${bizKmPct}% der Strecke</div>
-      <div class="stats-bar-wrap"><div class="stats-bar-biz" style="width:${bizKmPct}%"></div></div>
-    </div>
-    <div class="stats-col">
-      <div class="stats-label">Privat</div>
-      <div class="stats-km">${prvKm.toFixed(1)} km</div>
-      <div class="stats-sub">${prvTrips.length} Fahrten &middot; ${prvKmPct}% der Strecke</div>
-      <div class="stats-bar-wrap"><div class="stats-bar-prv" style="width:${prvKmPct}%"></div></div>
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Datum</th><th>Typ</th><th>Startadresse</th><th>Zieladresse</th><th>Zweck / Notiz</th>
-        <th class="num">GPS-Strecke (km)</th><th class="num">Kürzeste Route (km)</th><th class="num">Dauer</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="5">Gesamt</td>
-        <td class="num">${totalKm.toFixed(1)}</td>
-        <td class="num">${totalKmRoute !== null ? totalKmRoute.toFixed(1) : "–"}</td>
-        <td class="num">${fmtDur(totalDur)}</td>
-      </tr>
-    </tfoot>
-  </table>
-  ${user?.signatureBlock ? buildSignatureBlockHTML(lang) : ""}
-  <div class="footer">
-    <span>FahrtDoc · ${typeLabel ?? "Fahrtenbuch"}-Export</span>
-    <span>Erstellt am ${exportedAt}</span>
-  </div>
-</body>
-</html>`;
-}
 
 function drawSignatureBlock(
   doc: JsPDFType,
@@ -624,10 +379,13 @@ async function exportPDFWeb(
   const dateRange = getDateRange(trips, dateFrom, dateTo);
   const jsBizTrips = trips.filter((t) => t.type === "business");
   const jsPrvTrips = trips.filter((t) => t.type === "private");
+  const jsAwTrips = trips.filter((t) => t.type === "arbeitsweg");
   const jsBizKm = jsBizTrips.reduce((a, t) => a + t.km, 0);
   const jsPrvKm = jsPrvTrips.reduce((a, t) => a + t.km, 0);
+  const jsAwKm = jsAwTrips.reduce((a, t) => a + t.km, 0);
   const jsBizKmPct = totalKm > 0 ? Math.round((jsBizKm / totalKm) * 100) : 0;
-  const jsPrvKmPct = totalKm > 0 ? 100 - jsBizKmPct : 0;
+  const jsPrvKmPct = totalKm > 0 ? Math.round((jsPrvKm / totalKm) * 100) : 0;
+  const jsAwKmPct = totalKm > 0 ? 100 - jsBizKmPct - jsPrvKmPct : 0;
   const exportedAt = new Date().toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "long",
@@ -802,9 +560,9 @@ async function exportPDFWeb(
   y += 8;
   // ────────────────────────────────────────────────────────────────────────
 
-  // Columns: Datum, Typ, Start, End, Zweck, GPS-km, Route-km, Dauer
+  // Columns: Datum, Typ, Start, End, Reisezweck, GPS-km, Route-km, Dauer
   const colWidths = [25, 18, 50, 50, 42, 24, 24, 26];
-  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "Zweck / Notiz", "GPS-km", "Route-km", "Dauer"];
+  const headers = ["Datum", "Typ", "Startadresse", "Zieladresse", "Reisezweck", "GPS-km", "Route-km", "Dauer"];
   const rowH = 8;
   const pageH = 210;
   const bottomMargin = 20;
@@ -851,12 +609,13 @@ async function exportPDFWeb(
     doc.setFont("helvetica", "normal");
     doc.setTextColor(17, 17, 17);
 
+    const purposeDisplay = t.type === "business" ? safeText(t.purpose ?? "", 60) : "";
     const cells = [
       fmtDate(t.date),
       fmtType(t.type),
       safeText(t.startAddr, 80),
       safeText(t.endAddr, 80),
-      safeText(t.note ?? "", 60),
+      purposeDisplay,
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
@@ -977,10 +736,13 @@ async function exportPDFNative(
   const dateRange = getDateRange(trips, dateFrom, dateTo);
   const bizTripsN = trips.filter((t) => t.type === "business");
   const prvTripsN = trips.filter((t) => t.type === "private");
+  const awTripsN = trips.filter((t) => t.type === "arbeitsweg");
   const bizKmN = bizTripsN.reduce((a, t) => a + t.km, 0);
   const prvKmN = prvTripsN.reduce((a, t) => a + t.km, 0);
+  const awKmN = awTripsN.reduce((a, t) => a + t.km, 0);
   const bizKmPctN = totalKm > 0 ? Math.round((bizKmN / totalKm) * 100) : 0;
-  const prvKmPctN = totalKm > 0 ? 100 - bizKmPctN : 0;
+  const prvKmPctN = totalKm > 0 ? Math.round((prvKmN / totalKm) * 100) : 0;
+  const awKmPctN = totalKm > 0 ? 100 - bizKmPctN - prvKmPctN : 0;
   const exportedAt = new Date().toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "long",
@@ -1119,9 +881,9 @@ async function exportPDFNative(
   }
   y += 8;
 
-  // Columns: Datum, Typ, Start, End, Zweck, GPS-km, Route-km, Dauer
+  // Columns: Datum, Typ, Start, End, Reisezweck, GPS-km, Route-km, Dauer
   const colWidthsN = [25, 18, 50, 50, 42, 24, 24, 26];
-  const headersN = ["Datum", "Typ", "Startadresse", "Zieladresse", "Zweck / Notiz", "GPS-km", "Route-km", "Dauer"];
+  const headersN = ["Datum", "Typ", "Startadresse", "Zieladresse", "Reisezweck", "GPS-km", "Route-km", "Dauer"];
   const rowH = 8;
   const pageH = 210;
   const bottomMargin = 20;
@@ -1166,12 +928,13 @@ async function exportPDFNative(
     doc.line(margin, y + rowH, margin + contentW, y + rowH);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(17, 17, 17);
+    const purposeDisplayN = t.type === "business" ? safeText(t.purpose ?? "", 60) : "";
     const cells = [
       fmtDate(t.date),
       fmtType(t.type),
       safeText(t.startAddr, 80),
       safeText(t.endAddr, 80),
-      safeText(t.note ?? "", 60),
+      purposeDisplayN,
       t.km.toFixed(1),
       t.kmRoute !== undefined ? t.kmRoute.toFixed(1) : "-",
       fmtDur(t.dur),
@@ -1339,8 +1102,9 @@ export async function exportSplitPDF(
 
   const businessTripsAll = trips.filter((t) => t.type === "business");
   const privateTripsAll = trips.filter((t) => t.type === "private");
+  const arbeitswegTripsAll = trips.filter((t) => t.type === "arbeitsweg");
 
-  if (businessTripsAll.length === 0 && privateTripsAll.length === 0) {
+  if (businessTripsAll.length === 0 && privateTripsAll.length === 0 && arbeitswegTripsAll.length === 0) {
     Alert.alert("Keine Fahrten", "Es gibt keine Fahrten für den gewählten Zeitraum.");
     return;
   }
@@ -1348,7 +1112,8 @@ export async function exportSplitPDF(
   const tooManyTrips =
     Platform.OS !== "web" &&
     (businessTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF ||
-      privateTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF);
+      privateTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF ||
+      arbeitswegTripsAll.length > MAX_TRIPS_PER_NATIVE_PDF);
   if (tooManyTrips) {
     Alert.alert(
       lang === "de" ? "Export begrenzt" : "Export limited",
