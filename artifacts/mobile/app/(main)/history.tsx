@@ -37,7 +37,7 @@ type SavedSelection = { id: string; name: string; tripIds: string[] };
 
 type PeriodFilter = "all" | 1 | 3 | 6 | 12;
 
-type TypeFilter = "all" | "business" | "private";
+type TypeFilter = "all" | "business" | "private" | "arbeitsweg";
 
 const fmtDur = (s: number) => {
   if (s < 60) return `${s}s`;
@@ -122,7 +122,7 @@ export default function HistoryScreen() {
   const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
-  const [kategorie, setKategorie] = useState<'alle' | 'geschaeftlich' | 'privat'>('alle');
+  const [kategorie, setKategorie] = useState<'alle' | 'geschaeftlich' | 'privat' | 'arbeitsweg'>('alle');
   const [zeitraum, setZeitraum] = useState<'3m' | '6m' | 'vb' | null>(null);
   const [filterMonat, setFilterMonat] = useState<number | null>(null);
   const [gruppierungJahr, setGruppierungJahr] = useState<string | null>(null);
@@ -365,7 +365,9 @@ export default function HistoryScreen() {
     return filteredForDisplay.filter((trip) => {
       const typeLabel = trip.type === "business"
         ? t("tripType.business").toLowerCase()
-        : t("tripType.private").toLowerCase();
+        : trip.type === "arbeitsweg"
+          ? t("tripType.arbeitsweg").toLowerCase()
+          : t("tripType.private").toLowerCase();
       const dateStr = new Date(trip.date).toLocaleDateString(
         language === "en" ? "en-US" : "de-DE",
         { day: "2-digit", month: "2-digit", year: "numeric" }
@@ -632,8 +634,9 @@ export default function HistoryScreen() {
     const toExport = displayTrips;
     const businessCount = toExport.filter((tr) => tr.type === "business").length;
     const privateCount = toExport.filter((tr) => tr.type === "private").length;
+    const arbeitswegCount = toExport.filter((tr) => tr.type === "arbeitsweg").length;
 
-    if (businessCount === 0 && privateCount === 0) {
+    if (businessCount === 0 && privateCount === 0 && arbeitswegCount === 0) {
       Alert.alert(t("history.noTripsTitle"), t("history.noTripsMsg"));
       return;
     }
@@ -645,10 +648,13 @@ export default function HistoryScreen() {
     if (privateCount > 0) {
       lines.push(`${privateCount} ${t("history.splitPrivate")}`);
     }
-    if (businessCount > 0 && privateCount === 0) {
+    if (arbeitswegCount > 0) {
+      lines.push(`${arbeitswegCount} ${t("tripType.arbeitsweg")}`);
+    }
+    if (businessCount > 0 && privateCount === 0 && arbeitswegCount === 0) {
       lines.push(t("history.splitNoPrivate"));
     }
-    if (privateCount > 0 && businessCount === 0) {
+    if (privateCount > 0 && businessCount === 0 && arbeitswegCount === 0) {
       lines.push(t("history.splitNoBusiness"));
     }
 
@@ -773,6 +779,7 @@ export default function HistoryScreen() {
               ['alle', t("history.all")],
               ['geschaeftlich', t("tripType.business")],
               ['privat', t("tripType.private")],
+              ['arbeitsweg', t("tripType.arbeitsweg")],
             ] as const).map(([val, label]) => {
               const active = kategorie === val;
               return (
@@ -781,7 +788,11 @@ export default function HistoryScreen() {
                   onPress={() => {
                     const next = (active && val !== 'alle') ? 'alle' : val;
                     setKategorie(next);
-                    setTypeFilter(next === 'alle' ? 'all' : next === 'geschaeftlich' ? 'business' : 'private');
+                    setTypeFilter(
+                      next === 'alle' ? 'all' :
+                      next === 'geschaeftlich' ? 'business' :
+                      next === 'arbeitsweg' ? 'arbeitsweg' : 'private'
+                    );
                     if (Platform.OS !== 'web') Haptics.selectionAsync();
                   }}
                   style={{
