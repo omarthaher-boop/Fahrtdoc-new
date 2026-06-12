@@ -52,7 +52,7 @@ export default function HomeScreen() {
   const [period, setPeriod] = useState<Period>(3);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [pendingType, setPendingType] = useState<"business" | "private" | null>(null);
+  const [pendingType, setPendingType] = useState<"business" | "private" | "arbeitsweg" | null>(null);
   const suggestedType = useMemo(() => suggestTripType(), []);
   const [starting, setStarting] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -252,7 +252,7 @@ export default function HomeScreen() {
   const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
-  const openStartModal = (type: "business" | "private") => {
+  const openStartModal = (type: "business" | "private" | "arbeitsweg") => {
     if (activeTrip) {
       if (Platform.OS === "web") {
         window.alert("Es läuft bereits eine Fahrt!\n\nBitte beende die aktuelle Fahrt, bevor du eine neue startest.");
@@ -318,7 +318,7 @@ export default function HomeScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  const pendingLabel = pendingType === "business" ? t("home.businessTrip") : t("home.privateTrip");
+  const pendingLabel = pendingType === "business" ? t("home.businessTrip") : pendingType === "arbeitsweg" ? t("tripType.arbeitsweg") : t("home.privateTrip");
 
   const handleEdit = (trip: Trip) => setEditingTrip(trip);
   const handleView = (trip: Trip) => setViewingTrip(trip);
@@ -419,6 +419,22 @@ export default function HomeScreen() {
                 <Feather name="arrow-right" size={16} color="#16A34A" style={styles.quickArrow} />
               </TouchableOpacity>
             </View>
+            {/* Arbeitsweg full-width button */}
+            <TouchableOpacity
+              style={[styles.quickBtnWide, { backgroundColor: "#fff3e0", borderColor: "#f57c00" }]}
+              onPress={() => openStartModal("arbeitsweg")}
+              disabled={starting}
+              testID="start-arbeitsweg"
+            >
+              <View style={[styles.quickIcon, { backgroundColor: "#e65100" }]}>
+                <Feather name="home" size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.quickLabel, { color: "#bf360c" }]}>{t("tripType.arbeitsweg")}</Text>
+                <Text style={[styles.quickSub, { color: "#e65100" }]}>{t("home.privateSub")}</Text>
+              </View>
+              <Feather name="arrow-right" size={16} color="#e65100" style={styles.quickArrow} />
+            </TouchableOpacity>
             {gpsStatus === "denied" && (
               <View style={[styles.gpsBanner, { backgroundColor: colors.warningLight ?? "#FFF8E7", borderColor: colors.warning ?? "#FFB703" }]}>
                 <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
@@ -719,6 +735,15 @@ const styles = StyleSheet.create({
   quickLabel: { fontSize: 14, fontWeight: "700" },
   quickSub: { fontSize: 12 },
   quickArrow: { alignSelf: "flex-end" },
+  quickBtnWide: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 16,
+    gap: 12,
+    marginTop: 12,
+  },
   gpsBanner: {
     flexDirection: "row",
     alignItems: "center",
