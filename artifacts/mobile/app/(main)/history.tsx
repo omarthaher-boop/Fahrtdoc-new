@@ -9,6 +9,7 @@ import {
   Linking,
   Modal,
   Platform,
+  FlatList,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +29,8 @@ import { exportPDF, exportCSV, exportSplitPDF } from "@/utils/exportPDF";
 import PaywallModal from "@/components/PaywallModal";
 import { useSubscription } from "@/lib/revenuecat";
 import { SUBSCRIPTION_ENABLED, FREE_TRIP_LIMIT } from "@/config/subscription";
+
+const FILTER_BAR_HEIGHT = 52;
 
 const FILTER_STORAGE_KEY = "@drivelog_history_filters";
 const SELECTION_STORAGE_KEY = "@drivelog_history_selection";
@@ -691,6 +694,79 @@ export default function HistoryScreen() {
     editTrip(id, changes);
   };
 
+  type ListItem =
+    | { kind: 'sectionHeader'; label: string; count: number }
+    | { kind: 'trip'; trip: Trip }
+    | { kind: 'paywall' };
+
+  const listData = useMemo<ListItem[]>(() => {
+    if (filtered.length === 0) return [];
+    const items: ListItem[] = [];
+    for (const { label, trips: groupTrips } of groups) {
+      items.push({ kind: 'sectionHeader', label, count: groupTrips.length });
+      for (const t of groupTrips) items.push({ kind: 'trip', trip: t });
+    }
+    if (hiddenTripCount > 0) items.push({ kind: 'paywall' });
+    return items;
+  }, [groups, filtered.length, hiddenTripCount]);
+
+  const keyExtractor = (item: ListItem, index: number): string => {
+    if (item.kind === 'sectionHeader') return `sh-${item.label}`;
+    if (item.kind === 'trip') return item.trip.id;
+    return `paywall-${index}`;
+  };
+
+  const renderListItem = ({ item }: { item: ListItem }) => {
+    if (item.kind === 'sectionHeader') {
+      return (
+        <View style={[styles.sectionHeader, { paddingHorizontal: 16, marginTop: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{item.label}</Text>
+          <View style={[styles.countBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Text style={[styles.countText, { color: colors.mutedForeground }]}>{item.count}</Text>
+          </View>
+        </View>
+      );
+    }
+    if (item.kind === 'trip') {
+      return (
+        <View style={{ paddingHorizontal: 16, marginBottom: 2 }}>
+          <TripCard
+            trip={item.trip}
+            onDelete={deleteTrip}
+            onEdit={handleEdit}
+            onView={handleView}
+            onCardPress={handleView}
+            selectionMode={selectionMode}
+            selected={selectedIds.has(item.trip.id)}
+            onToggleSelect={toggleTrip}
+            onRetrySync={retryWaypointSync}
+          />
+        </View>
+      );
+    }
+    if (item.kind === 'paywall') {
+      return (
+        <TouchableOpacity
+          onPress={() => setShowPaywall(true)}
+          activeOpacity={0.85}
+          style={[styles.premiumBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "40", marginHorizontal: 16 }]}
+        >
+          <Feather name="lock" size={18} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.premiumBannerTitle, { color: colors.primary }]}>
+              {hiddenTripCount} ältere {hiddenTripCount === 1 ? "Fahrt" : "Fahrten"} verborgen
+            </Text>
+            <Text style={[styles.premiumBannerSub, { color: colors.mutedForeground }]}>
+              Premium freischalten für unbegrenzte Fahrtenhistorie
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={16} color={colors.primary} />
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -747,494 +823,467 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {/* Sync retry banner */}
-      <Animated.View
-        style={[
-          styles.syncRetryBanner,
-          {
-            backgroundColor: colors.primary + "14",
-            borderBottomColor: colors.primary + "30",
-            maxHeight: syncBannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 44] }),
-            opacity: syncBannerAnim,
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.75 }] }} />
-        <Text style={[styles.syncRetryBannerText, { color: colors.primary }]}>
-          {t("history.syncRetrying")}
-        </Text>
-      </Animated.View>
-
-      {/* 3-Row Filter Block */}
-      <View style={{ marginHorizontal: 12, marginBottom: 6, gap: 7 }}>
-
-        {/* Row 1: Kategorie */}
-        <View style={{ backgroundColor: '#f0f4ff', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
-            {language === 'de' ? 'Kategorie' : 'Category'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {([
-              ['alle', t("history.all")],
-              ['geschaeftlich', t("tripType.business")],
-              ['privat', t("tripType.private")],
-              ['arbeitsweg', t("tripType.arbeitsweg")],
-            ] as const).map(([val, label]) => {
-              const active = kategorie === val;
-              return (
-                <TouchableOpacity
-                  key={val}
-                  onPress={() => {
-                    const next = (active && val !== 'alle') ? 'alle' : val;
-                    setKategorie(next);
-                    setTypeFilter(
-                      next === 'alle' ? 'all' :
-                      next === 'geschaeftlich' ? 'business' :
-                      next === 'arbeitsweg' ? 'arbeitsweg' : 'private'
-                    );
-                    if (Platform.OS !== 'web') Haptics.selectionAsync();
-                  }}
-                  style={{
-                    flex: 1, borderRadius: 20, paddingVertical: 9, alignItems: 'center',
-                    backgroundColor: active ? '#1a1a2e' : '#FFFFFF',
-                    borderWidth: 0.5, borderColor: active ? '#1a1a2e' : '#ddd',
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Row 2: Zeitraum */}
-        <View style={{ backgroundColor: '#edf7f2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
-            {language === 'de' ? 'Zeitraum' : 'Period'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {([
-              ['3m', t("history.threeMonths")],
-              ['6m', t("history.sixMonths")],
-              ['vb', t("history.dateRange")],
-            ] as const).map(([val, label]) => {
-              const active = zeitraum === val;
-              return (
-                <TouchableOpacity
-                  key={val}
-                  onPress={() => {
-                    if (active) {
-                      setZeitraum(null);
-                      setPeriodFilter('all');
-                      setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum('');
-                      setGruppierungJahr(null); setSelectedYear(null);
-                    } else {
-                      setZeitraum(val);
-                      setGruppierungJahr(null); setSelectedYear(null);
-                      if (val === '3m') { setPeriodFilter(3); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
-                      else if (val === '6m') { setPeriodFilter(6); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
-                      else { setPeriodFilter('all'); }
-                    }
-                    if (Platform.OS !== 'web') Haptics.selectionAsync();
-                  }}
-                  style={{
-                    flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center',
-                    backgroundColor: active ? '#1a7f5a' : '#FFFFFF',
-                    borderWidth: 0.5, borderColor: active ? '#1a7f5a' : '#ddd',
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {zeitraum === 'vb' && (
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.from")}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
-                  <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
-                    value={vonDatum}
-                    onChangeText={(v) => { setVonDatum(v); setDateFrom(v); }}
-                    placeholder={t("history.datePlaceholder")}
-                    placeholderTextColor="#bbb"
-                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-                  />
-                </View>
-              </View>
-              <Feather name="arrow-right" size={14} color="#aaa" style={{ marginBottom: 9 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.to")}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
-                  <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
-                    value={bisDatum}
-                    onChangeText={(v) => { setBisDatum(v); setDateTo(v); }}
-                    placeholder={t("history.datePlaceholder")}
-                    placeholderTextColor="#bbb"
-                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Row 3: Gruppierung — zwei Dropdowns Monat + Jahr */}
-        <View style={{ backgroundColor: '#fff8ec', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.6 }}>
-            {language === 'de' ? 'Gruppierung' : 'Grouping'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-
-            {/* Dropdown: Monat */}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
-                {language === 'de' ? 'Monat' : 'Month'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => { setShowMonatDropdown(p => !p); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: filterMonat !== null ? '#d97706' : '#ddd', backgroundColor: filterMonat !== null ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '500', color: filterMonat !== null ? '#92400e' : '#666', flex: 1 }}>
-                  {filterMonat !== null
-                    ? new Date(2000, filterMonat, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })
-                    : (language === 'de' ? 'Alle' : 'All')}
-                </Text>
-                <Feather name={showMonatDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
-              </TouchableOpacity>
-              {showMonatDropdown && (
-                <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                    <TouchableOpacity
-                      onPress={() => { setFilterMonat(null); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === null ? '#fef3c7' : 'transparent' }}
-                    >
-                      <Text style={{ fontSize: 13, color: filterMonat === null ? '#92400e' : '#444', fontWeight: filterMonat === null ? '600' : '400' }}>
-                        {language === 'de' ? 'Alle Monate' : 'All months'}
-                      </Text>
-                    </TouchableOpacity>
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => { setFilterMonat(i); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === i ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
-                      >
-                        <Text style={{ fontSize: 13, color: filterMonat === i ? '#92400e' : '#444', fontWeight: filterMonat === i ? '600' : '400' }}>
-                          {new Date(2000, i, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            {/* Dropdown: Jahr */}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
-                {language === 'de' ? 'Jahr' : 'Year'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => { setShowJahrDropdown(p => !p); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: gruppierungJahr ? '#d97706' : '#ddd', backgroundColor: gruppierungJahr ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '500', color: gruppierungJahr ? '#92400e' : '#666', flex: 1 }}>
-                  {gruppierungJahr ?? (language === 'de' ? 'Alle' : 'All')}
-                </Text>
-                <Feather name={showJahrDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
-              </TouchableOpacity>
-              {showJahrDropdown && (
-                <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((yr, idx) => (
-                      <TouchableOpacity
-                        key={yr}
-                        onPress={() => {
-                          if (gruppierungJahr === String(yr)) {
-                            setGruppierungJahr(null); setSelectedYear(null);
-                          } else {
-                            setGruppierungJahr(String(yr));
-                            setSelectedYear(yr);
-                            setPeriodFilter('all');
-                            setDateFrom(''); setDateTo('');
-                          }
-                          setShowJahrDropdown(false);
-                          if (Platform.OS !== 'web') Haptics.selectionAsync();
-                        }}
-                        style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: gruppierungJahr === String(yr) ? '#fef3c7' : 'transparent', borderTopWidth: idx === 0 ? 0 : 0.5, borderTopColor: '#f0f0f0' }}
-                      >
-                        <Text style={{ fontSize: 13, color: gruppierungJahr === String(yr) ? '#92400e' : '#444', fontWeight: gruppierungJahr === String(yr) ? '600' : '400' }}>
-                          {yr}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity
-                      onPress={() => { setGruppierungJahr(null); setSelectedYear(null); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-                      style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: !gruppierungJahr ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
-                    >
-                      <Text style={{ fontSize: 13, color: !gruppierungJahr ? '#92400e' : '#444', fontWeight: !gruppierungJahr ? '600' : '400' }}>
-                        {language === 'de' ? 'Alle Jahre' : 'All years'}
-                      </Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-          </View>
-        </View>
-
-      </View>
-
-      {/* Stats summary card */}
-      <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
-        {/* Row 1: stat items */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Feather name="list" size={18} color={colors.primary} />
-            <View>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>{displayTrips.length}</Text>
-              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-                {selectionMode && selectedIds.size > 0 ? t("history.selected") : t("home.trips")}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.statItem}>
-            <Feather name="navigation" size={18} color={colors.primary} />
-            <View>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>{statsKm.toFixed(1)} km</Text>
-              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>{t("history.totalDistance")}</Text>
-            </View>
-          </View>
-        </View>
-        {/* Row 2: export buttons */}
-        <View style={[styles.exportRow, { borderTopColor: colors.border }]}>
-          <View style={styles.exportBtnWrap}>
-            <TouchableOpacity
-              onPress={handleExportPDF}
-              disabled={exportingPDF}
-              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingPDF ? 0.6 : 1 }]}
-            >
-              {exportingPDF ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
-              ) : (
-                <Feather name="file-text" size={13} color={colors.primary} />
-              )}
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
-            </TouchableOpacity>
-            {selectionMode && selectedIds.size > 0 && (
-              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
-                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </Animated.View>
-            )}
-          </View>
-          <View style={styles.exportBtnWrap}>
-            <TouchableOpacity
-              onPress={handleSplitExport}
-              disabled={exportingSplit}
-              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingSplit ? 0.6 : 1 }]}
-            >
-              {exportingSplit ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
-              ) : (
-                <Feather name="scissors" size={13} color={colors.primary} />
-              )}
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>{t("history.splitExport")}</Text>
-            </TouchableOpacity>
-            {selectionMode && selectedIds.size > 0 && (
-              <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.exportBtnWrap}>
-            <TouchableOpacity
-              onPress={handleExportCSV}
-              disabled={exportingCSV}
-              accessibilityLabel={t("history.exportCSV")}
-              style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingCSV ? 0.6 : 1 }]}
-            >
-              {exportingCSV ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
-              ) : (
-                <Feather name="grid" size={13} color={colors.primary} />
-              )}
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>CSV</Text>
-            </TouchableOpacity>
-            {selectionMode && selectedIds.size > 0 && (
-              <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
-                <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-              </Animated.View>
-            )}
-          </View>
-          <View style={styles.exportBtnWrap}>
-            <TouchableOpacity
-              onPress={handleEmailExport}
-              style={[styles.exportBtn, { borderColor: colors.primary }]}
-            >
-              <Feather name="mail" size={13} color={colors.primary} />
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>E-Mail</Text>
-              {selectionMode && selectedIds.size > 0 && (
-                <View style={[styles.emailInlineCount, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* Selection bar — directly above trip list */}
-      <View style={[styles.searchBarRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 1.5 }]}>
-          <Feather name="search" size={15} color={colors.primary} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder={t("history.searchPlaceholder")}
-            placeholderTextColor={colors.mutedForeground}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            clearButtonMode="never"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.searchClearBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Feather name="x" size={14} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <View style={[styles.selectionHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <TouchableOpacity onPress={toggleSelectionMode} style={styles.selectionToggle}>
-          <Feather
-            name={selectionMode ? "check-square" : "square"}
-            size={15}
-            color={selectionMode ? colors.primary : colors.mutedForeground}
-          />
-          <Text style={[styles.selectionToggleText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
-            {selectionMode && selectedIds.size > 0
-              ? `${selectedIds.size} ${t("history.of")} ${filteredBySearch.length} ${t("history.selected")}`
-              : t("history.selection")}
-          </Text>
-        </TouchableOpacity>
-        {selectionMode ? (
-          <View style={styles.selectionQuick}>
-            <TouchableOpacity onPress={selectAll} style={[styles.selQuickBtn, { borderColor: colors.primary }]}>
-              <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.selectAll")}</Text>
-            </TouchableOpacity>
-            {selectedIds.size > 0 && (
-              <TouchableOpacity onPress={clearSelection} style={[styles.selQuickBtn, { borderColor: colors.mutedForeground }]}>
-                <Text style={[styles.selQuickText, { color: colors.mutedForeground }]}>{t("history.selectNone")}</Text>
-              </TouchableOpacity>
-            )}
-            {selectedIds.size > 0 && (
-              <TouchableOpacity
-                onPress={openSaveModal}
-                style={[styles.selQuickBtn, { borderColor: colors.success, backgroundColor: colors.success + "14" }]}
-              >
-                <Feather name="bookmark" size={11} color={colors.success} />
-                <Text style={[styles.selQuickText, { color: colors.success }]}>{t("history.saveSelection")}</Text>
-              </TouchableOpacity>
-            )}
-            {savedSelections.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setShowLoadMenu(true)}
-                style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
-              >
-                <Feather name="folder" size={11} color={colors.primary} />
-                <Text style={[styles.selQuickText, { color: colors.primary }]}>{savedSelections.length}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          savedSelections.length > 0 ? (
-            <TouchableOpacity
-              onPress={() => { setSelectionMode(true); setShowLoadMenu(true); }}
-              style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
-            >
-              <Feather name="folder" size={11} color={colors.primary} />
-              <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.savedSelections")}</Text>
-            </TouchableOpacity>
-          ) : null
-        )}
-      </View>
-
-      {/* Trip list grouped by date */}
-      {filtered.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Feather name="map" size={40} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t("history.noTripsTitle")}</Text>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            {t("history.noTripsMsg")}
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad, paddingTop: 4 }}
+      {/* Scrollable area: FlatList with sticky category FilterBar overlay */}
+      <View style={{ flex: 1 }}>
+        <FlatList
+          data={listData}
+          renderItem={renderListItem}
+          keyExtractor={keyExtractor}
+          scrollsToTop
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-        >
-          {groups.map(({ label, trips: groupTrips }) => (
-            <View key={label} style={styles.group}>
-              {/* Section header */}
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{label}</Text>
-                <View style={[styles.countBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Text style={[styles.countText, { color: colors.mutedForeground }]}>{groupTrips.length}</Text>
+          contentContainerStyle={{ paddingTop: FILTER_BAR_HEIGHT, paddingBottom: bottomPad }}
+          ListHeaderComponent={
+            <View>
+              {/* Sync retry banner */}
+              <Animated.View
+                style={[
+                  styles.syncRetryBanner,
+                  {
+                    backgroundColor: colors.primary + "14",
+                    borderBottomColor: colors.primary + "30",
+                    maxHeight: syncBannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 44] }),
+                    opacity: syncBannerAnim,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.75 }] }} />
+                <Text style={[styles.syncRetryBannerText, { color: colors.primary }]}>
+                  {t("history.syncRetrying")}
+                </Text>
+              </Animated.View>
+
+              {/* Filter rows: Zeitraum + Gruppierung */}
+              <View style={{ marginHorizontal: 12, marginTop: 8, marginBottom: 6, gap: 7 }}>
+
+                {/* Zeitraum */}
+                <View style={{ backgroundColor: '#edf7f2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
+                  <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.6 }}>
+                    {language === 'de' ? 'Zeitraum' : 'Period'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {([
+                      ['3m', t("history.threeMonths")],
+                      ['6m', t("history.sixMonths")],
+                      ['vb', t("history.dateRange")],
+                    ] as const).map(([val, label]) => {
+                      const active = zeitraum === val;
+                      return (
+                        <TouchableOpacity
+                          key={val}
+                          onPress={() => {
+                            if (active) {
+                              setZeitraum(null);
+                              setPeriodFilter('all');
+                              setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum('');
+                              setGruppierungJahr(null); setSelectedYear(null);
+                            } else {
+                              setZeitraum(val);
+                              setGruppierungJahr(null); setSelectedYear(null);
+                              if (val === '3m') { setPeriodFilter(3); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                              else if (val === '6m') { setPeriodFilter(6); setDateFrom(''); setDateTo(''); setVonDatum(''); setBisDatum(''); }
+                              else { setPeriodFilter('all'); }
+                            }
+                            if (Platform.OS !== 'web') Haptics.selectionAsync();
+                          }}
+                          style={{
+                            flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center',
+                            backgroundColor: active ? '#1a7f5a' : '#FFFFFF',
+                            borderWidth: 0.5, borderColor: active ? '#1a7f5a' : '#ddd',
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '500', color: active ? '#FFFFFF' : '#666' }}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {zeitraum === 'vb' && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.from")}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
+                          <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
+                          <TextInput
+                            style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
+                            value={vonDatum}
+                            onChangeText={(v) => { setVonDatum(v); setDateFrom(v); }}
+                            placeholder={t("history.datePlaceholder")}
+                            placeholderTextColor="#bbb"
+                            keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                          />
+                        </View>
+                      </View>
+                      <Feather name="arrow-right" size={14} color="#aaa" style={{ marginBottom: 9 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{t("history.to")}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 0.5, borderColor: '#ccc', backgroundColor: '#fff', paddingHorizontal: 8, height: 36 }}>
+                          <Feather name="calendar" size={12} color="#999" style={{ marginRight: 4 }} />
+                          <TextInput
+                            style={{ flex: 1, fontSize: 13, color: colors.foreground, paddingVertical: 0 }}
+                            value={bisDatum}
+                            onChangeText={(v) => { setBisDatum(v); setDateTo(v); }}
+                            placeholder={t("history.datePlaceholder")}
+                            placeholderTextColor="#bbb"
+                            keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Gruppierung */}
+                <View style={{ backgroundColor: '#fff8ec', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
+                  <Text style={{ fontSize: 11, color: '#888', fontWeight: '600', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.6 }}>
+                    {language === 'de' ? 'Gruppierung' : 'Grouping'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+
+                    {/* Dropdown: Monat */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
+                        {language === 'de' ? 'Monat' : 'Month'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => { setShowMonatDropdown(p => !p); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: filterMonat !== null ? '#d97706' : '#ddd', backgroundColor: filterMonat !== null ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '500', color: filterMonat !== null ? '#92400e' : '#666', flex: 1 }}>
+                          {filterMonat !== null
+                            ? new Date(2000, filterMonat, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })
+                            : (language === 'de' ? 'Alle' : 'All')}
+                        </Text>
+                        <Feather name={showMonatDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
+                      </TouchableOpacity>
+                      {showMonatDropdown && (
+                        <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
+                          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                            <TouchableOpacity
+                              onPress={() => { setFilterMonat(null); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                              style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === null ? '#fef3c7' : 'transparent' }}
+                            >
+                              <Text style={{ fontSize: 13, color: filterMonat === null ? '#92400e' : '#444', fontWeight: filterMonat === null ? '600' : '400' }}>
+                                {language === 'de' ? 'Alle Monate' : 'All months'}
+                              </Text>
+                            </TouchableOpacity>
+                            {Array.from({ length: 12 }, (_, i) => (
+                              <TouchableOpacity
+                                key={i}
+                                onPress={() => { setFilterMonat(i); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                                style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: filterMonat === i ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                              >
+                                <Text style={{ fontSize: 13, color: filterMonat === i ? '#92400e' : '#444', fontWeight: filterMonat === i ? '600' : '400' }}>
+                                  {new Date(2000, i, 1).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { month: 'long' })}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Dropdown: Jahr */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, color: '#888', marginBottom: 4, fontWeight: '500' }}>
+                        {language === 'de' ? 'Jahr' : 'Year'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => { setShowJahrDropdown(p => !p); setShowMonatDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, borderWidth: 0.5, borderColor: gruppierungJahr ? '#d97706' : '#ddd', backgroundColor: gruppierungJahr ? '#fef3c7' : '#fff', paddingHorizontal: 10, paddingVertical: 9 }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '500', color: gruppierungJahr ? '#92400e' : '#666', flex: 1 }}>
+                          {gruppierungJahr ?? (language === 'de' ? 'Alle' : 'All')}
+                        </Text>
+                        <Feather name={showJahrDropdown ? 'chevron-up' : 'chevron-down'} size={14} color="#888" />
+                      </TouchableOpacity>
+                      {showJahrDropdown && (
+                        <View style={{ borderRadius: 8, borderWidth: 0.5, borderColor: '#ddd', backgroundColor: '#fff', marginTop: 4, overflow: 'hidden', maxHeight: 220 }}>
+                          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((yr, idx) => (
+                              <TouchableOpacity
+                                key={yr}
+                                onPress={() => {
+                                  if (gruppierungJahr === String(yr)) {
+                                    setGruppierungJahr(null); setSelectedYear(null);
+                                  } else {
+                                    setGruppierungJahr(String(yr));
+                                    setSelectedYear(yr);
+                                    setPeriodFilter('all');
+                                    setDateFrom(''); setDateTo('');
+                                  }
+                                  setShowJahrDropdown(false);
+                                  if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                }}
+                                style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: gruppierungJahr === String(yr) ? '#fef3c7' : 'transparent', borderTopWidth: idx === 0 ? 0 : 0.5, borderTopColor: '#f0f0f0' }}
+                              >
+                                <Text style={{ fontSize: 13, color: gruppierungJahr === String(yr) ? '#92400e' : '#444', fontWeight: gruppierungJahr === String(yr) ? '600' : '400' }}>
+                                  {yr}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                            <TouchableOpacity
+                              onPress={() => { setGruppierungJahr(null); setSelectedYear(null); setShowJahrDropdown(false); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+                              style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: !gruppierungJahr ? '#fef3c7' : 'transparent', borderTopWidth: 0.5, borderTopColor: '#f0f0f0' }}
+                            >
+                              <Text style={{ fontSize: 13, color: !gruppierungJahr ? '#92400e' : '#444', fontWeight: !gruppierungJahr ? '600' : '400' }}>
+                                {language === 'de' ? 'Alle Jahre' : 'All years'}
+                              </Text>
+                            </TouchableOpacity>
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+
+                  </View>
+                </View>
+
+              </View>
+
+              {/* Stats summary card */}
+              <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: selectionMode && selectedIds.size > 0 ? colors.primary : colors.border, marginHorizontal: 16, marginBottom: 8 }]}>
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Feather name="list" size={18} color={colors.primary} />
+                    <View>
+                      <Text style={[styles.statValue, { color: colors.foreground }]}>{displayTrips.length}</Text>
+                      <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
+                        {selectionMode && selectedIds.size > 0 ? t("history.selected") : t("home.trips")}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.statItem}>
+                    <Feather name="navigation" size={18} color={colors.primary} />
+                    <View>
+                      <Text style={[styles.statValue, { color: colors.foreground }]}>{statsKm.toFixed(1)} km</Text>
+                      <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>{t("history.totalDistance")}</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={[styles.exportRow, { borderTopColor: colors.border }]}>
+                  <View style={styles.exportBtnWrap}>
+                    <TouchableOpacity
+                      onPress={handleExportPDF}
+                      disabled={exportingPDF}
+                      style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingPDF ? 0.6 : 1 }]}
+                    >
+                      {exportingPDF ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+                      ) : (
+                        <Feather name="file-text" size={13} color={colors.primary} />
+                      )}
+                      <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+                    </TouchableOpacity>
+                    {selectionMode && selectedIds.size > 0 && (
+                      <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
+                        <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+                      </Animated.View>
+                    )}
+                  </View>
+                  <View style={styles.exportBtnWrap}>
+                    <TouchableOpacity
+                      onPress={handleSplitExport}
+                      disabled={exportingSplit}
+                      style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingSplit ? 0.6 : 1 }]}
+                    >
+                      {exportingSplit ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+                      ) : (
+                        <Feather name="scissors" size={13} color={colors.primary} />
+                      )}
+                      <Text style={[styles.exportBtnText, { color: colors.primary }]}>{t("history.splitExport")}</Text>
+                    </TouchableOpacity>
+                    {selectionMode && selectedIds.size > 0 && (
+                      <View style={[styles.exportBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.exportBtnWrap}>
+                    <TouchableOpacity
+                      onPress={handleExportCSV}
+                      disabled={exportingCSV}
+                      accessibilityLabel={t("history.exportCSV")}
+                      style={[styles.exportBtn, { borderColor: colors.primary, opacity: exportingCSV ? 0.6 : 1 }]}
+                    >
+                      {exportingCSV ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ width: 13, height: 13 }} />
+                      ) : (
+                        <Feather name="grid" size={13} color={colors.primary} />
+                      )}
+                      <Text style={[styles.exportBtnText, { color: colors.primary }]}>CSV</Text>
+                    </TouchableOpacity>
+                    {selectionMode && selectedIds.size > 0 && (
+                      <Animated.View style={[styles.exportBadge, { backgroundColor: colors.primary, transform: [{ scale: badgeScale }] }]}>
+                        <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+                      </Animated.View>
+                    )}
+                  </View>
+                  <View style={styles.exportBtnWrap}>
+                    <TouchableOpacity
+                      onPress={handleEmailExport}
+                      style={[styles.exportBtn, { borderColor: colors.primary }]}
+                    >
+                      <Feather name="mail" size={13} color={colors.primary} />
+                      <Text style={[styles.exportBtnText, { color: colors.primary }]}>E-Mail</Text>
+                      {selectionMode && selectedIds.size > 0 && (
+                        <View style={[styles.emailInlineCount, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.exportBadgeText}>{selectedIds.size}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-              {/* Trip cards */}
-              {groupTrips.map((tripItem) => (
-                <TripCard
-                  key={tripItem.id}
-                  trip={tripItem}
-                  onDelete={deleteTrip}
-                  onEdit={handleEdit}
-                  onView={handleView}
-                  onCardPress={handleView}
-                  selectionMode={selectionMode}
-                  selected={selectedIds.has(tripItem.id)}
-                  onToggleSelect={toggleTrip}
-                  onRetrySync={retryWaypointSync}
-                />
-              ))}
-            </View>
-          ))}
 
-          {/* Premium upgrade banner — shown when older trips are hidden */}
-          {hiddenTripCount > 0 && (
-            <TouchableOpacity
-              onPress={() => setShowPaywall(true)}
-              activeOpacity={0.85}
-              style={[styles.premiumBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "40" }]}
-            >
-              <Feather name="lock" size={18} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.premiumBannerTitle, { color: colors.primary }]}>
-                  {hiddenTripCount} ältere {hiddenTripCount === 1 ? "Fahrt" : "Fahrten"} verborgen
-                </Text>
-                <Text style={[styles.premiumBannerSub, { color: colors.mutedForeground }]}>
-                  Premium freischalten für unbegrenzte Fahrtenhistorie
-                </Text>
+              {/* Search bar */}
+              <View style={[styles.searchBarRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 1.5 }]}>
+                  <Feather name="search" size={15} color={colors.primary} style={styles.searchIcon} />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.foreground }]}
+                    placeholder={t("history.searchPlaceholder")}
+                    placeholderTextColor={colors.mutedForeground}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    returnKeyType="search"
+                    clearButtonMode="never"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.searchClearBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Feather name="x" size={14} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-              <Feather name="chevron-right" size={16} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-        </ScrollView>
-      )}
+
+              {/* Selection header */}
+              <View style={[styles.selectionHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+                <TouchableOpacity onPress={toggleSelectionMode} style={styles.selectionToggle}>
+                  <Feather
+                    name={selectionMode ? "check-square" : "square"}
+                    size={15}
+                    color={selectionMode ? colors.primary : colors.mutedForeground}
+                  />
+                  <Text style={[styles.selectionToggleText, { color: selectionMode ? colors.primary : colors.mutedForeground }]}>
+                    {selectionMode && selectedIds.size > 0
+                      ? `${selectedIds.size} ${t("history.of")} ${filteredBySearch.length} ${t("history.selected")}`
+                      : t("history.selection")}
+                  </Text>
+                </TouchableOpacity>
+                {selectionMode ? (
+                  <View style={styles.selectionQuick}>
+                    <TouchableOpacity onPress={selectAll} style={[styles.selQuickBtn, { borderColor: colors.primary }]}>
+                      <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.selectAll")}</Text>
+                    </TouchableOpacity>
+                    {selectedIds.size > 0 && (
+                      <TouchableOpacity onPress={clearSelection} style={[styles.selQuickBtn, { borderColor: colors.mutedForeground }]}>
+                        <Text style={[styles.selQuickText, { color: colors.mutedForeground }]}>{t("history.selectNone")}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {selectedIds.size > 0 && (
+                      <TouchableOpacity
+                        onPress={openSaveModal}
+                        style={[styles.selQuickBtn, { borderColor: colors.success, backgroundColor: colors.success + "14" }]}
+                      >
+                        <Feather name="bookmark" size={11} color={colors.success} />
+                        <Text style={[styles.selQuickText, { color: colors.success }]}>{t("history.saveSelection")}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {savedSelections.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setShowLoadMenu(true)}
+                        style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
+                      >
+                        <Feather name="folder" size={11} color={colors.primary} />
+                        <Text style={[styles.selQuickText, { color: colors.primary }]}>{savedSelections.length}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : (
+                  savedSelections.length > 0 ? (
+                    <TouchableOpacity
+                      onPress={() => { setSelectionMode(true); setShowLoadMenu(true); }}
+                      style={[styles.selQuickBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
+                    >
+                      <Feather name="folder" size={11} color={colors.primary} />
+                      <Text style={[styles.selQuickText, { color: colors.primary }]}>{t("history.savedSelections")}</Text>
+                    </TouchableOpacity>
+                  ) : null
+                )}
+              </View>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={[styles.emptyWrap, { paddingTop: 60 }]}>
+              <Feather name="map" size={40} color={colors.mutedForeground} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t("history.noTripsTitle")}</Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                {t("history.noTripsMsg")}
+              </Text>
+            </View>
+          }
+        />
+
+        {/* Absolute category filter bar — stays fixed while list scrolls */}
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: FILTER_BAR_HEIGHT,
+          backgroundColor: colors.background,
+          zIndex: 10,
+          borderBottomWidth: 0.5,
+          borderBottomColor: colors.border,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          gap: 8,
+        }}>
+          {([
+            ['alle', t("history.all")],
+            ['geschaeftlich', t("tripType.business")],
+            ['privat', t("tripType.private")],
+            ['arbeitsweg', t("tripType.arbeitsweg")],
+          ] as const).map(([val, label]) => {
+            const active = kategorie === val;
+            return (
+              <TouchableOpacity
+                key={val}
+                onPress={() => {
+                  const next = (active && val !== 'alle') ? 'alle' : val;
+                  setKategorie(next);
+                  setTypeFilter(
+                    next === 'alle' ? 'all' :
+                    next === 'geschaeftlich' ? 'business' :
+                    next === 'arbeitsweg' ? 'arbeitsweg' : 'private'
+                  );
+                  if (Platform.OS !== 'web') Haptics.selectionAsync();
+                }}
+                style={{
+                  flex: 1,
+                  borderRadius: 20,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                  backgroundColor: active ? '#1a1a2e' : colors.card,
+                  borderWidth: 0.5,
+                  borderColor: active ? '#1a1a2e' : colors.border,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#FFFFFF' : colors.mutedForeground }}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
       {/* Month picker modal */}
       <Modal
