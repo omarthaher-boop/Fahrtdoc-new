@@ -56,7 +56,7 @@ export interface Trip {
   km: number;
   kmRoute?: number;
   dur: number;
-  type: "business" | "private";
+  type: "business" | "private" | "arbeitsweg";
   purpose?: string;
   edited?: boolean;
   note?: string;
@@ -69,7 +69,7 @@ export interface Trip {
 export interface ActiveTrip {
   id: string;
   startTime: number;
-  type: "business" | "private";
+  type: "business" | "private" | "arbeitsweg";
   startAddr: string;
   distance: number;
   positions: { lat: number; lon: number; ts: number; speed?: number }[];
@@ -141,7 +141,8 @@ interface AppContextType {
   gpsTracking: boolean;
   gpsStatus: "ok" | "denied" | "waiting";
   livePos: { lat: number; lon: number; speed?: number | null; heading?: number | null; accuracy?: number | null } | null;
-  startTrip: (type: "business" | "private", startAddrOverride?: string) => Promise<void>;
+  startTrip: (type: "business" | "private" | "arbeitsweg", startAddrOverride?: string) => Promise<void>;
+  setActiveTripType: (type: "business" | "private" | "arbeitsweg") => void;
   stopTrip: () => Promise<Trip | null>;
   setActiveTripNote: (note: string) => void;
   togglePause: (waypoint?: Waypoint) => void;
@@ -1590,8 +1591,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return ok;
   }, [trips, persistTripsLocal]);
 
+  const setActiveTripType = useCallback((type: "business" | "private" | "arbeitsweg") => {
+    setActiveTrip((prev) => prev ? { ...prev, type } : prev);
+  }, []);
+
   const startTrip = useCallback(
-    async (type: "business" | "private", startAddrOverride?: string) => {
+    async (type: "business" | "private" | "arbeitsweg", startAddrOverride?: string) => {
       setGpsStatus("waiting");
       clearDriveDetectStopped().catch(() => {});
       const tripId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -2023,6 +2028,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         gpsStatus,
         livePos,
         startTrip,
+        setActiveTripType,
         stopTrip,
         setActiveTripNote,
         togglePause,
