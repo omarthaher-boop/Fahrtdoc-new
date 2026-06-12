@@ -109,44 +109,10 @@ export async function clearDriveDetectStopped(): Promise<void> {
  * takes precedence over the stopped-at key — if the task fired recently the
  * notification is suppressed and the stopped state is cleared automatically.
  */
-export async function checkAndSendDriveDetectStoppedNotif(lang: string): Promise<void> {
-  try {
-    const [stoppedAtRaw, sentRaw, heartbeatRaw, thresholdRaw] = await AsyncStorage.multiGet([
-      DRIVE_DETECT_STOPPED_AT_KEY,
-      DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY,
-      DRIVE_DETECT_HEARTBEAT_KEY,
-      DRIVE_DETECT_STOPPED_THRESHOLD_KEY,
-    ]);
-    const stoppedAt = stoppedAtRaw[1] ? parseInt(stoppedAtRaw[1], 10) : null;
-    const alreadySent = sentRaw[1] === "true";
-    const lastHeartbeat = heartbeatRaw[1] ? parseInt(heartbeatRaw[1], 10) : null;
-
-    // If the background task fired recently, the task is still alive — clear any
-    // stale stopped state and skip the notification.
-    if (lastHeartbeat !== null && Date.now() - lastHeartbeat < HEARTBEAT_FRESH_MS) {
-      await AsyncStorage.multiRemove([DRIVE_DETECT_STOPPED_AT_KEY, DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY]);
-      return;
-    }
-
-    if (!stoppedAt || alreadySent) return;
-    const thresholdMin = thresholdRaw[1] ? parseInt(thresholdRaw[1], 10) : DEFAULT_STOPPED_THRESHOLD_MIN;
-    const thresholdMs = thresholdMin * 60 * 1000;
-    if (Date.now() - stoppedAt < thresholdMs) return;
-
-    const strings = DETECT_STOPPED_STRINGS[lang] ?? DETECT_STOPPED_STRINGS["en"];
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: strings.title,
-        body: strings.body,
-        sound: true,
-        data: { driveDetectStopped: true },
-      },
-      trigger: null,
-    });
-    await AsyncStorage.setItem(DRIVE_DETECT_STOPPED_NOTIF_SENT_KEY, "true");
-  } catch {
-    // Non-fatal
-  }
+// Drive-detect stopped notifications are disabled.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function checkAndSendDriveDetectStoppedNotif(_lang: string): Promise<void> {
+  // No-op: these notifications were removed to prevent false-positive alerts.
 }
 
 
@@ -216,14 +182,8 @@ if (Constants.appOwnership !== "expo") {
           const langKey = (langRaw[1] === "en" ? "en" : "de") as keyof typeof translations;
           const driveDict = translations[langKey];
 
-          // Watchdog: only relevant when no trip is active.
-          // During an active trip the drive-detect task is intentionally stopped
-          // → cancel any pending watchdog so it doesn't fire a false-positive alert.
-          if (!tripActive) {
-            await rescheduleWatchdog();
-          } else {
-            await cancelDriveWatchdog();
-          }
+          // Watchdog notifications are disabled — always cancel any pending one.
+          await cancelDriveWatchdog();
 
           const latestSpeed = data.locations[data.locations.length - 1].coords.speed;
           if (latestSpeed === null || latestSpeed < 0) return;
