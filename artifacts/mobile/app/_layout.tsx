@@ -24,6 +24,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { useCarPlay } from "@/hooks/useCarPlay";
 import { SubscriptionProvider, initializeRevenueCat } from "@/lib/revenuecat";
+import { cancelDriveWatchdog, clearDriveDetectStopped } from "@/utils/driveDetect";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,6 +34,9 @@ if (Platform.OS !== "web") {
   } catch (e) {
     console.warn("[RevenueCat] Init skipped:", e);
   }
+  // Cancel any watchdog/stopped notifications left over from previous app sessions.
+  cancelDriveWatchdog().catch(() => {});
+  clearDriveDetectStopped().catch(() => {});
 }
 
 const queryClient = new QueryClient();
