@@ -49,7 +49,8 @@ export interface ApiTrip {
   endLon?: number | null;
   km: number;
   dur: number;
-  type: "business" | "private";
+  type: "business" | "private" | "arbeitsweg";
+  purpose?: string;
   edited?: boolean | null;
   deleted?: boolean;
   waypoints?: ApiWaypoint[];
