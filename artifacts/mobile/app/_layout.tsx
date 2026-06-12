@@ -28,6 +28,15 @@ import { cancelDriveWatchdog, clearDriveDetectStopped } from "@/utils/driveDetec
 
 SplashScreen.preventAutoHideAsync();
 
+// Show notifications while app is in foreground too
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
 if (Platform.OS !== "web") {
   try {
     initializeRevenueCat();
@@ -89,6 +98,11 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    Notifications.requestPermissionsAsync().catch(() => {});
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
