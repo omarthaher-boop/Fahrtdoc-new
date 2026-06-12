@@ -64,14 +64,19 @@ export interface AuthResult {
 }
 
 export async function requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch(`${API_BASE}/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     return await res.json();
   } catch {
+    clearTimeout(timeout);
     return { success: false, error: "network_error" };
   }
 }
@@ -81,14 +86,19 @@ export async function confirmPasswordReset(
   code: string,
   newPassword: string
 ): Promise<ResetPasswordResponse> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch(`${API_BASE}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, code, newPassword }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     return await res.json();
   } catch {
+    clearTimeout(timeout);
     return { success: false, error: "network_error" };
   }
 }
