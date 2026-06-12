@@ -251,6 +251,9 @@ export default function HomeScreen() {
   const businessCount = useMemo(() => periodTrips.filter((t) => t.type === "business").length, [periodTrips]);
   const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
   const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
+  const arbeitswegCount = useMemo(() => periodTrips.filter((t) => t.type === "arbeitsweg").length, [periodTrips]);
+  const arbeitswegKm = useMemo(() => periodTrips.filter((t) => t.type === "arbeitsweg").reduce((a, b) => a + b.km, 0), [periodTrips]);
+  const privateKm = useMemo(() => periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0), [periodTrips]);
 
   const openStartModal = (type: "business" | "private" | "arbeitsweg") => {
     if (activeTrip) {
@@ -446,9 +449,9 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Period filter */}
+        {/* Stats Section — Dark Navy Card */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.stats")}</Text>
+          {/* Period filter pills */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll}>
             {([1, 3, 6, 12] as Period[]).map((p) => (
               <TouchableOpacity
@@ -460,7 +463,7 @@ export default function HomeScreen() {
                     borderColor: period === p ? colors.primary : colors.border,
                   },
                 ]}
-                onPress={() => setPeriod(p)}
+                onPress={() => { setPeriod(p); if (Platform.OS !== "web") Haptics.selectionAsync(); }}
               >
                 <Text style={[styles.pillText, { color: period === p ? "#FFFFFF" : colors.mutedForeground }]}>
                   {PERIOD_LABELS[p]}
@@ -469,51 +472,133 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
 
-          {/* Stats grid */}
-          <View style={styles.statsGrid}>
-            <StatCard label={t("home.totalKm")} value={totalKm.toFixed(0)} unit="km" accent={colors.primary} />
-            <StatCard label={t("home.trips")} value={String(periodTrips.length)} accent={colors.success} />
-          </View>
-          <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard label={t("home.driveDuration")} value={fmtDur(totalDur)} mini accent={colors.primary} />
-            <StatCard label={t("home.businessShort")} value={businessCount + " " + t("home.trips")} mini accent={colors.primary} />
-            <StatCard label={t("home.privateShort")} value={privateCount + " " + t("home.trips")} mini accent={colors.success} />
-          </View>
-
-          {/* Distribution bar */}
-          {periodTrips.length > 0 && (
-            <View style={[styles.distCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.distLabel, { color: colors.mutedForeground }]}>{t("home.distribution")}</Text>
-              <View style={[styles.distBar, { backgroundColor: colors.border }]}>
-                {businessCount > 0 && (
-                  <View style={[styles.distSegment, { flex: businessCount, backgroundColor: colors.primary }]}>
-                    {businessCount / periodTrips.length > 0.15 && (
-                      <Text style={styles.distPct}>{Math.round((businessCount / periodTrips.length) * 100)}%</Text>
-                    )}
-                  </View>
-                )}
-                {privateCount > 0 && (
-                  <View style={[styles.distSegment, { flex: privateCount, backgroundColor: colors.success }]}>
-                    {privateCount / periodTrips.length > 0.15 && (
-                      <Text style={styles.distPct}>{Math.round((privateCount / periodTrips.length) * 100)}%</Text>
-                    )}
-                  </View>
-                )}
+          {/* Dark navy statistics card */}
+          <View style={{
+            backgroundColor: '#1a2b6b',
+            borderRadius: 20,
+            padding: 18,
+            marginTop: 12,
+          }}>
+            {/* Card header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+                Statistik
+              </Text>
+              <View style={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.15)',
+              }}>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '500' }}>
+                  {PERIOD_LABELS[period]}
+                </Text>
               </View>
-              <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.legendText, { color: colors.sub }]}>{t("home.businessShort")} {businessKm.toFixed(0)} km</Text>
+            </View>
+
+            {/* Three stat boxes */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              {/* Geschäftlich */}
+              <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', padding: 10, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>{businessKm.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 2 }}>km</Text>
                 </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-                  <Text style={[styles.legendText, { color: colors.sub }]}>
-                    {t("home.privateShort")} {periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0).toFixed(0)} km
+                <Text style={{ fontSize: 9, color: '#99aaff', fontWeight: '600', marginBottom: 2 }}>Geschäftlich</Text>
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>{businessCount} Fahrten</Text>
+                <View style={{ backgroundColor: 'rgba(107,140,255,0.18)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#99aaff' }}>
+                    {totalKm > 0 ? Math.round((businessKm / totalKm) * 100) : 0}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Arbeitsweg */}
+              <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', padding: 10, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>{arbeitswegKm.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 2 }}>km</Text>
+                </View>
+                <Text style={{ fontSize: 9, color: '#ffcc88', fontWeight: '600', marginBottom: 2 }}>Arbeitsweg</Text>
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>{arbeitswegCount} Fahrten</Text>
+                <View style={{ backgroundColor: 'rgba(255,170,68,0.18)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#ffcc88' }}>
+                    {totalKm > 0 ? Math.round((arbeitswegKm / totalKm) * 100) : 0}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Privat */}
+              <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', padding: 10, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>{privateKm.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 2 }}>km</Text>
+                </View>
+                <Text style={{ fontSize: 9, color: '#66dd99', fontWeight: '600', marginBottom: 2 }}>Privat</Text>
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>{privateCount} Fahrten</Text>
+                <View style={{ backgroundColor: 'rgba(76,216,122,0.18)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#66dd99' }}>
+                    {totalKm > 0 ? Math.round((privateKm / totalKm) * 100) : 0}%
                   </Text>
                 </View>
               </View>
             </View>
-          )}
+
+            {/* Km-Verteilung label row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Km-Verteilung</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.7)' }}>{totalKm.toFixed(0)} km total</Text>
+            </View>
+
+            {/* Segmented progress bar */}
+            <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', overflow: 'hidden', marginBottom: 8 }}>
+              {totalKm > 0 && businessKm > 0 && (
+                <View style={{ flex: businessKm, backgroundColor: '#6b8cff' }} />
+              )}
+              {totalKm > 0 && arbeitswegKm > 0 && (
+                <View style={{ flex: arbeitswegKm, backgroundColor: '#ffaa44', marginLeft: 2 }} />
+              )}
+              {totalKm > 0 && privateKm > 0 && (
+                <View style={{ flex: privateKm, backgroundColor: '#4cd87a', marginLeft: 2 }} />
+              )}
+            </View>
+
+            {/* Legend */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6b8cff' }} />
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+                  Geschäftl. {totalKm > 0 ? Math.round((businessKm / totalKm) * 100) : 0}%
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#ffaa44' }} />
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+                  Arbeitsweg {totalKm > 0 ? Math.round((arbeitswegKm / totalKm) * 100) : 0}%
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#4cd87a' }} />
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+                  Privat {totalKm > 0 ? Math.round((privateKm / totalKm) * 100) : 0}%
+                </Text>
+              </View>
+            </View>
+
+            {/* Footer */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 10 }}>
+              <View>
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Gesamt Kilometer</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>{totalKm.toFixed(0)} km</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Fahrten</Text>
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', fontWeight: '500' }}>{periodTrips.length} Fahrten</Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         {/* Recent trips */}
