@@ -10,7 +10,7 @@ export interface TripTypeSuggestionOptions {
   businessDays?: number[];
 }
 
-export type TripType = "business" | "private";
+export type TripType = "business" | "private" | "arbeitsweg";
 
 export function suggestTripType(
   now: Date = new Date(),
