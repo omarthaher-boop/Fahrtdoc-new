@@ -44,10 +44,10 @@ export type TripSourcePlatform = "carplay" | "androidAuto" | null;
 // ---------------------------------------------------------------------------
 
 export type CarPlayAction =
-  | { type: "startTrip"; tripType: "business" | "private" }
+  | { type: "startTrip"; tripType: "business" | "private" | "arbeitsweg" }
   | { type: "stopTrip" }
   | { type: "pauseTrip" }
-  | { type: "selectTripType"; tripType: "business" | "private" }
+  | { type: "selectTripType"; tripType: "business" | "private" | "arbeitsweg" }
   | { type: "cancelTripType" };
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ export type CarPlayAction =
 export interface CarPlayTripState {
   isActive: boolean;
   isPaused: boolean;
-  tripType?: "business" | "private";
+  tripType?: "business" | "private" | "arbeitsweg";
   elapsedSeconds?: number;
   distanceKm?: number;
   /**
