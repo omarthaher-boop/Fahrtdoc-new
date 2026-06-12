@@ -37,7 +37,7 @@ interface Props {
 export default function EditTripModal({ trip, visible, onClose, onSave }: Props) {
   const colors = useColors();
   const { t } = useLanguage();
-  const [type, setType] = useState<"business" | "private">("business");
+  const [type, setType] = useState<"business" | "private" | "arbeitsweg">("business");
   const [purpose, setPurpose] = useState("");
   const [startAddr, setStartAddr] = useState("");
   const [endAddr, setEndAddr] = useState("");
@@ -275,6 +275,15 @@ export default function EditTripModal({ trip, visible, onClose, onSave }: Props)
                     <Feather name="user" size={14} color={type === "private" ? "#FFF" : colors.mutedForeground} />
                     <Text style={[styles.typeBtnText, { color: type === "private" ? "#FFF" : colors.mutedForeground }]}>
                       {t("tripType.private")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, type === "arbeitsweg" && { backgroundColor: "#e65100" }]}
+                    onPress={() => setType("arbeitsweg")}
+                  >
+                    <Feather name="home" size={14} color={type === "arbeitsweg" ? "#FFF" : colors.mutedForeground} />
+                    <Text style={[styles.typeBtnText, { color: type === "arbeitsweg" ? "#FFF" : colors.mutedForeground }]}>
+                      {t("tripType.arbeitsweg")}
                     </Text>
                   </TouchableOpacity>
                 </View>
