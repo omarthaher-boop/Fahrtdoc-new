@@ -65,6 +65,7 @@ export default function TripCard({
   const { t, language } = useLanguage();
   const { syncRetryingIds, editTrip } = useApp();
   const isBusiness = trip.type === "business";
+  const isArbeitsweg = trip.type === "arbeitsweg";
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const syncErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,8 +99,8 @@ export default function TripCard({
     if (!showNoteSheet) setNoteText(trip.note ?? "");
   }, [trip.note, showNoteSheet]);
 
-  const accentColor = isBusiness ? colors.primary : colors.success;
-  const accentBg = isBusiness ? "#EEF3FF" : "#ECFDF5";
+  const accentColor = isBusiness ? colors.primary : isArbeitsweg ? "#e65100" : colors.success;
+  const accentBg = isBusiness ? "#EEF3FF" : isArbeitsweg ? "#fff3e0" : "#ECFDF5";
   const dur = fmtDurMin(trip.dur, t);
   const fmtKm = new Intl.NumberFormat(language === "en" ? "en-GB" : "de-DE", {
     minimumFractionDigits: 1,
@@ -273,14 +274,14 @@ export default function TripCard({
         <View style={styles.inner}>
           {/* Top row: type badge + time + actions */}
           <View style={styles.topRow}>
-            <View style={[styles.typeBadge, { backgroundColor: accentBg }]}>
+            <View style={[styles.typeBadge, { backgroundColor: accentBg, borderWidth: isArbeitsweg ? 1 : 0, borderColor: isArbeitsweg ? "#f57c00" : "transparent" }]}>
               <Feather
-                name={isBusiness ? "briefcase" : "user"}
+                name={isBusiness ? "briefcase" : isArbeitsweg ? "home" : "user"}
                 size={13}
                 color={accentColor}
               />
               <Text style={[styles.typeText, { color: accentColor }]}>
-                {isBusiness ? t("tripType.business") : t("tripType.private")}
+                {isBusiness ? t("tripType.business") : isArbeitsweg ? t("tripType.arbeitsweg") : t("tripType.private")}
               </Text>
             </View>
 
