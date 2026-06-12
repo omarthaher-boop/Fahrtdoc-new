@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.omarthaher.fahrtdoc",
       "buildNumber": "38",
       "infoPlist": {
-        "UIBackgroundModes": ["location"],
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
         "NSFaceIDUsageDescription": "FahrtDoc verwendet Face ID, um dein Konto zu schützen und die Anmeldung zu beschleunigen.",
         "NSPhotoLibraryUsageDescription": "FahrtDoc benötigt Zugriff auf deine Fotos, um ein Firmenlogo für den PDF-Export auszuwählen.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -90,7 +90,10 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
