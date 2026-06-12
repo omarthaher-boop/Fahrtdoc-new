@@ -408,86 +408,95 @@ async function exportPDFWeb(
   const brandLabel = user?.companyName || "FahrtDoc";
   const subLabel = typeLabel ?? "Fahrtenbuch";
 
-  const appLogo = await getAppLogoBase64();
+  const stripeCompanyName = safeText(user?.companyName ?? "Meine Firma", 40);
+  const stripeUserName = safeText(user?.name ?? "", 50);
+  const stripeLicensePlate = user?.plate ?? "";
 
-  let logoH = 0;
-  if (user?.logoUri) {
-    try {
-      const loadImg = (src: string): Promise<HTMLImageElement> =>
-        new Promise((res, rej) => {
-          const img = new window.Image();
-          img.onload = () => res(img);
-          img.onerror = rej;
-          img.src = src;
-        });
-      const img = await loadImg(user.logoUri);
-      const ratio = img.naturalWidth / img.naturalHeight;
-      const maxW = 48;
-      const maxH = 20;
-      let w = maxW;
-      let h = maxW / ratio;
-      if (h > maxH) { h = maxH; w = maxH * ratio; }
-      const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
-      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
-      doc.addImage(user.logoUri, fmt, pageW / 2 - w / 2, y, w, h);
-      logoH = h + 3;
-      y += logoH;
-    } catch {
-      // skip logo if loading fails
-    }
-  }
+  // ── Bold Stripe Header ─────────────────────────────────────────────────────
+  y = 0;
+  const stripeH = 22;
 
-  doc.setFontSize(18);
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, pageW, stripeH, "F");
+
+  // LEFT: FD icon + "FahrtDoc"
+  doc.setFillColor(...white);
+  doc.roundedRect(10, 5, 12, 12, 2, 2, "F");
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...navy);
-  doc.text(brandLabel, pageW / 2, y, { align: "center" });
+  doc.text("FD", 16, 13.2, { align: "center" });
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...white);
+  doc.text("FahrtDoc", 25.5, 14);
 
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(90, 106, 154);
-  doc.text(subLabel, pageW / 2, y + 6, { align: "center" });
-
-  // App logo top-right
-  if (appLogo) {
+  // CENTER: company logo + company name (web: load to get aspect ratio)
+  if (user?.logoUri) {
     try {
-      const loadImg = (src: string): Promise<HTMLImageElement> =>
+      const loadCompImg = (src: string): Promise<HTMLImageElement> =>
         new Promise((res, rej) => {
           const img = new window.Image();
           img.onload = () => res(img);
           img.onerror = rej;
           img.src = src;
         });
-      const logoImg = await loadImg(appLogo);
-      const ratio = logoImg.naturalWidth / logoImg.naturalHeight;
-      const maxH = 14;
-      const maxW = 28;
-      let lh = maxH;
-      let lw = maxH * ratio;
-      if (lw > maxW) { lw = maxW; lh = maxW / ratio; }
-      const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
-      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
-      doc.addImage(appLogo, fmt, pageW - margin - lw, 20 - 4, lw, lh);
+      const compImg = await loadCompImg(user.logoUri);
+      const ratio = compImg.naturalWidth / compImg.naturalHeight;
+      const maxSize = 13;
+      let cw = maxSize;
+      let ch = maxSize / ratio;
+      if (ch > maxSize) { ch = maxSize; cw = maxSize * ratio; }
+      const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
+      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
+      doc.addImage(user.logoUri, fmt, pageW / 2 - cw / 2, 3, cw, ch);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...white);
+      doc.text(stripeCompanyName, pageW / 2, 20.5, { align: "center" });
     } catch {
-      // skip if loading fails
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...white);
+      doc.text(stripeCompanyName, pageW / 2, 13, { align: "center" });
     }
+  } else {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...white);
+    doc.text(stripeCompanyName, pageW / 2, 13, { align: "center" });
   }
 
-  doc.setFontSize(9);
-  doc.setTextColor(68, 68, 68);
-  const metaLines: string[] = [];
-  if (user?.name) metaLines.push(user.name);
-  if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
-  metaLines.push(`Zeitraum: ${dateRange}`);
-  const metaStartY = appLogo ? 20 + 12 : 20 + logoH;
-  metaLines.forEach((line, i) => {
-    doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
-  });
+  // RIGHT: user name + plate + date range
+  if (stripeUserName) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...white);
+    doc.text(stripeUserName, pageW - 10, 9, { align: "right" });
+  }
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(200, 210, 240);
+  if (stripeLicensePlate) {
+    doc.text(safeText(`Kennzeichen: ${stripeLicensePlate}`, 50), pageW - 10, 14, { align: "right" });
+  }
+  doc.text(safeText(`Zeitraum: ${dateRange}`, 60), pageW - 10, 19, { align: "right" });
 
-  y += 14;
-  doc.setDrawColor(...navy);
-  doc.setLineWidth(0.7);
-  doc.line(margin, y, pageW - margin, y);
-  y += 8;
+  // Info line below stripe
+  y = stripeH;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...navy);
+  if (stripeLicensePlate) {
+    doc.text(`Kennzeichen: ${stripeLicensePlate}`, margin, y + 6);
+  }
+  doc.text(`Zeitraum: ${dateRange}`, pageW - margin, y + 6, { align: "right" });
+  y += 10;
+  doc.setDrawColor(224, 224, 224);
+  doc.setLineWidth(0.4);
+  doc.line(0, y, pageW, y);
+  y += 6;
+  // ──────────────────────────────────────────────────────────────────────────
 
   doc.setFillColor(...lightBlue);
   doc.roundedRect(margin, y, contentW, 16, 3, 3, "F");
@@ -762,61 +771,83 @@ async function exportPDFNative(
   const brandLabel = user?.companyName || "FahrtDoc";
   const subLabel = typeLabel ?? "Fahrtenbuch";
 
-  const appLogo = await getAppLogoBase64();
+  const stripeCompanyName = safeText(user?.companyName ?? "Meine Firma", 40);
+  const stripeUserName = safeText(user?.name ?? "", 50);
+  const stripeLicensePlate = user?.plate ?? "";
 
-  // User company logo — centered (native: fixed dimensions, no DOM needed)
-  let logoHN = 0;
+  // ── Bold Stripe Header ─────────────────────────────────────────────────────
+  y = 0;
+  const stripeH = 22;
+
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, pageW, stripeH, "F");
+
+  // LEFT: FD icon + "FahrtDoc"
+  doc.setFillColor(...white);
+  doc.roundedRect(10, 5, 12, 12, 2, 2, "F");
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text("FD", 16, 13.2, { align: "center" });
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...white);
+  doc.text("FahrtDoc", 25.5, 14);
+
+  // CENTER: company logo + company name
   if (user?.logoUri) {
     try {
       const matchFmt = user.logoUri.match(/^data:image\/(\w+);base64,/);
       const fmt = matchFmt ? matchFmt[1].toUpperCase() : "JPEG";
-      const logoW = 40;
-      const logoH = 16;
-      doc.addImage(user.logoUri, fmt, pageW / 2 - logoW / 2, y, logoW, logoH);
-      logoHN = logoH + 3;
-      y += logoHN;
+      const logoSize = 13;
+      doc.addImage(user.logoUri, fmt, pageW / 2 - logoSize / 2, 3, logoSize, logoSize);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...white);
+      doc.text(stripeCompanyName, pageW / 2, 20.5, { align: "center" });
     } catch {
-      // skip logo if loading fails
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...white);
+      doc.text(stripeCompanyName, pageW / 2, 13, { align: "center" });
     }
+  } else {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...white);
+    doc.text(stripeCompanyName, pageW / 2, 13, { align: "center" });
   }
 
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...navy);
-  doc.text(brandLabel, pageW / 2, y, { align: "center" });
-
-  doc.setFontSize(10);
+  // RIGHT: user name + plate + date range
+  if (stripeUserName) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...white);
+    doc.text(stripeUserName, pageW - 10, 9, { align: "right" });
+  }
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(90, 106, 154);
-  doc.text(subLabel, pageW / 2, y + 6, { align: "center" });
-
-  // App logo top-right (native: fixed dimensions)
-  if (appLogo) {
-    try {
-      const matchFmt = appLogo.match(/^data:image\/(\w+);base64,/);
-      const fmt = matchFmt ? matchFmt[1].toUpperCase() : "PNG";
-      doc.addImage(appLogo, fmt, pageW - margin - 20, 20 - 4, 20, 14);
-    } catch {
-      // skip if loading fails
-    }
+  doc.setTextColor(200, 210, 240);
+  if (stripeLicensePlate) {
+    doc.text(safeText(`Kennzeichen: ${stripeLicensePlate}`, 50), pageW - 10, 14, { align: "right" });
   }
+  doc.text(safeText(`Zeitraum: ${dateRange}`, 60), pageW - 10, 19, { align: "right" });
 
+  // Info line below stripe
+  y = stripeH;
   doc.setFontSize(9);
-  doc.setTextColor(68, 68, 68);
-  const metaLines: string[] = [];
-  if (user?.name) metaLines.push(user.name);
-  if (user?.plate) metaLines.push(`Kennzeichen: ${user.plate}`);
-  metaLines.push(`Zeitraum: ${dateRange}`);
-  const metaStartY = appLogo ? 20 + 12 : 20 + logoHN;
-  metaLines.forEach((line, i) => {
-    doc.text(line, pageW - margin, metaStartY + i * 5, { align: "right" });
-  });
-
-  y += 14;
-  doc.setDrawColor(...navy);
-  doc.setLineWidth(0.7);
-  doc.line(margin, y, pageW - margin, y);
-  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...navy);
+  if (stripeLicensePlate) {
+    doc.text(`Kennzeichen: ${stripeLicensePlate}`, margin, y + 6);
+  }
+  doc.text(`Zeitraum: ${dateRange}`, pageW - margin, y + 6, { align: "right" });
+  y += 10;
+  doc.setDrawColor(224, 224, 224);
+  doc.setLineWidth(0.4);
+  doc.line(0, y, pageW, y);
+  y += 6;
+  // ──────────────────────────────────────────────────────────────────────────
 
   doc.setFillColor(...lightBlue);
   doc.roundedRect(margin, y, contentW, 16, 3, 3, "F");
