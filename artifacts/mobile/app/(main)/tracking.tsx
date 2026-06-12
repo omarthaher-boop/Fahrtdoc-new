@@ -86,7 +86,7 @@ export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const { t } = useLanguage();
-  const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, togglePause, livePos, gpsTracking } = useApp();
+  const { activeTrip, paused, elapsed, stopTrip, setActiveTripNote, setActiveTripType, togglePause, livePos, gpsTracking } = useApp();
 
   const [speedKmh, setSpeedKmh] = useState<number | null>(null);
   const [heading, setHeading] = useState<number | null>(null);
@@ -304,9 +304,14 @@ export default function TrackingScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
-  const tripTypeColor = activeTrip.type === "business" ? colors.primary : colors.success;
+  const tripTypeColor =
+    activeTrip.type === "business" ? colors.primary :
+    activeTrip.type === "arbeitsweg" ? "#e65100" :
+    colors.success;
   const tripTypeLabel =
-    activeTrip.type === "business" ? t("tripType.business") : t("tripType.private");
+    activeTrip.type === "business" ? t("tripType.business") :
+    activeTrip.type === "arbeitsweg" ? t("tripType.arbeitsweg") :
+    t("tripType.private");
 
   return (
     <KeyboardAvoidingView
@@ -348,13 +353,33 @@ export default function TrackingScreen() {
               {paused ? t("tracking.paused") : t("tracking.screen.title")}
             </Text>
           </View>
-          <View style={[styles.typePill, { backgroundColor: tripTypeColor + "18", borderColor: tripTypeColor + "40" }]}>
-            <Feather
-              name={activeTrip.type === "business" ? "briefcase" : "user"}
-              size={11}
-              color={tripTypeColor}
-            />
-            <Text style={[styles.typePillText, { color: tripTypeColor }]}>{tripTypeLabel}</Text>
+          {/* Type switcher pills */}
+          <View style={styles.typeSwitchRow}>
+            {(["business", "private", "arbeitsweg"] as const).map((type) => {
+              const isActive = activeTrip.type === type;
+              const c = type === "business" ? colors.primary : type === "arbeitsweg" ? "#e65100" : colors.success;
+              const label = t(`tripType.${type}` as "tripType.business");
+              const icon = type === "business" ? "briefcase" : type === "arbeitsweg" ? "home" : "user";
+              return (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => setActiveTripType(type)}
+                  style={[
+                    styles.typeSwitchPill,
+                    {
+                      backgroundColor: isActive ? c + "20" : "transparent",
+                      borderColor: isActive ? c + "60" : colors.border,
+                    },
+                  ]}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                >
+                  <Feather name={icon} size={10} color={isActive ? c : colors.mutedForeground} />
+                  <Text style={[styles.typeSwitchText, { color: isActive ? c : colors.mutedForeground, fontWeight: isActive ? "700" : "400" }]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -718,16 +743,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.3,
   },
-  typePill: {
+  typeSwitchRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  typeSwitchPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
+    gap: 3,
+    paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
   },
-  typePillText: { fontSize: 11, fontWeight: "600" },
+  typeSwitchText: { fontSize: 10 },
   headerRight: { width: 36 },
   mapArea: { overflow: "hidden" },
   mapPlaceholder: {
