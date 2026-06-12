@@ -24,6 +24,7 @@ import { useApp, type Waypoint } from "@/context/AppContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { DRIVE_DETECT_TASK } from "@/utils/driveDetect";
+import { startTripNotifications, stopTripNotifications } from "@/services/tripNotificationService";
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
@@ -187,6 +188,27 @@ export default function TrackingScreen() {
     }
   }, [activeTrip]);
 
+  // Refs so the notification interval always reads current values
+  const notifActiveTripRef = useRef(activeTrip);
+  useEffect(() => { notifActiveTripRef.current = activeTrip; }, [activeTrip]);
+  const notifElapsedRef = useRef(elapsed);
+  useEffect(() => { notifElapsedRef.current = elapsed; }, [elapsed]);
+
+  // Start trip notifications on mount, stop on unmount
+  const notifStartedRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS === "web" || !activeTrip) return;
+    if (notifStartedRef.current) return;
+    notifStartedRef.current = true;
+    void startTripNotifications(activeTrip.type, () => ({
+      km: notifActiveTripRef.current?.distance ?? 0,
+      elapsed: notifElapsedRef.current,
+    }));
+    return () => {
+      void stopTripNotifications();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const hasPositions = activeTrip ? (activeTrip.positions.length > 0 || livePos !== null) : false;
   const showMap = gpsTracking && hasPositions;
 
@@ -221,6 +243,8 @@ export default function TrackingScreen() {
   const handleStop = () => {
     if (geocoding) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Stop interval + dismiss running notifications, then show completion toast
+    void stopTripNotifications(activeTrip?.distance, activeTrip?.type);
     stopTrip();
   };
 
