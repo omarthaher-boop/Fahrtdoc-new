@@ -20,6 +20,23 @@ import { requestPasswordReset } from "@/lib/api";
 
 type ErrorKey = "forgot.error.invalidEmail" | "forgot.error.unknown" | "forgot.error.serverError";
 
+/** Maps raw API error codes to translation keys; unknown codes are shown as-is (already German from backend). */
+function getErrorDisplay(error: string): { key: ErrorKey } | { raw: string } {
+  if (
+    error === "network_error" ||
+    error === "timeout" ||
+    error.toLowerCase().includes("network") ||
+    error.toLowerCase().includes("fetch") ||
+    error.toLowerCase().includes("failed to fetch")
+  ) {
+    return { key: "forgot.error.serverError" };
+  }
+  if (error.toLowerCase().includes("rate") || error.toLowerCase().includes("anfragen")) {
+    return { raw: error };
+  }
+  return { raw: error };
+}
+
 export default function ForgotPasswordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -29,9 +46,10 @@ export default function ForgotPasswordScreen() {
   const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const clearErrors = () => { setErrorKey(null); setServerError(null); };
+
   const handleSubmit = async () => {
-    setErrorKey(null);
-    setServerError(null);
+    clearErrors();
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes("@")) {
       setErrorKey("forgot.error.invalidEmail");
@@ -45,7 +63,12 @@ export default function ForgotPasswordScreen() {
       const res = await requestPasswordReset(trimmed);
       if (!res.success) {
         if (res.error) {
-          setServerError(res.error);
+          const display = getErrorDisplay(res.error);
+          if ("key" in display) {
+            setErrorKey(display.key);
+          } else {
+            setServerError(display.raw);
+          }
         } else {
           setErrorKey("forgot.error.unknown");
         }
@@ -110,7 +133,7 @@ export default function ForgotPasswordScreen() {
               <TextInput
                 style={[styles.input, { color: colors.foreground }]}
                 value={email}
-                onChangeText={(text) => { setEmail(text); setErrorKey(null); setServerError(null); }}
+                onChangeText={(text) => { setEmail(text); clearErrors(); }}
                 placeholder={t("auth.emailPlaceholder")}
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="email-address"
