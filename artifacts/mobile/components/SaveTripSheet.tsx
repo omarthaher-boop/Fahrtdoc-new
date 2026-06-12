@@ -514,12 +514,12 @@ export default function SaveTripSheet() {
                   </View>
                   <View style={styles.infoChip}>
                     <Feather
-                      name={draftTrip?.type === "business" ? "briefcase" : "user"}
+                      name={draftTrip?.type === "business" ? "briefcase" : draftTrip?.type === "arbeitsweg" ? "home" : "user"}
                       size={12}
                       color={colors.mutedForeground}
                     />
                     <Text style={[styles.infoChipText, { color: colors.mutedForeground }]}>
-                      {draftTrip?.type === "business" ? t("tripType.business") : t("tripType.private")}
+                      {draftTrip?.type === "business" ? t("tripType.business") : draftTrip?.type === "arbeitsweg" ? t("tripType.arbeitsweg") : t("tripType.private")}
                     </Text>
                   </View>
                   {stoppedViaCarPlay && (
