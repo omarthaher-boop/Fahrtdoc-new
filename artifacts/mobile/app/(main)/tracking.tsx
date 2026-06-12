@@ -106,6 +106,7 @@ export default function TrackingScreen() {
   const [noteExpanded, setNoteExpanded] = useState(!!(activeTrip?.note));
   const noteInputRef = useRef<TextInput>(null);
   const tripNoteInputRef = useRef<TextInput>(null);
+  const panelScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (!livePos) return;
@@ -308,7 +309,11 @@ export default function TrackingScreen() {
     activeTrip.type === "business" ? t("tripType.business") : t("tripType.private");
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+    >
       {/* Header */}
       <View
         style={[
@@ -395,15 +400,15 @@ export default function TrackingScreen() {
       </View>
 
       {/* Stats + Controls panel */}
-      <View
-        style={[
+      <ScrollView
+        ref={panelScrollRef}
+        style={[styles.panelScroll, { backgroundColor: colors.card, borderTopColor: colors.border }]}
+        contentContainerStyle={[
           styles.panel,
-          {
-            backgroundColor: colors.card,
-            borderTopColor: colors.border,
-            paddingBottom: bottomPad + 24,
-          },
+          { paddingBottom: bottomPad + 24 },
         ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Status warnings */}
         {paused && (
@@ -508,6 +513,7 @@ export default function TrackingScreen() {
                 setTripNote(text);
                 setActiveTripNote(text);
               }}
+              onFocus={() => setTimeout(() => panelScrollRef.current?.scrollToEnd({ animated: true }), 100)}
               multiline
               maxLength={300}
               returnKeyType="done"
@@ -580,7 +586,7 @@ export default function TrackingScreen() {
             <Text style={styles.stopBtnText}>{t("tracking.screen.stop")}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Pause / Waypoint sheet */}
       <Modal
@@ -673,7 +679,7 @@ export default function TrackingScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -750,10 +756,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
   },
+  panelScroll: {
+    borderTopWidth: 1,
+    flexShrink: 1,
+  },
   panel: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    borderTopWidth: 1,
     gap: 12,
   },
   warningBanner: {
