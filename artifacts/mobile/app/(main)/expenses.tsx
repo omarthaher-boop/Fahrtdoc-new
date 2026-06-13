@@ -34,6 +34,29 @@ import {
 } from '@/services/receiptAnalyzer';
 import { useMediaPermissions } from '@/hooks/useMediaPermissions';
 
+// ─── Cross-platform dialogs ────────────────────────────────────────────────────
+
+function confirmAction(title: string, message: string, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Abbrechen', style: 'cancel' },
+      { text: 'Löschen', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
+}
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const PRIMARY = '#1a2b6b';
@@ -393,7 +416,7 @@ export default function ExpensesScreen() {
         setScanStep(2);
       })
       .catch(() => {
-        Alert.alert('Analyse fehlgeschlagen', 'Bitte Daten manuell eingeben.');
+        showAlert('Analyse fehlgeschlagen', 'Bitte Daten manuell eingeben.');
         setScanStep(2);
       })
       .finally(() => setAnalysisLoading(false));
@@ -474,7 +497,7 @@ export default function ExpensesScreen() {
         setScanStep(1);
       }
     } catch {
-      Alert.alert('Fehler', 'Kamera konnte nicht geöffnet werden.');
+      showAlert('Fehler', 'Kamera konnte nicht geöffnet werden.');
     }
   };
 
@@ -492,7 +515,7 @@ export default function ExpensesScreen() {
         setScanStep(1);
       }
     } catch {
-      Alert.alert('Fehler', 'Mediathek konnte nicht geöffnet werden.');
+      showAlert('Fehler', 'Mediathek konnte nicht geöffnet werden.');
     }
   };
 
@@ -509,7 +532,7 @@ export default function ExpensesScreen() {
         setScanStep(1);
       }
     } catch {
-      Alert.alert('Fehler', 'Dokument konnte nicht geöffnet werden.');
+      showAlert('Fehler', 'Dokument konnte nicht geöffnet werden.');
     }
   };
 
@@ -522,7 +545,7 @@ export default function ExpensesScreen() {
   const handleSaveScan = async () => {
     const amountNum = parseFloat(scanForm.amount.replace(',', '.'));
     if (!scanForm.description.trim() || !(amountNum > 0)) {
-      Alert.alert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
+      showAlert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
       return;
     }
     Keyboard.dismiss();
@@ -545,7 +568,7 @@ export default function ExpensesScreen() {
   const handleSaveAdd = async () => {
     const amountNum = parseFloat(addForm.amount.replace(',', '.'));
     if (!addForm.description.trim() || !(amountNum > 0)) {
-      Alert.alert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
+      showAlert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
       return;
     }
     Keyboard.dismiss();
@@ -565,18 +588,19 @@ export default function ExpensesScreen() {
     setAddForm(emptyForm());
   };
 
-  const handleDelete = async (id: string) => {
-    Alert.alert('Eintrag löschen', 'Diesen Kosteneintrag wirklich löschen?', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
+  const handleDelete = (id: string) => {
+    confirmAction(
+      'Eintrag löschen',
+      'Diesen Kosteneintrag wirklich löschen?',
+      async () => {
+        try {
           await deleteExpense(id);
           await loadAllExpenses();
-        },
-      },
-    ]);
+        } catch {
+          showAlert('Fehler', 'Eintrag konnte nicht gelöscht werden.');
+        }
+      }
+    );
   };
 
   const openEditModal = (expense: Expense) => {
@@ -605,7 +629,7 @@ export default function ExpensesScreen() {
     if (!editingExpense) return;
     const amountNum = parseFloat(editForm.amount.replace(',', '.'));
     if (!editForm.description.trim() || !(amountNum > 0)) {
-      Alert.alert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
+      showAlert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
       return;
     }
     Keyboard.dismiss();
@@ -625,26 +649,19 @@ export default function ExpensesScreen() {
 
   const handleDeleteExpense = () => {
     if (!editingExpense) return;
-    Alert.alert(
+    confirmAction(
       'Eintrag löschen',
       'Möchtest du diesen Eintrag wirklich löschen?',
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Löschen',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteExpense(editingExpense.id);
-              await loadAllExpenses();
-              setEditModalVisible(false);
-              setEditingExpense(null);
-            } catch {
-              Alert.alert('Fehler', 'Eintrag konnte nicht gelöscht werden.');
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await deleteExpense(editingExpense.id);
+          await loadAllExpenses();
+          setEditModalVisible(false);
+          setEditingExpense(null);
+        } catch {
+          showAlert('Fehler', 'Eintrag konnte nicht gelöscht werden.');
+        }
+      }
     );
   };
 
