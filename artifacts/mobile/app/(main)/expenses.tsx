@@ -354,6 +354,9 @@ export default function ExpensesScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editForm, setEditForm] = useState<FormState>(emptyForm());
 
+  const [permissionPromptVisible, setPermissionPromptVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'camera' | 'library' | 'document' | null>(null);
+
   const scrollRef = useRef<ScrollView>(null);
   const permissions = useMediaPermissions();
 
@@ -540,6 +543,20 @@ export default function ExpensesScreen() {
     await permissions.requestPermissions();
     resetScanModal();
     setScanModalVisible(true);
+  };
+
+  const requestWithExplanation = (action: 'camera' | 'library' | 'document') => {
+    setPendingAction(action);
+    setPermissionPromptVisible(true);
+  };
+
+  const handleConfirmPermission = async () => {
+    setPermissionPromptVisible(false);
+    const action = pendingAction;
+    setPendingAction(null);
+    if (action === 'camera') await handleOpenCamera();
+    else if (action === 'library') await handleOpenMediaLibrary();
+    else if (action === 'document') await handleScanDocument();
   };
 
   const handleSaveScan = async () => {
@@ -917,13 +934,13 @@ export default function ExpensesScreen() {
                     Beleg aufnehmen
                   </Text>
                   {[
-                    { handler: handleOpenMediaLibrary, icon: 'image' as const, label: 'Mediathek', sub: 'Bild aus Fotos wählen' },
-                    { handler: handleOpenCamera, icon: 'camera' as const, label: 'Kamera', sub: 'Beleg fotografieren' },
-                    { handler: handleScanDocument, icon: 'file-text' as const, label: 'Dokument scannen', sub: 'PDF oder Bilddatei' },
+                    { action: 'library' as const, icon: 'image' as const, label: 'Mediathek', sub: 'Bild aus Fotos wählen' },
+                    { action: 'camera' as const, icon: 'camera' as const, label: 'Kamera', sub: 'Beleg fotografieren' },
+                    { action: 'document' as const, icon: 'file-text' as const, label: 'Dokument scannen', sub: 'PDF oder Bilddatei' },
                   ].map((opt) => (
                     <TouchableOpacity
                       key={opt.label}
-                      onPress={opt.handler}
+                      onPress={() => requestWithExplanation(opt.action)}
                       style={{
                         ...CARD_STYLE,
                         flexDirection: 'row',
@@ -1196,6 +1213,101 @@ export default function ExpensesScreen() {
       <ScanModal />
       <AddModal />
       <EditModal />
+
+      {/* Soft-Ask Permission Prompt */}
+      <Modal
+        visible={permissionPromptVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPermissionPromptVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: '#fff',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 28,
+              paddingBottom: 36,
+              alignItems: 'center',
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 18,
+                backgroundColor: PRIMARY + '18',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 18,
+              }}
+            >
+              <Feather
+                name={
+                  pendingAction === 'library'
+                    ? 'image'
+                    : pendingAction === 'document'
+                    ? 'file-text'
+                    : 'camera'
+                }
+                size={28}
+                color={PRIMARY}
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1a1a1a', marginBottom: 12, textAlign: 'center' }}>
+              {pendingAction === 'library'
+                ? 'Fotozugriff'
+                : pendingAction === 'document'
+                ? 'Kamerazugriff für Dokumente'
+                : 'Kamerazugriff'}
+            </Text>
+
+            {/* Description */}
+            <Text style={{ fontSize: 13, color: '#666', lineHeight: 20, textAlign: 'center', marginBottom: 28, paddingHorizontal: 8 }}>
+              {pendingAction === 'library'
+                ? 'FahrtDoc benötigt Zugriff auf deine Fotos, um bestehende Belegfotos auszuwählen. Es werden keine anderen Fotos eingesehen oder übertragen.'
+                : pendingAction === 'document'
+                ? 'FahrtDoc benötigt Zugriff auf deine Kamera, um Dokumente zu scannen. Die Aufnahme wird ausschliesslich zur Beleg-Erfassung verwendet.'
+                : 'FahrtDoc benötigt Zugriff auf deine Kamera, um Belege und Rechnungen zu fotografieren. Die Fotos werden ausschliesslich lokal auf deinem Gerät gespeichert und nur zur Beleg-Erfassung verwendet.'}
+            </Text>
+
+            {/* Buttons */}
+            <TouchableOpacity
+              onPress={() => { void handleConfirmPermission(); }}
+              style={{
+                backgroundColor: PRIMARY,
+                borderRadius: 14,
+                paddingVertical: 15,
+                alignSelf: 'stretch',
+                alignItems: 'center',
+                marginBottom: 10,
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Fortfahren</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setPermissionPromptVisible(false)}
+              style={{
+                backgroundColor: '#f2f2f7',
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignSelf: 'stretch',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#e8e8e8',
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#555', fontSize: 15, fontWeight: '600' }}>Abbrechen</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
