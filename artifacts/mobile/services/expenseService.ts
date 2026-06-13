@@ -25,13 +25,9 @@ export async function saveExpense(expense: Expense): Promise<void> {
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-  try {
-    const existing = await loadExpenses();
-    const updated = existing.filter((e) => e.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {
-    // silently fail
-  }
+  const existing = await loadExpenses();
+  const updated = existing.filter((e) => e.id !== id);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
 export async function updateExpense(expense: Expense): Promise<void> {
