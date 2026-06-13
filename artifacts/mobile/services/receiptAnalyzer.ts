@@ -1,5 +1,5 @@
-// HINWEIS: EXPO_PUBLIC_ANTHROPIC_API_KEY in .env setzen für KI-Beleg-Analyse
 import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
 import type { ExpenseCategory } from '@/types/expense';
 
 export interface AnalysisResult {
@@ -16,50 +16,68 @@ export interface AnalysisResult {
   };
 }
 
-const fallbackResult = (): AnalysisResult => ({
-  merchant: 'Unbekannt',
+const emptyFallback = (): AnalysisResult => ({
+  merchant: '',
   amount: 0,
   date: new Date().toISOString().split('T')[0],
   category: 'sonstiges',
-  description: 'Beleg konnte nicht analysiert werden',
+  description: '',
   confidence: { merchant: 0, amount: 0, date: 0, category: 0 },
 });
 
+function getApiKey(): string {
+  return (
+    process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ??
+    (Constants.expoConfig?.extra as { anthropicApiKey?: string } | undefined)?.anthropicApiKey ??
+    ''
+  );
+}
+
 export async function analyzeReceipt(imageUri: string): Promise<AnalysisResult> {
-  const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
-  if (!apiKey) return fallbackResult();
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    console.error('❌ ANTHROPIC API KEY fehlt! Setze EXPO_PUBLIC_ANTHROPIC_API_KEY.');
+    return emptyFallback();
+  }
+
+  console.log('🔍 Starte Beleganalyse...');
+  console.log('📍 Image URI:', imageUri.slice(0, 60));
 
   let base64: string;
   try {
     base64 = await FileSystem.readAsStringAsync(imageUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
-  } catch {
-    return fallbackResult();
+    console.log('📄 Base64 Länge:', base64.length);
+  } catch (err) {
+    console.error('❌ Bild konnte nicht gelesen werden:', err);
+    return emptyFallback();
   }
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
-            },
-            {
-              type: 'text',
-              text: `Analysiere diesen Kassenbon/Beleg und extrahiere folgende Informationen als JSON.
-Antworte NUR mit validem JSON, kein weiterer Text:
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
+              },
+              {
+                type: 'text',
+                text: `Analysiere diesen Kassenbon/Beleg und extrahiere folgende Informationen als JSON.
+Antworte NUR mit validem JSON, kein weiterer Text, keine Markdown-Backticks:
 {
   "merchant": "Name des Händlers oder Unternehmens",
   "amount": 0.00,
@@ -79,22 +97,32 @@ Kategorieregeln:
 - "parkgebuehr" wenn Parkhaus, Parkplatz, Parkuhr, Vignette
 - "sonstiges" für alles andere (Versicherung, Steuer, Zubehör)
 Falls ein Feld nicht erkennbar ist, verwende sinnvolle Standardwerte.`,
-            },
-          ],
-        },
-      ],
-    }),
-  });
+              },
+            ],
+          },
+        ],
+      }),
+    });
 
-  if (!response.ok) throw new Error('API-Fehler beim Analysieren des Belegs');
+    console.log('📡 API Response Status:', response.status);
 
-  const data = (await response.json()) as { content?: { text?: string }[] };
-  const text = data.content?.[0]?.text ?? '{}';
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ API Fehler:', response.status, errorText);
+      return emptyFallback();
+    }
 
-  try {
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as AnalysisResult;
-  } catch {
-    return fallbackResult();
+    const data = (await response.json()) as { content?: { text?: string }[] };
+    const text = data.content?.[0]?.text ?? '';
+    console.log('📝 Rohantwort:', text.slice(0, 200));
+
+    const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(clean) as AnalysisResult;
+    console.log('✅ Erfolgreich geparst — Betrag:', parsed.amount, '| Kategorie:', parsed.category);
+    return parsed;
+
+  } catch (err) {
+    console.error('❌ Analyse fehlgeschlagen:', err);
+    return emptyFallback();
   }
 }
