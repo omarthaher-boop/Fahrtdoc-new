@@ -397,7 +397,7 @@ export default function HomeScreen() {
         {!activeTrip && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.quickStart")}</Text>
-            <View style={styles.quickCol}>
+            <View style={styles.quickContainer}>
               {/* Geschäftsreise */}
               <TouchableOpacity
                 style={[styles.quickCard, { borderLeftColor: "#1a2b6b" }]}
@@ -407,13 +407,16 @@ export default function HomeScreen() {
                 testID="start-business"
               >
                 <View style={[styles.quickCardIcon, { backgroundColor: "#1a2b6b" }]}>
-                  <Ionicons name="briefcase" size={17} color="#fff" />
+                  <Ionicons name="briefcase" size={19} color="#fff" />
                 </View>
+                <View style={styles.quickDivider} />
                 <View style={styles.quickCardText}>
                   <Text style={styles.quickCardLabel}>{t("home.businessTrip")}</Text>
                   <Text style={styles.quickCardSub}>Arbeit &amp; Dienst</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={15} color="#ccc" />
+                <View style={styles.quickChevron}>
+                  <Ionicons name="chevron-forward" size={14} color="#bbb" />
+                </View>
               </TouchableOpacity>
 
               {/* Private Fahrt */}
@@ -425,13 +428,16 @@ export default function HomeScreen() {
                 testID="start-private"
               >
                 <View style={[styles.quickCardIcon, { backgroundColor: "#27ae60" }]}>
-                  <Ionicons name="person" size={17} color="#fff" />
+                  <Ionicons name="person" size={19} color="#fff" />
                 </View>
+                <View style={styles.quickDivider} />
                 <View style={styles.quickCardText}>
                   <Text style={styles.quickCardLabel}>{t("home.privateTrip")}</Text>
                   <Text style={styles.quickCardSub}>Persönlich</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={15} color="#ccc" />
+                <View style={styles.quickChevron}>
+                  <Ionicons name="chevron-forward" size={14} color="#bbb" />
+                </View>
               </TouchableOpacity>
 
               {/* Arbeitsweg */}
@@ -443,13 +449,16 @@ export default function HomeScreen() {
                 testID="start-arbeitsweg"
               >
                 <View style={[styles.quickCardIcon, { backgroundColor: "#e65100" }]}>
-                  <Ionicons name="home" size={17} color="#fff" />
+                  <Ionicons name="home" size={19} color="#fff" />
                 </View>
+                <View style={styles.quickDivider} />
                 <View style={styles.quickCardText}>
                   <Text style={styles.quickCardLabel}>{t("tripType.arbeitsweg")}</Text>
                   <Text style={styles.quickCardSub}>Persönlich</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={15} color="#ccc" />
+                <View style={styles.quickChevron}>
+                  <Ionicons name="chevron-forward" size={14} color="#bbb" />
+                </View>
               </TouchableOpacity>
             </View>
             {gpsStatus === "denied" && (
@@ -814,28 +823,57 @@ const styles = StyleSheet.create({
   plateText: { fontSize: 13, fontWeight: "700" },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 17, fontWeight: "800", marginBottom: 12, letterSpacing: -0.2 },
-  quickCol: { flexDirection: "column" },
+  quickContainer: {
+    backgroundColor: "#e7e9ee",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 0.5,
+    borderColor: "#dcdfe6",
+  },
   quickCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    paddingVertical: 10,
+    borderRadius: 14,
+    borderLeftWidth: 5,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 6,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    elevation: 4,
   },
   quickCardIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  quickDivider: {
+    width: 1.5,
+    alignSelf: "stretch",
+    backgroundColor: "#e2e2e2",
+    marginHorizontal: 14,
+  },
+  quickCardText: { flex: 1 },
+  quickCardLabel: { fontSize: 15, fontWeight: "600", color: "#000" },
+  quickCardSub: { fontSize: 11, color: "#999", marginTop: 2 },
+  quickChevron: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#f5f5f7",
     alignItems: "center",
     justifyContent: "center",
   },
-  quickCardText: { flex: 1 },
-  quickCardLabel: { fontSize: 14, fontWeight: "500", color: "#000" },
-  quickCardSub: { fontSize: 11, color: "#999", marginTop: 1 },
   gpsBanner: {
     flexDirection: "row",
     alignItems: "center",
