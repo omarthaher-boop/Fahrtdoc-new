@@ -26,6 +26,7 @@ import {
   deleteExpense,
   loadExpenses,
   saveExpense,
+  updateExpense,
 } from '@/services/expenseService';
 import {
   analyzeReceipt,
@@ -213,6 +214,8 @@ function ExpenseFormFields({
         placeholder="z.B. Tanken Shell Autobahn"
         placeholderTextColor="#bbb"
         maxLength={80}
+        blurOnSubmit={false}
+        returnKeyType="next"
       />
 
       <Text style={labelStyle}>BETRAG (CHF) *</Text>
@@ -223,6 +226,8 @@ function ExpenseFormFields({
         placeholder="0.00"
         placeholderTextColor="#bbb"
         keyboardType="decimal-pad"
+        blurOnSubmit={false}
+        returnKeyType="next"
       />
 
       <Text style={labelStyle}>DATUM</Text>
@@ -233,6 +238,8 @@ function ExpenseFormFields({
         placeholder="JJJJ-MM-TT"
         placeholderTextColor="#bbb"
         maxLength={10}
+        blurOnSubmit={false}
+        returnKeyType="next"
       />
 
       <Text style={labelStyle}>FAHRT VERKNÜPFEN (OPTIONAL)</Text>
@@ -318,6 +325,10 @@ export default function ExpensesScreen() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [scanForm, setScanForm] = useState<FormState>(emptyForm());
   const [addForm, setAddForm] = useState<FormState>(emptyForm());
+
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editForm, setEditForm] = useState<FormState>(emptyForm());
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -534,6 +545,66 @@ export default function ExpensesScreen() {
     ]);
   };
 
+  const openEditModal = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditForm({
+      category: expense.category,
+      amount: expense.amount.toFixed(2),
+      description: expense.description,
+      date: expense.date,
+      linkedTripId: expense.linkedTripId ?? '',
+      note: expense.note ?? '',
+    });
+    setEditModalVisible(true);
+  };
+
+  const closeEditModal = () => {
+    Keyboard.dismiss();
+    setTimeout(() => {
+      setEditModalVisible(false);
+      setEditingExpense(null);
+      setEditForm(emptyForm());
+    }, 100);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingExpense) return;
+    const amountNum = parseFloat(editForm.amount.replace(',', '.'));
+    if (!editForm.description.trim() || !(amountNum > 0)) {
+      Alert.alert('Pflichtfelder', 'Bitte Beschreibung und Betrag (> 0) angeben.');
+      return;
+    }
+    Keyboard.dismiss();
+    const updated: Expense = {
+      ...editingExpense,
+      category: editForm.category,
+      amount: Math.round(amountNum * 100) / 100,
+      description: editForm.description.trim(),
+      date: editForm.date,
+      linkedTripId: editForm.linkedTripId || undefined,
+      note: editForm.note.trim() || undefined,
+    };
+    await updateExpense(updated);
+    await loadAllExpenses();
+    closeEditModal();
+  };
+
+  const handleDeleteFromEdit = () => {
+    if (!editingExpense) return;
+    Alert.alert('Eintrag löschen', 'Diesen Kosteneintrag wirklich löschen?', [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: 'Löschen',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteExpense(editingExpense.id);
+          await loadAllExpenses();
+          closeEditModal();
+        },
+      },
+    ]);
+  };
+
   const resetScanModal = () => {
     setScanStep(0);
     setImageUri(null);
@@ -571,46 +642,54 @@ export default function ExpensesScreen() {
 
     return (
       <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
-        <View
-          style={{
-            ...CARD_STYLE,
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 12,
-            marginBottom: 8,
-            gap: 12,
-          }}
+        <TouchableOpacity
+          onPress={() => openEditModal(item)}
+          activeOpacity={0.7}
         >
           <View
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              backgroundColor: cfg.color + '18',
+              ...CARD_STYLE,
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              padding: 12,
+              marginBottom: 8,
+              gap: 12,
             }}
           >
-            <Feather name={cfg.icon} size={16} color={cfg.color} />
-          </View>
-          <View style={{ flex: 1, flexShrink: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '500', color: '#000', flex: 1, flexShrink: 1 }} numberOfLines={2}>
-              {item.description}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-              <Text style={{ fontSize: 11, color: '#888' }}>{fmtDate(item.date)}</Text>
-              {item.receiptUri && (
-                <View style={{ backgroundColor: PRIMARY + '18', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, color: PRIMARY, fontWeight: '700' }}>Gescannt</Text>
-                </View>
-              )}
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                backgroundColor: cfg.color + '18',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Feather name={cfg.icon} size={16} color={cfg.color} />
+            </View>
+            <View style={{ flex: 1, flexShrink: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '500', color: '#000', flex: 1, flexShrink: 1 }} numberOfLines={2}>
+                {item.description}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                <Text style={{ fontSize: 11, color: '#888' }}>{fmtDate(item.date)}</Text>
+                {item.receiptUri && (
+                  <View style={{ backgroundColor: PRIMARY + '18', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 9, color: PRIMARY, fontWeight: '700' }}>Gescannt</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#c0392b' }}>
+                −CHF {item.amount.toFixed(2)}
+              </Text>
+              <Feather name="chevron-right" size={12} color="#ccc" />
             </View>
           </View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#c0392b' }}>
-            −CHF {item.amount.toFixed(2)}
-          </Text>
-        </View>
+        </TouchableOpacity>
       </Swipeable>
     );
   };
@@ -758,7 +837,7 @@ export default function ExpensesScreen() {
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: '#1a1a1a' }}>Beleg scannen</Text>
-              <TouchableOpacity onPress={closeScanModal}>
+              <TouchableOpacity onPress={() => { Keyboard.dismiss(); setTimeout(closeScanModal, 100); }}>
                 <Feather name="x" size={20} color="#888" />
               </TouchableOpacity>
             </View>
@@ -912,7 +991,7 @@ export default function ExpensesScreen() {
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#ccc', alignSelf: 'center', marginBottom: 16 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: '#1a1a1a' }}>Kosten manuell hinzufügen</Text>
-              <TouchableOpacity onPress={() => { setAddModalVisible(false); setAddForm(emptyForm()); }}>
+              <TouchableOpacity onPress={() => { Keyboard.dismiss(); setTimeout(() => { setAddModalVisible(false); setAddForm(emptyForm()); }, 100); }}>
                 <Feather name="x" size={20} color="#888" />
               </TouchableOpacity>
             </View>
@@ -938,6 +1017,62 @@ export default function ExpensesScreen() {
                 style={{ backgroundColor: PRIMARY, borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 4 }}
               >
                 <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Speichern</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // ── Edit Modal ────────────────────────────────────────────────────────────────
+
+  const EditModal = () => (
+    <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={closeEditModal}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#f2f2f7', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '93%', paddingTop: 12 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#ccc', alignSelf: 'center', marginBottom: 16 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
+              <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: '#1a1a1a' }}>Eintrag bearbeiten</Text>
+              <TouchableOpacity onPress={closeEditModal}>
+                <Feather name="x" size={20} color="#888" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.5, marginBottom: 10 }}>
+                KATEGORIE
+              </Text>
+              <CategoryGrid
+                selected={editForm.category}
+                onSelect={(c) => setEditForm((f) => ({ ...f, category: c }))}
+              />
+              <ExpenseFormFields
+                form={editForm}
+                onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
+                trips={trips}
+              />
+              <TouchableOpacity
+                onPress={handleSaveEdit}
+                style={{ backgroundColor: PRIMARY, borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 4 }}
+              >
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Speichern</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeleteFromEdit}
+                style={{ backgroundColor: '#fff', borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 10, borderWidth: 1.5, borderColor: '#c0392b' }}
+              >
+                <Text style={{ color: '#c0392b', fontSize: 15, fontWeight: '700' }}>Eintrag löschen</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={closeEditModal}
+                style={{ backgroundColor: '#f2f2f7', borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#e8e8e8' }}
+              >
+                <Text style={{ color: '#555', fontSize: 14, fontWeight: '600' }}>Abbrechen</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -992,6 +1127,7 @@ export default function ExpensesScreen() {
 
       <ScanModal />
       <AddModal />
+      <EditModal />
     </View>
   );
 }
