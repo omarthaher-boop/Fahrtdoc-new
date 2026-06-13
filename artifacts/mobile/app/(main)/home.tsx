@@ -246,14 +246,26 @@ export default function HomeScreen() {
     [trips, cutoff]
   );
 
-  const totalKm = useMemo(() => periodTrips.reduce((a, b) => a + b.km, 0), [periodTrips]);
-  const totalDur = useMemo(() => periodTrips.reduce((a, b) => a + b.dur, 0), [periodTrips]);
-  const businessCount = useMemo(() => periodTrips.filter((t) => t.type === "business").length, [periodTrips]);
-  const privateCount = useMemo(() => periodTrips.filter((t) => t.type === "private").length, [periodTrips]);
-  const businessKm = useMemo(() => periodTrips.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0), [periodTrips]);
-  const arbeitswegCount = useMemo(() => periodTrips.filter((t) => t.type === "arbeitsweg").length, [periodTrips]);
-  const arbeitswegKm = useMemo(() => periodTrips.filter((t) => t.type === "arbeitsweg").reduce((a, b) => a + b.km, 0), [periodTrips]);
-  const privateKm = useMemo(() => periodTrips.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0), [periodTrips]);
+  // Compute stats directly from trips+period so the React Compiler sees the
+  // dependency chain clearly and doesn't freeze values after addTrip().
+  const statsData = useMemo(() => {
+    const pt = trips.filter((t) => new Date(t.date) >= cutoff);
+    const bKm   = pt.filter((t) => t.type === "business").reduce((a, b) => a + b.km, 0);
+    const awKm  = pt.filter((t) => t.type === "arbeitsweg").reduce((a, b) => a + b.km, 0);
+    const pKm   = pt.filter((t) => t.type === "private").reduce((a, b) => a + b.km, 0);
+    return {
+      totalKm:       pt.reduce((a, b) => a + b.km, 0),
+      totalDur:      pt.reduce((a, b) => a + b.dur, 0),
+      businessCount: pt.filter((t) => t.type === "business").length,
+      privateCount:  pt.filter((t) => t.type === "private").length,
+      arbeitswegCount: pt.filter((t) => t.type === "arbeitsweg").length,
+      businessKm: bKm,
+      arbeitswegKm: awKm,
+      privateKm: pKm,
+    };
+  }, [trips, cutoff]);
+
+  const { totalKm, totalDur, businessCount, privateCount, arbeitswegCount, businessKm, arbeitswegKm, privateKm } = statsData;
 
   const openStartModal = (type: "business" | "private" | "arbeitsweg") => {
     if (activeTrip) {
