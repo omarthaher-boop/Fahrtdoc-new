@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -58,6 +59,7 @@ export default function ActiveTripBanner() {
   const { t, language } = useLanguage();
   const { activeTrip, paused, elapsed, stopTrip, togglePause, livePos, gpsTracking } = useApp();
   const tripSource = useTripSourcePlatform();
+  const router = useRouter();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const [showCombinedPauseSheet, setShowCombinedPauseSheet] = useState(false);
@@ -191,7 +193,11 @@ export default function ActiveTripBanner() {
 
   return (
     <>
-      <View style={[styles.banner, { backgroundColor: paused ? warningLight : colors.successLight, borderColor: paused ? warningColor : colors.success }]}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push("/(main)/tracking")}
+        style={[styles.banner, { backgroundColor: paused ? warningLight : colors.successLight, borderColor: paused ? warningColor : colors.success }]}
+      >
         <View style={styles.left}>
           <View style={styles.dotRow}>
             <Animated.View style={[styles.dot, { backgroundColor: paused ? warningColor : colors.success, opacity: pulseAnim }]} />
@@ -346,7 +352,7 @@ export default function ActiveTripBanner() {
             <Feather name="square" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Combined Pause Bottom Sheet */}
       <Modal
