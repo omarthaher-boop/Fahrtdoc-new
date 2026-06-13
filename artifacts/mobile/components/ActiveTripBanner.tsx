@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -94,7 +94,7 @@ export default function ActiveTripBanner() {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 700, useNativeDriver: Platform.OS !== "web" }),
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 700, useNativeDriver: Platform.OS !== "web" }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== "web" }),
       ])
     );
@@ -187,172 +187,142 @@ export default function ActiveTripBanner() {
     togglePause();
   };
 
-  const warningColor = colors.warning ?? "#FFB703";
-  const warningLight = colors.warningLight ?? "#FFF8E7";
-  const successDark = colors.successDark ?? "#059669";
+  const categoryLabel =
+    activeTrip.type === "business"
+      ? t("tripType.business")
+      : activeTrip.type === "arbeitsweg"
+      ? (language === "de" ? "Arbeitsweg" : "Commute")
+      : t("tripType.private");
 
   return (
     <>
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.9}
         onPress={() => router.push("/(main)/tracking")}
-        style={[styles.banner, { backgroundColor: paused ? warningLight : colors.successLight, borderColor: paused ? warningColor : colors.success }]}
+        style={styles.banner}
       >
-        <View style={styles.left}>
-          <View style={styles.dotRow}>
-            <Animated.View style={[styles.dot, { backgroundColor: paused ? warningColor : colors.success, opacity: pulseAnim }]} />
-            <Text style={[styles.label, { color: paused ? warningColor : successDark }]}>
-              {paused ? t("tracking.paused") : geocoding ? t("waypoint.locating") : t("tracking.active")}
+        {/* LEFT — pulsing navigate icon */}
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <View style={styles.iconCircle}>
+            <Ionicons
+              name={paused ? "pause-circle" : "navigate"}
+              size={20}
+              color="#4ade80"
+            />
+          </View>
+        </Animated.View>
+
+        {/* MIDDLE — title + subtitle */}
+        <View style={styles.middle}>
+          <View style={styles.titleRow}>
+            <Text style={styles.titleText} numberOfLines={1}>
+              {paused ? t("tracking.paused") : `Fahrt läuft · ${categoryLabel}`}
             </Text>
-            {paused && (
-              <View style={[styles.pausedBadge, { backgroundColor: warningColor }]}>
-                <Feather name="pause" size={10} color="#FFFFFF" />
-                <Text style={styles.pausedBadgeText}>{t("tracking.paused")}</Text>
-              </View>
-            )}
             {tripSource !== null && (
               <View style={styles.carplayBadge}>
                 <Feather
                   name={tripSource === "androidAuto" ? "smartphone" : "monitor"}
-                  size={10}
+                  size={9}
                   color="#FFFFFF"
                 />
-                <Text style={styles.carplayBadgeText}>
-                  {tripSource === "androidAuto"
-                    ? t("tracking.androidAutoSource")
-                    : t("tracking.carplaySource")}
-                </Text>
               </View>
             )}
           </View>
-
+          <Text style={styles.subtitleText} numberOfLines={1}>
+            {geocoding ? t("waypoint.locating") : `${fmtTime(elapsed)} · unterwegs`}
+          </Text>
           {!gpsTracking && (
-            <View style={[styles.gpsOffRow, { backgroundColor: warningLight, borderColor: warningColor }]}>
-              <Feather name="wifi-off" size={12} color={warningColor} />
-              <Text style={[styles.gpsOffText, { color: warningColor }]}>{t("tracking.gpsOff")}</Text>
+            <View style={styles.gpsOffRow}>
+              <Feather name="wifi-off" size={10} color="#fbbf24" />
+              <Text style={styles.gpsOffText}>{t("tracking.gpsOff")}</Text>
             </View>
-          )}
-
-
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Feather name="navigation" size={12} color={colors.success} />
-              <Text style={[styles.statNum, { color: colors.foreground }]}>
-                {activeTrip.distance.toFixed(1)}
-              </Text>
-              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>km</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Feather name="clock" size={12} color={colors.success} />
-              <Text style={[styles.statNum, { color: colors.foreground }]}>
-                {fmtTime(elapsed)}
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Feather name="briefcase" size={12} color={colors.primary} />
-              <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-                {activeTrip.type === "business" ? t("tripType.business") : t("tripType.private")}
-              </Text>
-            </View>
-            {(activeTrip.waypoints?.length ?? 0) > 0 && (
-              <>
-                <View style={styles.statDivider} />
-                <TouchableOpacity
-                  style={styles.stat}
-                  onPress={() => setShowWaypoints((v) => !v)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Feather name="map-pin" size={12} color={colors.primary} />
-                  <Text style={[styles.statUnit, { color: colors.mutedForeground }]}>
-                    {activeTrip.waypoints!.length}
-                  </Text>
-                  {activeTrip.waypoints!.some((wp) => wp.note) && (
-                    <Feather name="edit-2" size={10} color={colors.primary} />
-                  )}
-                  <Feather
-                    name={showWaypoints ? "chevron-up" : "chevron-down"}
-                    size={10}
-                    color={colors.mutedForeground}
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {(activeTrip.waypoints?.length ?? 0) > 0 && (
-            <Animated.View
-              style={[
-                styles.waypointList,
-                { borderColor: colors.border, backgroundColor: colors.background },
-                {
-                  height: waypointExpandAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, waypointContentHeight > 0 ? waypointContentHeight : 1],
-                  }),
-                  opacity: waypointExpandAnim,
-                  overflow: "hidden",
-                },
-              ]}
-            >
-              <View onLayout={(e) => setWaypointContentHeight(e.nativeEvent.layout.height)}>
-                {activeTrip.waypoints!.map((wp, i) => (
-                  <View
-                    key={wp.timestamp}
-                    style={[
-                      styles.waypointItem,
-                      i < activeTrip.waypoints!.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                    ]}
-                  >
-                    <View style={[styles.waypointBullet, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.waypointBulletText}>{i + 1}</Text>
-                    </View>
-                    <View style={styles.waypointContent}>
-                      <Text style={[styles.waypointAddr, { color: colors.foreground }]} numberOfLines={1}>
-                        {wp.addr}
-                      </Text>
-                      {wp.note ? (
-                        <View style={styles.waypointNoteRow}>
-                          <Feather name="edit-2" size={10} color={colors.primary} />
-                          <Text style={[styles.waypointNote, { color: colors.mutedForeground }]} numberOfLines={1}>
-                            {wp.note}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </Animated.View>
           )}
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity
-            onPress={handlePausePress}
-            disabled={geocoding}
-            style={[
-              styles.actionBtn,
-              paused
-                ? { backgroundColor: warningColor, borderColor: warningColor }
-                : { backgroundColor: colors.successLight, borderColor: colors.success },
-            ]}
-          >
-            {geocoding ? (
-              <ActivityIndicator size="small" color={successDark} />
-            ) : (
-              <Feather name={paused ? "play" : "pause"} size={16} color={paused ? "#FFFFFF" : successDark} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleStop}
-            disabled={geocoding}
-            style={[styles.stopBtn, { backgroundColor: geocoding ? colors.mutedForeground : colors.destructive }]}
-          >
-            <Feather name="square" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
+
+        {/* RIGHT — km + action buttons */}
+        <View style={styles.rightCol}>
+          <Text style={styles.kmText}>{activeTrip.distance.toFixed(1)} km</Text>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              onPress={handlePausePress}
+              disabled={geocoding}
+              style={styles.pauseBtn}
+            >
+              {geocoding ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name={paused ? "play" : "pause"} size={14} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleStop}
+              disabled={geocoding}
+              style={[styles.stopBtn, { backgroundColor: geocoding ? "rgba(255,255,255,0.2)" : "#e74c3c" }]}
+            >
+              <Ionicons name="stop" size={12} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
+
+      {/* Waypoints expandable list — rendered outside main banner row */}
+      {(activeTrip.waypoints?.length ?? 0) > 0 && (
+        <>
+          <TouchableOpacity
+            onPress={() => setShowWaypoints((v) => !v)}
+            style={styles.waypointToggle}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Feather name="map-pin" size={11} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.waypointToggleText}>
+              {activeTrip.waypoints!.length} {activeTrip.waypoints!.length === 1 ? "Stopp" : "Stopps"}
+            </Text>
+            <Feather
+              name={showWaypoints ? "chevron-up" : "chevron-down"}
+              size={11}
+              color="rgba(255,255,255,0.5)"
+            />
+          </TouchableOpacity>
+          <Animated.View
+            style={[
+              styles.waypointList,
+              {
+                height: waypointExpandAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, waypointContentHeight > 0 ? waypointContentHeight : 1],
+                }),
+                opacity: waypointExpandAnim,
+                overflow: "hidden",
+              },
+            ]}
+          >
+            <View onLayout={(e) => setWaypointContentHeight(e.nativeEvent.layout.height)}>
+              {activeTrip.waypoints!.map((wp, i) => (
+                <View
+                  key={wp.timestamp}
+                  style={[
+                    styles.waypointItem,
+                    i < activeTrip.waypoints!.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(255,255,255,0.12)" },
+                  ]}
+                >
+                  <View style={styles.waypointBullet}>
+                    <Text style={styles.waypointBulletText}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.waypointContent}>
+                    <Text style={styles.waypointAddr} numberOfLines={1}>{wp.addr}</Text>
+                    {wp.note ? (
+                      <View style={styles.waypointNoteRow}>
+                        <Feather name="edit-2" size={10} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.waypointNote} numberOfLines={1}>{wp.note}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        </>
+      )}
 
       {/* Combined Pause Bottom Sheet */}
       <Modal
@@ -440,78 +410,44 @@ export default function ActiveTripBanner() {
 }
 
 const styles = StyleSheet.create({
+  // ── Navy banner ────────────────────────────────────────────────────────────
   banner: {
+    backgroundColor: "#1a2b6b",
     borderRadius: 16,
-    borderWidth: 1.5,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 4,
   },
-  left: { flex: 1, gap: 8 },
-  dotRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  label: { fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
-  pausedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  pausedBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  carplayBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: "#6366F1",
-  },
-  carplayBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
-  gpsOffRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  gpsOffText: { fontSize: 11, fontWeight: "600", flexShrink: 1 },
-  restartBtn: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 70,
-    minHeight: 26,
   },
-  restartBtnText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
-  statsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  stat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  statNum: { fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums" as const] },
-  statUnit: { fontSize: 11 },
-  statDivider: { width: 1, height: 14, backgroundColor: "#E5E9F0" },
-  actions: { flexDirection: "row", gap: 8, marginLeft: 12 },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1.5,
+  middle: { flex: 1, gap: 3 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  titleText: { fontSize: 14, fontWeight: "500", color: "#fff", flexShrink: 1 },
+  subtitleText: { fontSize: 12, color: "rgba(255,255,255,0.65)", fontVariant: ["tabular-nums" as const] },
+  rightCol: { alignItems: "flex-end", gap: 6 },
+  kmText: { fontSize: 13, fontWeight: "500", color: "#4ade80", textAlign: "right" },
+  actionRow: { flexDirection: "row", gap: 8 },
+  pauseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
   stopBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -592,10 +528,46 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   sheetBtnSecondaryText: { fontSize: 14, fontWeight: "600" },
+  // ── GPS warning (inside dark banner) ──────────────────────────────────────
+  gpsOffRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  gpsOffText: { fontSize: 11, fontWeight: "600", color: "#fbbf24", flexShrink: 1 },
+  // ── CarPlay badge ──────────────────────────────────────────────────────────
+  carplayBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#6366F1",
+  },
+  // ── Waypoint toggle row ────────────────────────────────────────────────────
+  waypointToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 2,
+  },
+  waypointToggleText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.65)",
+    fontWeight: "500",
+  },
+  // ── Waypoint list ──────────────────────────────────────────────────────────
   waypointList: {
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     overflow: "hidden",
+    marginBottom: 8,
   },
   waypointItem: {
     flexDirection: "row",
@@ -612,10 +584,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 1,
     flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   waypointBulletText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
   waypointContent: { flex: 1, gap: 2 },
-  waypointAddr: { fontSize: 12, fontWeight: "600", lineHeight: 16 },
+  waypointAddr: { fontSize: 12, fontWeight: "600", lineHeight: 16, color: "rgba(255,255,255,0.85)" },
   waypointNoteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  waypointNote: { fontSize: 11, flex: 1, lineHeight: 15 },
+  waypointNote: { fontSize: 11, flex: 1, lineHeight: 15, color: "rgba(255,255,255,0.5)" },
 });
