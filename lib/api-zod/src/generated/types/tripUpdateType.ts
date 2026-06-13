@@ -12,4 +12,5 @@ export type TripUpdateType =
 export const TripUpdateType = {
   business: "business",
   private: "private",
+  arbeitsweg: "arbeitsweg",
 } as const;
