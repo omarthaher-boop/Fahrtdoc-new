@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -320,14 +321,46 @@ export default function ExpensesScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
 
-  const reload = useCallback(async () => {
+  const loadAllExpenses = useCallback(async () => {
     const data = await loadExpenses();
     setExpenses(data);
   }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    loadAllExpenses();
+  }, [loadAllExpenses]);
+
+  // BUG 2: Load total km from trips in same period
+  const [totalKm, setTotalKm] = useState(0);
+  useEffect(() => {
+    async function loadTripKm() {
+      try {
+        const raw = await AsyncStorage.getItem('trips');
+        if (!raw) { setTotalKm(0); return; }
+        const allTrips: unknown = JSON.parse(raw);
+        if (!Array.isArray(allTrips)) { setTotalKm(0); return; }
+        const now = new Date();
+        let from: Date;
+        if (period === '1 Mon.') from = new Date(now.getFullYear(), now.getMonth(), 1);
+        else if (period === '3 Mon.') from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        else if (period === '6 Mon.') from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        else from = new Date(now.getFullYear(), 0, 1);
+        const km = (allTrips as Record<string, unknown>[]).reduce((sum, t) => {
+          const d = new Date((t.startTime as number | undefined)
+            ? new Date(t.startTime as number).toISOString()
+            : ((t.date as string | undefined) ?? (t.createdAt as string | undefined) ?? ''));
+          if (d >= from && d <= now) {
+            return sum + (Number(t.km) || Number(t.distance) || 0);
+          }
+          return sum;
+        }, 0);
+        setTotalKm(km);
+      } catch {
+        setTotalKm(0);
+      }
+    }
+    loadTripKm();
+  }, [period]);
 
   // Run AI analysis when entering step 1
   useEffect(() => {
@@ -353,39 +386,63 @@ export default function ExpensesScreen() {
       .finally(() => setAnalysisLoading(false));
   }, [scanStep, imageUri]);
 
-  // ── Derived stats ─────────────────────────────────────────────────────────────
+  // ── Derived stats (BUG 1: all as useMemo) ────────────────────────────────────
 
-  const filtered = filterExpenses(expenses, period);
-  const filteredSorted = [...filtered].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-
-  const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
-
-  const filteredTrips = (() => {
+  const filteredExpenses = useMemo(() => {
     const now = new Date();
     let from: Date;
     if (period === '1 Mon.') from = new Date(now.getFullYear(), now.getMonth(), 1);
     else if (period === '3 Mon.') from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     else if (period === '6 Mon.') from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     else from = new Date(now.getFullYear(), 0, 1);
-    return trips.filter((t) => new Date(t.date) >= from);
-  })();
+    return expenses.filter((e) => {
+      const d = new Date(e.date);
+      return d >= from && d <= now;
+    });
+  }, [expenses, period]);
 
-  const totalTripKm = filteredTrips.reduce((s, t) => s + t.km, 0);
-  const costPerKm = totalTripKm > 0 ? totalAmount / totalTripKm : 0;
+  const filteredSorted = useMemo(
+    () => [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [filteredExpenses]
+  );
 
-  const kraftstoffTotal = filtered.filter((e) => e.category === 'kraftstoff').reduce((s, e) => s + e.amount, 0);
-  const wartungTotal = filtered.filter((e) => e.category === 'wartung').reduce((s, e) => s + e.amount, 0);
-  const parkTotal = filtered.filter((e) => e.category === 'parkgebuehr').reduce((s, e) => s + e.amount, 0);
-  const sonstigesTotal = filtered.filter((e) => e.category === 'sonstiges').reduce((s, e) => s + e.amount, 0);
+  const totalAmount = useMemo(
+    () => filteredExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
 
-  const categoryTotals: Record<ExpenseCategory, number> = {
-    kraftstoff: kraftstoffTotal,
-    wartung: wartungTotal,
-    parkgebuehr: parkTotal,
-    sonstiges: sonstigesTotal,
-  };
+  const kraftstoffTotal = useMemo(
+    () => filteredExpenses.filter((e) => e.category === 'kraftstoff').reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
+  const wartungTotal = useMemo(
+    () => filteredExpenses.filter((e) => e.category === 'wartung').reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
+  const parkTotal = useMemo(
+    () => filteredExpenses.filter((e) => e.category === 'parkgebuehr').reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
+  const sonstigesTotal = useMemo(
+    () => filteredExpenses.filter((e) => e.category === 'sonstiges').reduce((s, e) => s + (Number(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
+
+  // BUG 2: kostenProKm — null when no km data
+  const kostenProKm = useMemo<number | null>(() => {
+    if (totalKm <= 0 || totalAmount <= 0) return null;
+    return totalAmount / totalKm;
+  }, [totalAmount, totalKm]);
+
+  // BUG 5: category data — only categories with amount > 0
+  const categoryData = useMemo(() => {
+    return [
+      { key: 'kraftstoff' as ExpenseCategory, label: 'Kraftstoff', amount: kraftstoffTotal, color: '#e67e22', icon: 'droplet' as const },
+      { key: 'wartung' as ExpenseCategory, label: 'Wartung', amount: wartungTotal, color: '#27ae60', icon: 'tool' as const },
+      { key: 'parkgebuehr' as ExpenseCategory, label: 'Parkgebühr', amount: parkTotal, color: PRIMARY, icon: 'map-pin' as const },
+      { key: 'sonstiges' as ExpenseCategory, label: 'Sonstiges', amount: sonstigesTotal, color: '#8e44ad', icon: 'tag' as const },
+    ].filter((c) => c.amount > 0);
+  }, [kraftstoffTotal, wartungTotal, parkTotal, sonstigesTotal]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -436,7 +493,7 @@ export default function ExpensesScreen() {
       createdAt: new Date().toISOString(),
     };
     await saveExpense(expense);
-    await reload();
+    await loadAllExpenses();
     setScanStep(3);
   };
 
@@ -458,7 +515,7 @@ export default function ExpensesScreen() {
       createdAt: new Date().toISOString(),
     };
     await saveExpense(expense);
-    await reload();
+    await loadAllExpenses();
     setAddModalVisible(false);
     setAddForm(emptyForm());
   };
@@ -471,7 +528,7 @@ export default function ExpensesScreen() {
         style: 'destructive',
         onPress: async () => {
           await deleteExpense(id);
-          await reload();
+          await loadAllExpenses();
         },
       },
     ]);
@@ -537,8 +594,8 @@ export default function ExpensesScreen() {
           >
             <Feather name={cfg.icon} size={16} color={cfg.color} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1a1a1a' }} numberOfLines={1}>
+          <View style={{ flex: 1, flexShrink: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: '#000', flex: 1, flexShrink: 1 }} numberOfLines={2}>
               {item.description}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
@@ -594,7 +651,7 @@ export default function ExpensesScreen() {
           { label: 'Gesamt', value: `CHF ${totalAmount.toFixed(2)}`, icon: 'bar-chart-2' as const, color: PRIMARY },
           {
             label: 'Kosten/km',
-            value: totalTripKm > 0 ? `CHF ${costPerKm.toFixed(2)}` : '—',
+            value: kostenProKm !== null ? `CHF ${kostenProKm.toFixed(2)}/km` : '— CHF/km',
             icon: 'navigation' as const,
             color: '#27ae60',
           },
@@ -614,37 +671,29 @@ export default function ExpensesScreen() {
         ))}
       </View>
 
-      {/* Category distribution */}
-      {totalAmount > 0 && (
+      {/* Category distribution (BUG 5: only categories with amount > 0) */}
+      {categoryData.length > 0 && (
         <View style={{ ...CARD_STYLE, marginHorizontal: 14, padding: 14, marginBottom: 14 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.5, marginBottom: 12 }}>
             KOSTENVERTEILUNG
           </Text>
-          {CATEGORIES.map((cat) => {
-            const cfg = CATEGORY_CONFIG[cat];
-            const catTotal = categoryTotals[cat];
-            if (catTotal <= 0) return null;
-            const pct = (catTotal / totalAmount) * 100;
+          {categoryData.map((cat) => {
+            const barPct = totalAmount > 0
+              ? Math.round((cat.amount / totalAmount) * 100)
+              : 0;
             return (
-              <View key={cat} style={{ marginBottom: 10 }}>
+              <View key={cat.key} style={{ marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                    <Feather name={cfg.icon} size={13} color={cfg.color} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#555' }}>{cfg.label}</Text>
+                    <Feather name={cat.icon} size={13} color={cat.color} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#555' }}>{cat.label}</Text>
                   </View>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#1a1a1a' }}>
-                    CHF {catTotal.toFixed(2)}
+                    CHF {cat.amount.toFixed(2)}
                   </Text>
                 </View>
                 <View style={{ height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
-                  <View
-                    style={{
-                      height: 6,
-                      width: `${pct}%`,
-                      backgroundColor: cfg.color,
-                      borderRadius: 3,
-                    }}
-                  />
+                  <View style={{ height: 6, width: `${barPct}%` as `${number}%`, backgroundColor: cat.color, borderRadius: 3 }} />
                 </View>
               </View>
             );
