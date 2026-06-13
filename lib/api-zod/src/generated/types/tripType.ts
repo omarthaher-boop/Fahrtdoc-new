@@ -11,4 +11,5 @@ export type TripType = (typeof TripType)[keyof typeof TripType];
 export const TripType = {
   business: "business",
   private: "private",
+  arbeitsweg: "arbeitsweg",
 } as const;
