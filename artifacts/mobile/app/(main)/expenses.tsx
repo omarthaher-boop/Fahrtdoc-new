@@ -1044,6 +1044,14 @@ export default function ExpensesScreen() {
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
               showsVerticalScrollIndicator={false}
             >
+              {/* Receipt image preview */}
+              {editingExpense?.receiptUri && (
+                <Image
+                  source={{ uri: editingExpense.receiptUri }}
+                  style={{ width: '100%', height: 160, borderRadius: 12, resizeMode: 'cover', marginBottom: 14 }}
+                />
+              )}
+
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.5, marginBottom: 10 }}>
                 KATEGORIE
               </Text>
