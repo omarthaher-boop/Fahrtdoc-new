@@ -141,6 +141,7 @@ function ClassicMainTabs() {
         name="expenses"
         options={{
           title: "Kosten",
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <TabIcon
               isIOS={isIOS}
