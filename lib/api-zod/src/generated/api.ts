@@ -61,7 +61,8 @@ export const ListTripsResponseItem = zod.object({
   endLon: zod.number().optional(),
   km: zod.number(),
   dur: zod.number(),
-  type: zod.enum(["business", "private"]),
+  type: zod.enum(["business", "private", "arbeitsweg"]),
+  purpose: zod.string().optional(),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
   waypoints: zod
@@ -92,7 +93,8 @@ export const CreateTripBody = zod.object({
   endLon: zod.number().optional(),
   km: zod.number(),
   dur: zod.number(),
-  type: zod.enum(["business", "private"]),
+  type: zod.enum(["business", "private", "arbeitsweg"]),
+  purpose: zod.string().optional(),
   edited: zod.boolean().nullish(),
   waypoints: zod
     .array(
@@ -123,7 +125,8 @@ export const BatchUpsertTripsBody = zod.object({
       endLon: zod.number().optional(),
       km: zod.number(),
       dur: zod.number(),
-      type: zod.enum(["business", "private"]),
+      type: zod.enum(["business", "private", "arbeitsweg"]),
+      purpose: zod.string().optional(),
       edited: zod.boolean().nullish(),
       waypoints: zod
         .array(
@@ -151,7 +154,8 @@ export const BatchUpsertTripsResponseItem = zod.object({
   endLon: zod.number().optional(),
   km: zod.number(),
   dur: zod.number(),
-  type: zod.enum(["business", "private"]),
+  type: zod.enum(["business", "private", "arbeitsweg"]),
+  purpose: zod.string().optional(),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
   waypoints: zod
@@ -185,7 +189,8 @@ export const UpdateTripBody = zod.object({
   endLon: zod.number().nullish(),
   km: zod.number().optional(),
   dur: zod.number().optional(),
-  type: zod.enum(["business", "private"]).optional(),
+  type: zod.enum(["business", "private", "arbeitsweg"]).optional(),
+  purpose: zod.string().optional(),
   edited: zod.boolean().nullish(),
   waypoints: zod
     .array(
@@ -211,7 +216,8 @@ export const UpdateTripResponse = zod.object({
   endLon: zod.number().optional(),
   km: zod.number(),
   dur: zod.number(),
-  type: zod.enum(["business", "private"]),
+  type: zod.enum(["business", "private", "arbeitsweg"]),
+  purpose: zod.string().optional(),
   edited: zod.boolean().nullish(),
   deleted: zod.boolean(),
   waypoints: zod
