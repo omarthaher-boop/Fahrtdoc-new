@@ -32,6 +32,7 @@ import {
   analyzeReceipt,
   type AnalysisResult,
 } from '@/services/receiptAnalyzer';
+import { useMediaPermissions } from '@/hooks/useMediaPermissions';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -331,6 +332,7 @@ export default function ExpensesScreen() {
   const [editForm, setEditForm] = useState<FormState>(emptyForm());
 
   const scrollRef = useRef<ScrollView>(null);
+  const permissions = useMediaPermissions();
 
   const loadAllExpenses = useCallback(async () => {
     const data = await loadExpenses();
@@ -457,32 +459,64 @@ export default function ExpensesScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
-  const handlePickImage = async (mode: 'library' | 'camera' | 'document') => {
+  const handleOpenCamera = async () => {
+    const granted = await permissions.checkAndRequestCamera();
+    if (!granted) return;
     try {
-      if (mode === 'document') {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: ['image/*', 'application/pdf'],
-          copyToCacheDirectory: true,
-        });
-        if (!result.canceled && result.assets[0]) {
-          setImageUri(result.assets[0].uri);
-          setScanStep(1);
-        }
-        return;
-      }
-
-      const pick = mode === 'camera'
-        ? ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true })
-        : ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-
-      const result = await pick;
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
       if (!result.canceled && result.assets[0]) {
         setImageUri(result.assets[0].uri);
         setScanStep(1);
       }
-    } catch (err) {
-      Alert.alert('Fehler', 'Bild konnte nicht geladen werden.');
+    } catch {
+      Alert.alert('Fehler', 'Kamera konnte nicht geöffnet werden.');
     }
+  };
+
+  const handleOpenMediaLibrary = async () => {
+    const granted = await permissions.checkAndRequestMediaLibrary();
+    if (!granted) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsEditing: false,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+        setScanStep(1);
+      }
+    } catch {
+      Alert.alert('Fehler', 'Mediathek konnte nicht geöffnet werden.');
+    }
+  };
+
+  const handleScanDocument = async () => {
+    const granted = await permissions.checkAndRequestCamera();
+    if (!granted) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+        setScanStep(1);
+      }
+    } catch {
+      Alert.alert('Fehler', 'Dokument konnte nicht geöffnet werden.');
+    }
+  };
+
+  const handleOpenScanModal = async () => {
+    await permissions.requestPermissions();
+    resetScanModal();
+    setScanModalVisible(true);
   };
 
   const handleSaveScan = async () => {
@@ -589,20 +623,29 @@ export default function ExpensesScreen() {
     closeEditModal();
   };
 
-  const handleDeleteFromEdit = () => {
+  const handleDeleteExpense = () => {
     if (!editingExpense) return;
-    Alert.alert('Eintrag löschen', 'Diesen Kosteneintrag wirklich löschen?', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteExpense(editingExpense.id);
-          await loadAllExpenses();
-          closeEditModal();
+    Alert.alert(
+      'Eintrag löschen',
+      'Möchtest du diesen Eintrag wirklich löschen?',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Löschen',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteExpense(editingExpense.id);
+              await loadAllExpenses();
+              setEditModalVisible(false);
+              setEditingExpense(null);
+            } catch {
+              Alert.alert('Fehler', 'Eintrag konnte nicht gelöscht werden.');
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const resetScanModal = () => {
@@ -782,7 +825,7 @@ export default function ExpensesScreen() {
 
       {/* Scan banner */}
       <TouchableOpacity
-        onPress={() => { resetScanModal(); setScanModalVisible(true); }}
+        onPress={() => { void handleOpenScanModal(); }}
         style={{
           backgroundColor: PRIMARY,
           borderRadius: 12,
@@ -857,13 +900,13 @@ export default function ExpensesScreen() {
                     Beleg aufnehmen
                   </Text>
                   {[
-                    { mode: 'library' as const, icon: 'image' as const, label: 'Mediathek', sub: 'Bild aus Fotos wählen' },
-                    { mode: 'camera' as const, icon: 'camera' as const, label: 'Kamera', sub: 'Beleg fotografieren' },
-                    { mode: 'document' as const, icon: 'file-text' as const, label: 'Dokument scannen', sub: 'PDF oder Bilddatei' },
+                    { handler: handleOpenMediaLibrary, icon: 'image' as const, label: 'Mediathek', sub: 'Bild aus Fotos wählen' },
+                    { handler: handleOpenCamera, icon: 'camera' as const, label: 'Kamera', sub: 'Beleg fotografieren' },
+                    { handler: handleScanDocument, icon: 'file-text' as const, label: 'Dokument scannen', sub: 'PDF oder Bilddatei' },
                   ].map((opt) => (
                     <TouchableOpacity
-                      key={opt.mode}
-                      onPress={() => handlePickImage(opt.mode)}
+                      key={opt.label}
+                      onPress={opt.handler}
                       style={{
                         ...CARD_STYLE,
                         flexDirection: 'row',
@@ -1071,10 +1114,10 @@ export default function ExpensesScreen() {
                 <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Speichern</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleDeleteFromEdit}
-                style={{ backgroundColor: '#fff', borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 10, borderWidth: 1.5, borderColor: '#c0392b' }}
+                onPress={handleDeleteExpense}
+                style={{ backgroundColor: '#fff', borderRadius: 12, padding: 15, alignItems: 'center', marginTop: 10, borderWidth: 1.5, borderColor: '#e74c3c' }}
               >
-                <Text style={{ color: '#c0392b', fontSize: 15, fontWeight: '700' }}>Eintrag löschen</Text>
+                <Text style={{ color: '#e74c3c', fontSize: 15, fontWeight: '500' }}>Eintrag löschen</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={closeEditModal}
