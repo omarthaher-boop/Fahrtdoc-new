@@ -138,6 +138,21 @@ function ClassicMainTabs() {
         }}
       />
       <Tabs.Screen
+        name="expenses"
+        options={{
+          title: "Kosten",
+          tabBarIcon: ({ color }) => (
+            <TabIcon
+              isIOS={isIOS}
+              symbolName="creditcard"
+              featherName="credit-card"
+              color={color}
+              tracking={false}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: t("nav.profile"),
