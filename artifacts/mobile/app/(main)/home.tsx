@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -397,59 +397,61 @@ export default function HomeScreen() {
         {!activeTrip && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("home.quickStart")}</Text>
-            <View style={styles.quickRow}>
+            <View style={styles.quickCol}>
+              {/* Geschäftsreise */}
               <TouchableOpacity
-                style={[
-                  styles.quickBtn,
-                  { backgroundColor: "#EEF2FF", borderColor: suggestedType === "business" ? "#6366F1" : "#C7D2FE" },
-                  suggestedType === "business" && styles.quickBtnSuggested,
-                ]}
+                style={[styles.quickCard, { borderLeftColor: "#1a2b6b" }]}
                 onPress={() => openStartModal("business")}
                 disabled={starting}
+                activeOpacity={0.7}
                 testID="start-business"
               >
-                <View style={[styles.quickIcon, { backgroundColor: "#6366F1" }]}>
-                  <Feather name="briefcase" size={22} color="#FFFFFF" />
+                <View style={[styles.quickCardIcon, { backgroundColor: "#1a2b6b" }]}>
+                  <Ionicons name="briefcase" size={17} color="#fff" />
                 </View>
-                <Text style={[styles.quickLabel, { color: "#312E81" }]}>{t("home.businessTrip")}</Text>
-                <Text style={[styles.quickSub, { color: "#6366F1" }]}>{t("home.businessSub")}</Text>
-                <Feather name="arrow-right" size={16} color="#6366F1" style={styles.quickArrow} />
+                <View style={styles.quickCardText}>
+                  <Text style={styles.quickCardLabel}>{t("home.businessTrip")}</Text>
+                  <Text style={styles.quickCardSub}>Arbeit &amp; Dienst</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={15} color="#ccc" />
               </TouchableOpacity>
 
+              {/* Private Fahrt */}
               <TouchableOpacity
-                style={[
-                  styles.quickBtn,
-                  { backgroundColor: "#F0FDF4", borderColor: suggestedType === "private" ? "#22C55E" : "#86EFAC" },
-                  suggestedType === "private" && styles.quickBtnSuggested,
-                ]}
+                style={[styles.quickCard, { borderLeftColor: "#27ae60" }]}
                 onPress={() => openStartModal("private")}
                 disabled={starting}
+                activeOpacity={0.7}
                 testID="start-private"
               >
-                <View style={[styles.quickIcon, { backgroundColor: "#22C55E" }]}>
-                  <Feather name="user" size={22} color="#FFFFFF" />
+                <View style={[styles.quickCardIcon, { backgroundColor: "#27ae60" }]}>
+                  <Ionicons name="person" size={17} color="#fff" />
                 </View>
-                <Text style={[styles.quickLabel, { color: "#14532D" }]}>{t("home.privateTrip")}</Text>
-                <Text style={[styles.quickSub, { color: "#16A34A" }]}>{t("home.privateSub")}</Text>
-                <Feather name="arrow-right" size={16} color="#16A34A" style={styles.quickArrow} />
+                <View style={styles.quickCardText}>
+                  <Text style={styles.quickCardLabel}>{t("home.privateTrip")}</Text>
+                  <Text style={styles.quickCardSub}>Persönlich</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={15} color="#ccc" />
+              </TouchableOpacity>
+
+              {/* Arbeitsweg */}
+              <TouchableOpacity
+                style={[styles.quickCard, { borderLeftColor: "#e65100", marginBottom: 0 }]}
+                onPress={() => openStartModal("arbeitsweg")}
+                disabled={starting}
+                activeOpacity={0.7}
+                testID="start-arbeitsweg"
+              >
+                <View style={[styles.quickCardIcon, { backgroundColor: "#e65100" }]}>
+                  <Ionicons name="home" size={17} color="#fff" />
+                </View>
+                <View style={styles.quickCardText}>
+                  <Text style={styles.quickCardLabel}>{t("tripType.arbeitsweg")}</Text>
+                  <Text style={styles.quickCardSub}>Persönlich</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={15} color="#ccc" />
               </TouchableOpacity>
             </View>
-            {/* Arbeitsweg full-width button */}
-            <TouchableOpacity
-              style={[styles.quickBtnWide, { backgroundColor: "#fff3e0", borderColor: "#f57c00" }]}
-              onPress={() => openStartModal("arbeitsweg")}
-              disabled={starting}
-              testID="start-arbeitsweg"
-            >
-              <View style={[styles.quickIcon, { backgroundColor: "#e65100" }]}>
-                <Feather name="home" size={22} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.quickLabel, { color: "#bf360c" }]}>{t("tripType.arbeitsweg")}</Text>
-                <Text style={[styles.quickSub, { color: "#e65100" }]}>{t("home.privateSub")}</Text>
-              </View>
-              <Feather name="arrow-right" size={16} color="#e65100" style={styles.quickArrow} />
-            </TouchableOpacity>
             {gpsStatus === "denied" && (
               <View style={[styles.gpsBanner, { backgroundColor: colors.warningLight ?? "#FFF8E7", borderColor: colors.warning ?? "#FFB703" }]}>
                 <Feather name="alert-circle" size={14} color={colors.warning ?? "#FFB703"} />
@@ -812,35 +814,28 @@ const styles = StyleSheet.create({
   plateText: { fontSize: 13, fontWeight: "700" },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 17, fontWeight: "800", marginBottom: 12, letterSpacing: -0.2 },
-  quickRow: { flexDirection: "row", gap: 12 },
-  quickBtn: {
-    flex: 1,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    padding: 16,
-    gap: 8,
-  },
-  quickBtnSuggested: {
-    borderWidth: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  quickIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  quickLabel: { fontSize: 14, fontWeight: "700" },
-  quickSub: { fontSize: 12 },
-  quickArrow: { alignSelf: "flex-end" },
-  quickBtnWide: {
+  quickCol: { flexDirection: "column" },
+  quickCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 18,
-    borderWidth: 1.5,
-    padding: 16,
     gap: 12,
-    marginTop: 12,
+    marginBottom: 6,
   },
+  quickCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickCardText: { flex: 1 },
+  quickCardLabel: { fontSize: 14, fontWeight: "500", color: "#000" },
+  quickCardSub: { fontSize: 11, color: "#999", marginTop: 1 },
   gpsBanner: {
     flexDirection: "row",
     alignItems: "center",
