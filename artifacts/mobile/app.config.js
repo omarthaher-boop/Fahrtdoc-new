@@ -12,4 +12,9 @@ module.exports = {
       },
     },
   },
+  extra: {
+    ...(expo.extra ?? {}),
+    anthropicApiKey: process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '',
+    eas: expo.extra?.eas,
+  },
 };
