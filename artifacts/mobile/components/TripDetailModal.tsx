@@ -1,6 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -12,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TripRouteMap from "@/components/TripRouteMap";
+import FullScreenMapModal from "@/components/FullScreenMapModal";
 import { Trip, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
@@ -52,11 +55,20 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
 
   const [noteText, setNoteText] = useState(trip?.note ?? "");
   const [noteSaved, setNoteSaved] = useState(false);
+  const [mapFullScreen, setMapFullScreen] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setNoteText(trip?.note ?? "");
     setNoteSaved(false);
   }, [trip?.id]);
+
+  const handleBannerPress = () => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+    setTimeout(() => noteInputRef.current?.focus(), 350);
+  };
 
   if (!trip) return null;
 
@@ -68,9 +80,13 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
   const waypoints = trip.waypoints ?? [];
 
   const handleSaveNote = () => {
+    Keyboard.dismiss();
     editTrip(trip.id, { note: noteText.trim() });
     setNoteSaved(true);
-    setTimeout(() => setNoteSaved(false), 2000);
+    setTimeout(() => {
+      setNoteSaved(false);
+      onClose();
+    }, 800);
   };
 
   const noteChanged = noteText.trim() !== (trip.note ?? "").trim();
@@ -82,7 +98,10 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View
           style={[
             styles.sheet,
@@ -93,6 +112,27 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
           ]}
         >
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+          {/* Note banner — shown above the scroll area for immediate visibility */}
+          {!!trip.note && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleBannerPress}
+              style={[
+                styles.noteBanner,
+                { backgroundColor: colors.accent, borderColor: colors.primary + "40" },
+              ]}
+            >
+              <Feather name="file-text" size={13} color={colors.primary} style={{ flexShrink: 0 }} />
+              <Text
+                style={[styles.noteBannerText, { color: colors.foreground }]}
+                numberOfLines={3}
+              >
+                {trip.note}
+              </Text>
+              <Feather name="edit-2" size={12} color={colors.primary} style={{ flexShrink: 0, opacity: 0.6 }} />
+            </TouchableOpacity>
+          )}
 
           {/* Header row */}
           <View style={styles.headerRow}>
@@ -121,6 +161,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
           </View>
 
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
@@ -129,7 +170,29 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               {t("detail.routeLabel")}
             </Text>
-            <TripRouteMap trip={trip} path={trip.path} />
+            <View style={styles.mapWrapper}>
+              <TripRouteMap trip={trip} path={trip.path} />
+              {/* Full-coverage transparent overlay — tapping anywhere on the map expands it */}
+              <TouchableOpacity
+                style={styles.mapTapOverlay}
+                onPress={() => setMapFullScreen(true)}
+                activeOpacity={1}
+              />
+              {/* Visible expand icon in the corner as an affordance */}
+              <TouchableOpacity
+                style={[styles.expandBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setMapFullScreen(true)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Feather name="maximize-2" size={13} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+            <FullScreenMapModal
+              trip={trip}
+              path={trip.path}
+              visible={mapFullScreen}
+              onClose={() => setMapFullScreen(false)}
+            />
 
             {/* Route summary */}
             <Text
@@ -323,6 +386,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
             </Text>
             <View style={[styles.noteCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <TextInput
+                ref={noteInputRef}
                 style={[styles.noteInput, { color: colors.foreground }]}
                 value={noteText}
                 onChangeText={(v) => { setNoteText(v); setNoteSaved(false); }}
@@ -332,6 +396,10 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
                 numberOfLines={3}
                 maxLength={500}
                 textAlignVertical="top"
+                scrollEnabled={false}
+                onFocus={() => {
+                  setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+                }}
               />
               {noteChanged && (
                 <TouchableOpacity
@@ -364,7 +432,7 @@ export default function TripDetailModal({ trip, visible, onClose }: Props) {
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -428,6 +496,25 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 8,
+  },
+  mapWrapper: {
+    position: "relative",
+  },
+  mapTapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  expandBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   sectionLabel: {
     fontSize: 10,
@@ -568,5 +655,21 @@ const styles = StyleSheet.create({
   closeFullBtnText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  noteBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  noteBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    fontStyle: "italic",
   },
 });
