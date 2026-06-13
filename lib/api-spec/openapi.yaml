@@ -328,7 +328,9 @@ components:
           type: integer
         type:
           type: string
-          enum: [business, private]
+          enum: [business, private, arbeitsweg]
+        purpose:
+          type: string
         edited:
           type: ["boolean", "null"]
         deleted:
@@ -364,7 +366,9 @@ components:
           type: integer
         type:
           type: string
-          enum: [business, private]
+          enum: [business, private, arbeitsweg]
+        purpose:
+          type: string
         edited:
           type: ["boolean", "null"]
         waypoints:
@@ -382,20 +386,22 @@ components:
         endAddr:
           type: string
         startLat:
-          type: number
+          type: ["number", "null"]
         startLon:
-          type: number
+          type: ["number", "null"]
         endLat:
-          type: number
+          type: ["number", "null"]
         endLon:
-          type: number
+          type: ["number", "null"]
         km:
           type: number
         dur:
           type: integer
         type:
           type: string
-          enum: [business, private]
+          enum: [business, private, arbeitsweg]
+        purpose:
+          type: string
         edited:
           type: ["boolean", "null"]
         waypoints:
